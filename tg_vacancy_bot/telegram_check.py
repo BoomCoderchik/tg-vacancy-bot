@@ -17,6 +17,7 @@ class TelegramCheckResult:
     target_type: str
     membership_status: str
     can_post_messages: bool
+    operator_allowlist_enabled: bool
 
 
 def format_check_result(result: TelegramCheckResult) -> str:
@@ -28,6 +29,7 @@ def format_check_result(result: TelegramCheckResult) -> str:
             f"Target: {result.target_title} ({result.target_type})",
             f"Bot membership: {result.membership_status}",
             f"Can post messages: {post_status}",
+            f"Operator allowlist: {'on' if result.operator_allowlist_enabled else 'off'}",
         ]
     )
 
@@ -49,6 +51,7 @@ async def check_telegram_access(settings: Settings) -> TelegramCheckResult:
             target_type=str(chat.type),
             membership_status=str(status),
             can_post_messages=_can_post_messages(member),
+            operator_allowlist_enabled=bool(settings.operator_user_ids),
         )
     except TelegramAPIError as exc:
         raise RuntimeError(f"Telegram API check failed: {exc.message}") from exc

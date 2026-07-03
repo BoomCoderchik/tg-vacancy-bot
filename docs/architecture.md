@@ -19,6 +19,7 @@
 - `tg-vacancy-bot check-telegram`
   - Calls the real Telegram API.
   - Validates the bot token, target chat visibility, and bot membership/posting status.
+  - Reports whether the operator allowlist is enabled without printing user IDs.
   - Does not print the bot token.
 
 - `tg-vacancy-bot preview-message`

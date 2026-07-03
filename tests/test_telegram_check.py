@@ -8,6 +8,7 @@ def test_format_check_result_does_not_include_token() -> None:
         target_type="channel",
         membership_status="administrator",
         can_post_messages=True,
+        operator_allowlist_enabled=True,
     )
 
     text = format_check_result(result)
@@ -16,4 +17,6 @@ def test_format_check_result_does_not_include_token() -> None:
     assert "@vacancy_bot" in text
     assert "IT Jobs" in text
     assert "Can post messages: yes" in text
+    assert "Operator allowlist: on" in text
     assert "TOKEN" not in text
+    assert "123456" not in text
