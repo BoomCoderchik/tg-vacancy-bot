@@ -12,11 +12,19 @@
   - Publishes new deduplicated vacancies to `TARGET_CHAT_ID`.
   - Useful for external schedulers or manual testing.
 
+- `tg-vacancy-bot check-telegram`
+  - Calls the real Telegram API.
+  - Validates the bot token, target chat visibility, and bot membership/posting status.
+  - Does not print the bot token.
+
 ## Modules
 
 - `tg_vacancy_bot/config.py`
   - Loads private runtime configuration from `.env`.
   - Requires `TELEGRAM_BOT_TOKEN` and `TARGET_CHAT_ID` for real publishing.
+
+- `tg_vacancy_bot/telegram_check.py`
+  - Real Telegram API diagnostics for setup verification.
 
 - `tg_vacancy_bot/bot.py`
   - Telegram message handlers.

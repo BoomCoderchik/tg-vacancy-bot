@@ -38,6 +38,12 @@ Fill in `.env`, then run:
 tg-vacancy-bot run
 ```
 
+Before running the bot continuously, validate the real Telegram integration:
+
+```powershell
+tg-vacancy-bot check-telegram
+```
+
 To poll public sources once and publish new vacancies:
 
 ```powershell

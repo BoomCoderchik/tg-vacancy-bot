@@ -11,6 +11,7 @@ from .config import get_settings
 from .publisher import TelegramPublisher
 from .sources import build_adapters, filter_it_vacancies
 from .storage import VacancyStore
+from .telegram_check import check_telegram_access, format_check_result
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -18,6 +19,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("run", help="Run Telegram bot polling.")
     subparsers.add_parser("poll-once", help="Poll public sources once and publish new vacancies.")
+    subparsers.add_parser("check-telegram", help="Validate bot token, target chat access, and posting permissions.")
     return parser
 
 
@@ -57,6 +59,11 @@ def main(argv: Sequence[str] | None = None) -> None:
 
         if args.command == "poll-once":
             asyncio.run(poll_once())
+            return
+
+        if args.command == "check-telegram":
+            result = asyncio.run(check_telegram_access(settings))
+            print(format_check_result(result))
             return
     except RuntimeError as exc:
         print(f"Error: {exc}", file=sys.stderr)
