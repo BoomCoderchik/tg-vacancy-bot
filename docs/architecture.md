@@ -25,6 +25,9 @@
 - `tg_vacancy_bot/parser.py`
   - Extracts URL, title, stack, location, salary, and source from free-form vacancy text.
 
+- `tg_vacancy_bot/intake.py`
+  - Rejects forwarded text that does not look like an IT vacancy before formatting/publishing.
+
 - `tg_vacancy_bot/telegram_origin.py`
   - Extracts public `https://t.me/...` links from forwarded Telegram channel metadata.
 
@@ -61,6 +64,7 @@ Do not replace missing external services with fake data. If a token, chat ID, AP
 For `@it_jobs_board`-style intake:
 
 - If you forward a message to the bot in `normalize` mode, it parses the text and publishes a clean card.
+- In `normalize` mode, obvious non-vacancy messages are skipped.
 - If the forwarded source is a public Telegram channel, the card link can point back to the original `t.me/channel/message_id`.
 - If `FORWARDED_MODE=copy`, the bot copies the original incoming message to the target chat.
 
