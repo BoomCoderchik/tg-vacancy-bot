@@ -31,7 +31,11 @@ async def poll_once() -> None:
         total = 0
         published = 0
         for adapter in build_adapters(settings):
-            vacancies = await adapter.fetch()
+            try:
+                vacancies = await adapter.fetch()
+            except Exception:
+                logging.exception("%s: source fetch failed", adapter.name)
+                continue
             filtered = filter_it_vacancies(vacancies)
             total += len(filtered)
             published += await publisher.publish_new(filtered)

@@ -20,7 +20,13 @@ class Settings(BaseSettings):
 
     adzuna_app_id: str = Field(default="", alias="ADZUNA_APP_ID")
     adzuna_app_key: str = Field(default="", alias="ADZUNA_APP_KEY")
+    adzuna_country: str = Field(default="us", alias="ADZUNA_COUNTRY")
+    adzuna_query: str = Field(default="software developer", alias="ADZUNA_QUERY")
+    adzuna_location: str = Field(default="", alias="ADZUNA_LOCATION")
+
     jooble_api_key: str = Field(default="", alias="JOOBLE_API_KEY")
+    jooble_keywords: str = Field(default="software developer", alias="JOOBLE_KEYWORDS")
+    jooble_location: str = Field(default="", alias="JOOBLE_LOCATION")
 
     def require_runtime(self) -> None:
         missing = []
