@@ -70,6 +70,12 @@ Or:
 tg-vacancy-bot preview-message --file .\sample-message.txt
 ```
 
+To publish that same normalized card to the real target chat after `.env` is configured:
+
+```powershell
+tg-vacancy-bot publish-message --file .\sample-message.txt
+```
+
 ## Forwarded Message Flow
 
 Send or forward a vacancy message to the bot. In `normalize` mode, the bot will publish a card like:

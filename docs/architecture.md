@@ -28,6 +28,11 @@
   - Prints the Telegram card HTML without publishing anything.
   - Useful for checking forwarded-message parser quality before enabling live posting.
 
+- `tg-vacancy-bot publish-message`
+  - Parses one local UTF-8 message file.
+  - Publishes the normalized vacancy to the real `TARGET_CHAT_ID`.
+  - Uses the same deduplication store as source polling.
+
 ## Modules
 
 - `tg_vacancy_bot/config.py`

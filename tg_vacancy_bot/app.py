@@ -11,7 +11,7 @@ from .bot import run_bot_sync
 from .console import write_stdout
 from .config import get_settings
 from .env_setup import init_env_file
-from .preview import preview_message_card
+from .preview import parse_publishable_message, preview_message_card
 from .publisher import TelegramPublisher
 from .sources import build_adapters, filter_it_vacancies
 from .storage import VacancyStore
@@ -27,6 +27,8 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("check-telegram", help="Validate bot token, target chat access, and posting permissions.")
     preview_parser = subparsers.add_parser("preview-message", help="Parse message text and print the Telegram card HTML.")
     preview_parser.add_argument("--file", help="Read message text from a UTF-8 file instead of stdin.")
+    publish_parser = subparsers.add_parser("publish-message", help="Publish one normalized vacancy from UTF-8 text.")
+    publish_parser.add_argument("--file", required=True, help="Read message text from a UTF-8 file.")
     return parser
 
 
@@ -51,6 +53,18 @@ async def poll_once() -> None:
             published += await publisher.publish_new(filtered)
             logging.info("%s: fetched=%s filtered=%s", adapter.name, len(vacancies), len(filtered))
         logging.info("Done. candidates=%s published=%s", total, published)
+    finally:
+        await publisher.close()
+
+
+async def publish_message_file(file_path: str) -> int:
+    settings = get_settings()
+    settings.require_runtime()
+    store = VacancyStore(settings.database_path)
+    publisher = TelegramPublisher(settings, store)
+    text = Path(file_path).read_text(encoding="utf-8")
+    try:
+        return await publisher.publish_new([parse_publishable_message(text)])
     finally:
         await publisher.close()
 
@@ -80,6 +94,11 @@ def main(argv: Sequence[str] | None = None) -> None:
         if args.command == "preview-message":
             text = Path(args.file).read_text(encoding="utf-8") if args.file else sys.stdin.read()
             write_stdout(preview_message_card(text))
+            return
+
+        if args.command == "publish-message":
+            count = asyncio.run(publish_message_file(args.file))
+            write_stdout(f"Published: {count}")
             return
     except RuntimeError as exc:
         print(f"Error: {exc}", file=sys.stderr)
