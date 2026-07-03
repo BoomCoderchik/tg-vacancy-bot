@@ -24,6 +24,7 @@
 
 - `tg_vacancy_bot/parser.py`
   - Extracts URL, title, stack, location, salary, and source from free-form vacancy text.
+  - Reads labeled fields such as `Location`, `Локация`, `Stack`, `Стек`, `Salary`, `Зарплата`, and `Company`.
 
 - `tg_vacancy_bot/intake.py`
   - Rejects forwarded text that does not look like an IT vacancy before formatting/publishing.

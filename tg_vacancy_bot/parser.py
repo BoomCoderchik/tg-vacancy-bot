@@ -72,6 +72,15 @@ SALARY_RE = re.compile(
     re.IGNORECASE,
 )
 
+FIELD_LABELS = {
+    "location": ("location", "локация", "локации", "место", "формат"),
+    "stack": ("stack", "стек", "технологии", "skills", "tech stack"),
+    "salary": ("salary", "зарплата", "вилка", "compensation", "rate"),
+    "company": ("company", "компания"),
+}
+
+LABEL_RE = re.compile(r"^\s*(?:[^\wа-яА-ЯёЁ$€£₽]+)?(?P<label>[\wа-яА-ЯёЁ ]{2,24})\s*[:：-]\s*(?P<value>.+?)\s*$", re.IGNORECASE)
+
 
 def extract_urls(text: str) -> list[str]:
     urls = [url.rstrip(".,;") for url in URL_RE.findall(text or "")]
@@ -94,6 +103,30 @@ def extract_stack(text: str) -> tuple[str, ...]:
     if "SQL" in found and any(item in found for item in sql_specific):
         found.remove("SQL")
     return tuple(found)
+
+
+def extract_labeled_fields(text: str) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    for line in text.splitlines():
+        match = LABEL_RE.match(line)
+        if not match:
+            continue
+        label = " ".join(match.group("label").lower().split())
+        value = match.group("value").strip()
+        for field_name, aliases in FIELD_LABELS.items():
+            if label in aliases and value:
+                fields.setdefault(field_name, value[:500])
+                break
+    return fields
+
+
+def remove_labeled_lines(text: str) -> str:
+    kept = []
+    for line in text.splitlines():
+        if LABEL_RE.match(line):
+            continue
+        kept.append(line)
+    return "\n".join(kept).strip()
 
 
 def guess_title(text: str) -> str:
@@ -128,6 +161,20 @@ def guess_location(text: str) -> str | None:
     return None
 
 
+def parse_stack_value(value: str) -> tuple[str, ...]:
+    parts = [part.strip(" •,;") for part in re.split(r"[,;/|]+", value) if part.strip(" •,;")]
+    if not parts:
+        return extract_stack(value)
+
+    known = extract_stack(value)
+    combined = [*parts, *known]
+    result: list[str] = []
+    for item in combined:
+        if item and item not in result:
+            result.append(item)
+    return tuple(result)
+
+
 def guess_salary(text: str) -> str | None:
     match = SALARY_RE.search(text)
     if not match:
@@ -153,11 +200,12 @@ def parse_message_to_vacancy(text: str, fallback_source: str = "Telegram") -> Va
     source = detect_source(primary_url) if primary_url else fallback_source
 
     without_urls = URL_RE.sub("", cleaned).strip()
+    labeled_fields = extract_labeled_fields(without_urls)
     title = guess_title(without_urls or cleaned)
-    location = guess_location(without_urls)
-    salary = guess_salary(without_urls)
-    stack = extract_stack(without_urls)
-    description = without_urls
+    location = labeled_fields.get("location") or guess_location(without_urls)
+    salary = labeled_fields.get("salary") or guess_salary(without_urls)
+    stack = parse_stack_value(labeled_fields["stack"]) if "stack" in labeled_fields else extract_stack(without_urls)
+    description = remove_labeled_lines(without_urls)
 
     if description.startswith(title):
         description = description[len(title) :].strip(" \n:-")
@@ -168,6 +216,7 @@ def parse_message_to_vacancy(text: str, fallback_source: str = "Telegram") -> Va
         source=source,
         url=primary_url,
         location=location,
+        company=labeled_fields.get("company"),
         stack=stack,
         salary=salary,
         raw_text=cleaned,
