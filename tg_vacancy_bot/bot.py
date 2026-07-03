@@ -12,6 +12,7 @@ from aiogram.types import Message
 
 from .config import Settings
 from .formatting import format_vacancy_card
+from .intake import looks_like_vacancy_message
 from .parser import parse_message_to_vacancy
 from .source_polling import poll_sources_forever
 from .storage import VacancyStore
@@ -42,6 +43,10 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             return
 
         text = message.text or message.caption or ""
+        if not looks_like_vacancy_message(text):
+            await message.reply("I skipped this message because it does not look like an IT vacancy.")
+            return
+
         vacancy = parse_message_to_vacancy(text)
         if not vacancy.url:
             origin_url = forwarded_public_post_url(message)
