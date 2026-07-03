@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     target_chat_id: str = Field(default="", alias="TARGET_CHAT_ID")
     forwarded_mode: Literal["normalize", "copy"] = Field(default="normalize", alias="FORWARDED_MODE")
     database_path: str = Field(default="data/vacancies.sqlite3", alias="DATABASE_PATH")
+    source_poll_interval_seconds: int = Field(default=900, alias="SOURCE_POLL_INTERVAL_SECONDS")
 
     enable_remotive: bool = Field(default=True, alias="ENABLE_REMOTIVE")
     enable_arbeitnow: bool = Field(default=True, alias="ENABLE_ARBEITNOW")

@@ -13,6 +13,7 @@ from aiogram.types import Message
 from .config import Settings
 from .formatting import format_vacancy_card
 from .parser import parse_message_to_vacancy
+from .source_polling import poll_sources_forever
 from .storage import VacancyStore
 from .telegram_origin import forwarded_public_post_url
 
@@ -73,10 +74,16 @@ async def run_bot(settings: Settings) -> None:
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
     dp = create_dispatcher(settings, store)
+    polling_task = asyncio.create_task(poll_sources_forever(bot, settings, store))
 
     try:
         await dp.start_polling(bot)
     finally:
+        polling_task.cancel()
+        try:
+            await polling_task
+        except asyncio.CancelledError:
+            pass
         await bot.session.close()
 
 

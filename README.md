@@ -11,6 +11,7 @@ Telegram bot for collecting IT vacancies from forwarded messages and public job 
   - `copy`: copy the original message to the target channel.
 - Stores message fingerprints in SQLite to avoid duplicates.
 - Includes initial source adapters for Remotive, Arbeitnow, RemoteOK, and Hacker News "Who is Hiring".
+- Polls configured public sources in the background while the bot is running.
 
 ## Required Telegram Setup
 
@@ -42,6 +43,8 @@ To poll public sources once and publish new vacancies:
 ```powershell
 tg-vacancy-bot poll-once
 ```
+
+When `SOURCE_POLL_INTERVAL_SECONDS` is greater than `0`, `tg-vacancy-bot run` also polls configured public sources in the background while it listens for forwarded messages.
 
 ## Forwarded Message Flow
 
