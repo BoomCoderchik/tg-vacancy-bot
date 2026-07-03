@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import aiohttp
-
 from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.parser import extract_stack
 
-from ..base import REQUEST_TIMEOUT, SourceAdapter, html_to_text
+from ..base import SourceAdapter, html_to_text, source_session
 from ..filters import looks_like_it_vacancy
 
 
@@ -13,7 +11,7 @@ class HackerNewsWhoIsHiringAdapter(SourceAdapter):
     name = "Hacker News"
 
     async def fetch(self) -> list[Vacancy]:
-        async with aiohttp.ClientSession(timeout=REQUEST_TIMEOUT) as session:
+        async with source_session() as session:
             async with session.get("https://hn.algolia.com/api/v1/search_by_date?tags=story&query=who%20is%20hiring") as response:
                 response.raise_for_status()
                 data = await response.json()
@@ -23,7 +21,7 @@ class HackerNewsWhoIsHiringAdapter(SourceAdapter):
             return []
 
         story_id = story["objectID"]
-        async with aiohttp.ClientSession(timeout=REQUEST_TIMEOUT) as session:
+        async with source_session() as session:
             async with session.get(f"https://hn.algolia.com/api/v1/items/{story_id}") as response:
                 response.raise_for_status()
                 thread = await response.json()

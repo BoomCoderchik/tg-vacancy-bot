@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import aiohttp
-
 from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.parser import extract_stack
 
-from ..base import REQUEST_TIMEOUT, SourceAdapter, html_to_text
+from ..base import SourceAdapter, html_to_text, source_session
 
 
 class JoobleAdapter(SourceAdapter):
@@ -21,7 +19,7 @@ class JoobleAdapter(SourceAdapter):
             "keywords": self.settings.jooble_keywords,
             "location": self.settings.jooble_location,
         }
-        async with aiohttp.ClientSession(timeout=REQUEST_TIMEOUT) as session:
+        async with source_session() as session:
             async with session.post(url, json=payload) as response:
                 response.raise_for_status()
                 data = await response.json()

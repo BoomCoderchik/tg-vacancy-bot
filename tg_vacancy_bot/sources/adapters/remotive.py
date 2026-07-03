@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import aiohttp
-
 from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.parser import extract_stack
 
-from ..base import REQUEST_TIMEOUT, SourceAdapter, html_to_text
+from ..base import SourceAdapter, html_to_text, source_session
 
 
 class RemotiveAdapter(SourceAdapter):
@@ -13,7 +11,7 @@ class RemotiveAdapter(SourceAdapter):
     url = "https://remotive.com/api/remote-jobs?category=software-dev"
 
     async def fetch(self) -> list[Vacancy]:
-        async with aiohttp.ClientSession(timeout=REQUEST_TIMEOUT) as session:
+        async with source_session() as session:
             async with session.get(self.url) as response:
                 response.raise_for_status()
                 data = await response.json()

@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import aiohttp
-
 from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.parser import extract_stack
 
-from ..base import REQUEST_TIMEOUT, SourceAdapter, html_to_text
+from ..base import SourceAdapter, html_to_text, source_session
 
 
 class RemoteOkAdapter(SourceAdapter):
@@ -13,8 +11,7 @@ class RemoteOkAdapter(SourceAdapter):
     url = "https://remoteok.com/api"
 
     async def fetch(self) -> list[Vacancy]:
-        headers = {"User-Agent": "TG Vacancy Bot/0.1 (+https://t.me)"}
-        async with aiohttp.ClientSession(timeout=REQUEST_TIMEOUT, headers=headers) as session:
+        async with source_session() as session:
             async with session.get(self.url) as response:
                 response.raise_for_status()
                 data = await response.json(content_type=None)

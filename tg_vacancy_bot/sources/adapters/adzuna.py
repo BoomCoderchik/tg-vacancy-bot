@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import aiohttp
-
 from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.parser import extract_stack
 
-from ..base import REQUEST_TIMEOUT, SourceAdapter, html_to_text
+from ..base import SourceAdapter, html_to_text, source_session
 
 
 class AdzunaAdapter(SourceAdapter):
@@ -28,7 +26,7 @@ class AdzunaAdapter(SourceAdapter):
         if self.settings.adzuna_location:
             params["where"] = self.settings.adzuna_location
 
-        async with aiohttp.ClientSession(timeout=REQUEST_TIMEOUT) as session:
+        async with source_session() as session:
             async with session.get(url, params=params) as response:
                 response.raise_for_status()
                 data = await response.json()
