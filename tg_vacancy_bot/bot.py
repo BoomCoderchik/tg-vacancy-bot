@@ -10,6 +10,7 @@ from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.types import Message
 
+from .access_control import is_authorized_user
 from .config import Settings
 from .formatting import format_vacancy_card
 from .intake import looks_like_vacancy_message
@@ -35,6 +36,7 @@ def build_status_text(settings: Settings) -> str:
             "TG Vacancy Bot status",
             f"Forwarded mode: {settings.forwarded_mode}",
             f"Target chat: {settings.target_chat_id or 'not configured'}",
+            f"Operator allowlist: {'on' if settings.operator_user_ids else 'off'}",
             f"Source polling interval: {settings.source_poll_interval_seconds}s",
             "Sources: " + ", ".join(source_states),
         ]
@@ -53,10 +55,17 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
 
     @dp.message(Command("status"))
     async def status(message: Message) -> None:
+        if not _message_is_authorized(message, settings):
+            await message.reply("Not authorized.")
+            return
         await message.answer(build_status_text(settings))
 
     @dp.message(F.text | F.caption)
     async def handle_message(message: Message, bot: Bot) -> None:
+        if not _message_is_authorized(message, settings):
+            await message.reply("Not authorized.")
+            return
+
         if settings.forwarded_mode == "copy":
             await bot.copy_message(
                 chat_id=settings.target_chat_id,
@@ -91,6 +100,11 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
         await message.reply("Опубликовал вакансию в канал.")
 
     return dp
+
+
+def _message_is_authorized(message: Message, settings: Settings) -> bool:
+    user_id = message.from_user.id if message.from_user else None
+    return is_authorized_user(user_id, settings.operator_user_ids)
 
 
 async def run_bot(settings: Settings) -> None:

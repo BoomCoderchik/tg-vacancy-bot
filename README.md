@@ -20,8 +20,11 @@ Telegram bot for collecting IT vacancies from forwarded messages and public job 
 3. Create your target channel or group.
 4. Add the bot as an admin to that target channel/group.
 5. Put the target chat into `.env` as `TARGET_CHAT_ID`.
+6. For production safety, put your Telegram user ID into `OPERATOR_USER_IDS`.
 
 For a public channel, `TARGET_CHAT_ID` can be `@channel_username`. For a private channel/group, use the numeric chat ID.
+
+`OPERATOR_USER_IDS` is optional during first setup. When it is set, only listed Telegram users can publish forwarded messages, copy messages, or view `/status`. Use a comma-separated list, for example `OPERATOR_USER_IDS=123456789,987654321`.
 
 ## Local Setup
 

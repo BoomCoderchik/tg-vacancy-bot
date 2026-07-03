@@ -31,6 +31,10 @@
 - `tg_vacancy_bot/config.py`
   - Loads private runtime configuration from `.env`.
   - Requires `TELEGRAM_BOT_TOKEN` and `TARGET_CHAT_ID` for real publishing.
+  - Supports optional `OPERATOR_USER_IDS` for publish access control.
+
+- `tg_vacancy_bot/access_control.py`
+  - Parses operator allowlists and checks whether a sender may publish through the bot.
 
 - `tg_vacancy_bot/env_setup.py`
   - Safe `.env` bootstrap helper.
@@ -79,6 +83,7 @@ The bot depends on real Telegram access:
 - `TELEGRAM_BOT_TOKEN` from BotFather.
 - `TARGET_CHAT_ID` for the target channel/group.
 - Bot admin rights in the target channel/group.
+- Optional `OPERATOR_USER_IDS` to restrict who can publish through the bot.
 
 Optional source credentials:
 
@@ -95,6 +100,7 @@ For `@it_jobs_board`-style intake:
 - In `normalize` mode, obvious non-vacancy messages are skipped.
 - If the forwarded source is a public Telegram channel, the card link can point back to the original `t.me/channel/message_id`.
 - If `FORWARDED_MODE=copy`, the bot copies the original incoming message to the target chat.
+- If `OPERATOR_USER_IDS` is set, unauthorized users are rejected before copy/normalize publishing.
 
 ## LinkedIn Boundary
 
