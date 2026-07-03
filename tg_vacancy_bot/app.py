@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import sys
 from collections.abc import Sequence
 
 from .bot import run_bot_sync
@@ -49,13 +50,17 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
     settings = get_settings()
 
-    if args.command == "run":
-        run_bot_sync(settings)
-        return
+    try:
+        if args.command == "run":
+            run_bot_sync(settings)
+            return
 
-    if args.command == "poll-once":
-        asyncio.run(poll_once())
-        return
+        if args.command == "poll-once":
+            asyncio.run(poll_once())
+            return
+    except RuntimeError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
 
     raise SystemExit(f"Unknown command: {args.command}")
 
