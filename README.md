@@ -56,6 +56,7 @@ tg-vacancy-bot poll-once
 ```
 
 When `SOURCE_POLL_INTERVAL_SECONDS` is greater than `0`, `tg-vacancy-bot run` also polls configured public sources in the background while it listens for forwarded messages.
+`SOURCE_MAX_PUBLISH_PER_POLL` limits how many source vacancies can be published in one polling cycle, which prevents first-run flooding.
 
 To preview how a forwarded vacancy will be normalized before posting:
 

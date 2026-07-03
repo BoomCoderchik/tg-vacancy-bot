@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 async def poll_sources_once(bot: Bot, settings: Settings, store: VacancyStore) -> int:
     published = 0
+    max_publish = settings.source_max_publish_per_poll
     for adapter in build_adapters(settings):
         try:
             vacancies = await adapter.fetch()
@@ -24,6 +25,9 @@ async def poll_sources_once(bot: Bot, settings: Settings, store: VacancyStore) -
             continue
 
         for vacancy in filter_it_vacancies(vacancies):
+            if max_publish > 0 and published >= max_publish:
+                logger.info("Source poll publish limit reached: %s", max_publish)
+                return published
             if store.seen(vacancy):
                 continue
             await bot.send_message(

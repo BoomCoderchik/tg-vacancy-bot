@@ -6,6 +6,7 @@
   - Starts Telegram long polling.
   - Handles sent or forwarded vacancy messages.
   - Runs background public-source polling when `SOURCE_POLL_INTERVAL_SECONDS > 0`.
+  - Limits source publications per cycle with `SOURCE_MAX_PUBLISH_PER_POLL`.
 
 - `tg-vacancy-bot init-env`
   - Creates `.env` from `.env.example`.
@@ -70,6 +71,7 @@
 
 - `tg_vacancy_bot/source_polling.py`
   - Shared background source polling and publishing loop.
+  - Applies the per-poll source publishing limit.
 
 - `tg_vacancy_bot/storage.py`
   - SQLite deduplication by stable vacancy fingerprint.
