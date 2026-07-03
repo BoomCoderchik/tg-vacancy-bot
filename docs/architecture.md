@@ -51,7 +51,7 @@
 - `tg_vacancy_bot/bot.py`
   - Telegram message handlers.
   - Supports `FORWARDED_MODE=normalize` and `FORWARDED_MODE=copy`.
-  - Provides `/help` and `/status` operator commands.
+  - Provides `/help`, `/whoami`, and `/status` operator commands.
 
 - `tg_vacancy_bot/parser.py`
   - Extracts URL, title, stack, location, salary, and source from free-form vacancy text.
@@ -101,6 +101,7 @@ For `@it_jobs_board`-style intake:
 - If the forwarded source is a public Telegram channel, the card link can point back to the original `t.me/channel/message_id`.
 - If `FORWARDED_MODE=copy`, the bot copies the original incoming message to the target chat.
 - If `OPERATOR_USER_IDS` is set, unauthorized users are rejected before copy/normalize publishing.
+- `/whoami` remains available so an operator can discover their Telegram user ID for `OPERATOR_USER_IDS`.
 
 ## LinkedIn Boundary
 

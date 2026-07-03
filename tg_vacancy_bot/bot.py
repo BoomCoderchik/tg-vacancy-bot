@@ -43,6 +43,12 @@ def build_status_text(settings: Settings) -> str:
     )
 
 
+def format_whoami_text(user_id: int | None) -> str:
+    if user_id is None:
+        return "Telegram user ID is not available for this message."
+    return f"Your Telegram user ID: {user_id}"
+
+
 def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
     dp = Dispatcher()
 
@@ -59,6 +65,11 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             await message.reply("Not authorized.")
             return
         await message.answer(build_status_text(settings))
+
+    @dp.message(Command("whoami"))
+    async def whoami(message: Message) -> None:
+        user_id = message.from_user.id if message.from_user else None
+        await message.answer(format_whoami_text(user_id))
 
     @dp.message(F.text | F.caption)
     async def handle_message(message: Message, bot: Bot) -> None:

@@ -26,6 +26,8 @@ For a public channel, `TARGET_CHAT_ID` can be `@channel_username`. For a private
 
 `OPERATOR_USER_IDS` is optional during first setup. When it is set, only listed Telegram users can publish forwarded messages, copy messages, or view `/status`. Use a comma-separated list, for example `OPERATOR_USER_IDS=123456789,987654321`.
 
+To find your Telegram user ID, run the bot without `OPERATOR_USER_IDS` first, send `/whoami` to the bot, copy the returned ID into `.env`, then restart the bot.
+
 ## Local Setup
 
 ```powershell
@@ -92,6 +94,7 @@ In `normalize` mode, messages that do not look like IT vacancies are skipped. Us
 ## Bot Commands
 
 - `/start` or `/help`: shows the forwarding instructions.
+- `/whoami`: returns your Telegram user ID for `OPERATOR_USER_IDS`.
 - `/status`: shows the active forwarding mode, target chat, polling interval, and enabled sources without exposing secrets.
 
 ## LinkedIn Note
