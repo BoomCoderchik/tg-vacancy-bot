@@ -80,7 +80,7 @@ FIELD_LABELS = {
     "description": ("description", "описание", "about", "details"),
 }
 
-LABEL_RE = re.compile(r"^\s*(?:[^\wа-яА-ЯёЁ$€£₽]+)?(?P<label>[\wа-яА-ЯёЁ ]{2,24})\s*[:：-]\s*(?P<value>.+?)\s*$", re.IGNORECASE)
+LABEL_RE = re.compile(r"^\s*(?:[^\wа-яА-ЯёЁ$€£₽]+)?(?P<label>[\wа-яА-ЯёЁ ]{2,24})\s*[:：]\s*(?P<value>.+?)\s*$", re.IGNORECASE)
 
 
 def extract_urls(text: str) -> list[str]:

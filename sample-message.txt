@@ -1,0 +1,9 @@
+Senior Full-Stack Engineer
+Company: Example AI
+Location: Remote (US)
+Stack: Python, FastAPI, React, PostgreSQL, AWS
+Salary: $5000 - $7000
+
+Description:
+Hiring a Senior Full-Stack Engineer to build scalable backend APIs and frontend features for an AI automation platform.
+https://www.linkedin.com/posts/example

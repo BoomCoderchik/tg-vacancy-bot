@@ -69,3 +69,19 @@ https://www.linkedin.com/posts/example
     assert vacancy.description == "Build backend and frontend features for an AI platform."
     assert "Stack:" not in vacancy.description
     assert "Location:" not in vacancy.description
+
+
+def test_parse_labeled_card_does_not_treat_title_hyphen_as_label() -> None:
+    text = """
+Senior Full-Stack Engineer
+Location: Remote
+Stack: Python, React
+
+Description:
+Build product features.
+"""
+
+    vacancy = parse_message_to_vacancy(text)
+
+    assert vacancy.title == "Senior Full-Stack Engineer"
+    assert vacancy.description == "Build product features."
