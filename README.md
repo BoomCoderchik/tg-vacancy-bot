@@ -29,7 +29,7 @@ For a public channel, `TARGET_CHAT_ID` can be `@channel_username`. For a private
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
-Copy-Item .env.example .env
+tg-vacancy-bot init-env
 ```
 
 Fill in `.env`, then run:

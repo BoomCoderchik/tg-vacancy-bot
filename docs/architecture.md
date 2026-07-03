@@ -7,6 +7,10 @@
   - Handles sent or forwarded vacancy messages.
   - Runs background public-source polling when `SOURCE_POLL_INTERVAL_SECONDS > 0`.
 
+- `tg-vacancy-bot init-env`
+  - Creates `.env` from `.env.example`.
+  - Refuses to overwrite an existing `.env`.
+
 - `tg-vacancy-bot poll-once`
   - Fetches configured public sources once.
   - Publishes new deduplicated vacancies to `TARGET_CHAT_ID`.
@@ -27,6 +31,9 @@
 - `tg_vacancy_bot/config.py`
   - Loads private runtime configuration from `.env`.
   - Requires `TELEGRAM_BOT_TOKEN` and `TARGET_CHAT_ID` for real publishing.
+
+- `tg_vacancy_bot/env_setup.py`
+  - Safe `.env` bootstrap helper.
 
 - `tg_vacancy_bot/console.py`
   - Writes Unicode CLI output safely on Windows consoles.

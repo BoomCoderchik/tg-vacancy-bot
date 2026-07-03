@@ -10,6 +10,7 @@ from collections.abc import Sequence
 from .bot import run_bot_sync
 from .console import write_stdout
 from .config import get_settings
+from .env_setup import init_env_file
 from .preview import preview_message_card
 from .publisher import TelegramPublisher
 from .sources import build_adapters, filter_it_vacancies
@@ -21,6 +22,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="tg-vacancy-bot")
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("run", help="Run Telegram bot polling.")
+    subparsers.add_parser("init-env", help="Create .env from .env.example without overwriting an existing file.")
     subparsers.add_parser("poll-once", help="Poll public sources once and publish new vacancies.")
     subparsers.add_parser("check-telegram", help="Validate bot token, target chat access, and posting permissions.")
     preview_parser = subparsers.add_parser("preview-message", help="Parse message text and print the Telegram card HTML.")
@@ -60,6 +62,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     try:
         if args.command == "run":
             run_bot_sync(settings)
+            return
+
+        if args.command == "init-env":
+            write_stdout(init_env_file())
             return
 
         if args.command == "poll-once":
