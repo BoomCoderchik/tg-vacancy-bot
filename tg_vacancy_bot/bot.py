@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import replace
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
@@ -13,6 +14,7 @@ from .config import Settings
 from .formatting import format_vacancy_card
 from .parser import parse_message_to_vacancy
 from .storage import VacancyStore
+from .telegram_origin import forwarded_public_post_url
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +42,10 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
 
         text = message.text or message.caption or ""
         vacancy = parse_message_to_vacancy(text)
+        if not vacancy.url:
+            origin_url = forwarded_public_post_url(message)
+            if origin_url:
+                vacancy = replace(vacancy, source="Telegram", url=origin_url)
         if store.seen(vacancy):
             await message.reply("Похоже, эта вакансия уже публиковалась.")
             return
