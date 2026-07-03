@@ -77,6 +77,7 @@ FIELD_LABELS = {
     "stack": ("stack", "стек", "технологии", "skills", "tech stack"),
     "salary": ("salary", "зарплата", "вилка", "compensation", "rate"),
     "company": ("company", "компания"),
+    "description": ("description", "описание", "about", "details"),
 }
 
 LABEL_RE = re.compile(r"^\s*(?:[^\wа-яА-ЯёЁ$€£₽]+)?(?P<label>[\wа-яА-ЯёЁ ]{2,24})\s*[:：-]\s*(?P<value>.+?)\s*$", re.IGNORECASE)
@@ -123,10 +124,15 @@ def extract_labeled_fields(text: str) -> dict[str, str]:
 def remove_labeled_lines(text: str) -> str:
     kept = []
     for line in text.splitlines():
-        if LABEL_RE.match(line):
+        if LABEL_RE.match(line) or is_empty_description_label(line):
             continue
         kept.append(line)
     return "\n".join(kept).strip()
+
+
+def is_empty_description_label(line: str) -> bool:
+    normalized = line.strip().rstrip(":：-").lower()
+    return normalized in FIELD_LABELS["description"]
 
 
 def guess_title(text: str) -> str:
@@ -205,14 +211,14 @@ def parse_message_to_vacancy(text: str, fallback_source: str = "Telegram") -> Va
     location = labeled_fields.get("location") or guess_location(without_urls)
     salary = labeled_fields.get("salary") or guess_salary(without_urls)
     stack = parse_stack_value(labeled_fields["stack"]) if "stack" in labeled_fields else extract_stack(without_urls)
-    description = remove_labeled_lines(without_urls)
+    description = labeled_fields.get("description") or remove_labeled_lines(without_urls)
 
     if description.startswith(title):
         description = description[len(title) :].strip(" \n:-")
 
     return Vacancy(
         title=title,
-        description=description or cleaned,
+        description=description,
         source=source,
         url=primary_url,
         location=location,

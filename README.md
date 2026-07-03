@@ -52,6 +52,18 @@ tg-vacancy-bot poll-once
 
 When `SOURCE_POLL_INTERVAL_SECONDS` is greater than `0`, `tg-vacancy-bot run` also polls configured public sources in the background while it listens for forwarded messages.
 
+To preview how a forwarded vacancy will be normalized before posting:
+
+```powershell
+Get-Content .\sample-message.txt -Raw | tg-vacancy-bot preview-message
+```
+
+Or:
+
+```powershell
+tg-vacancy-bot preview-message --file .\sample-message.txt
+```
+
 ## Forwarded Message Flow
 
 Send or forward a vacancy message to the bot. In `normalize` mode, the bot will publish a card like:

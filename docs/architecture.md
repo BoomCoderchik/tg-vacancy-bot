@@ -17,14 +17,25 @@
   - Validates the bot token, target chat visibility, and bot membership/posting status.
   - Does not print the bot token.
 
+- `tg-vacancy-bot preview-message`
+  - Parses local message text from stdin or `--file`.
+  - Prints the Telegram card HTML without publishing anything.
+  - Useful for checking forwarded-message parser quality before enabling live posting.
+
 ## Modules
 
 - `tg_vacancy_bot/config.py`
   - Loads private runtime configuration from `.env`.
   - Requires `TELEGRAM_BOT_TOKEN` and `TARGET_CHAT_ID` for real publishing.
 
+- `tg_vacancy_bot/console.py`
+  - Writes Unicode CLI output safely on Windows consoles.
+
 - `tg_vacancy_bot/telegram_check.py`
   - Real Telegram API diagnostics for setup verification.
+
+- `tg_vacancy_bot/preview.py`
+  - Local parser/formatter preview for forwarded messages.
 
 - `tg_vacancy_bot/bot.py`
   - Telegram message handlers.

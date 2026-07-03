@@ -66,5 +66,6 @@ https://www.linkedin.com/posts/example
     assert vacancy.location == "Remote US"
     assert vacancy.salary == "$5000 - $7000"
     assert vacancy.stack[:4] == ("Python", "FastAPI", "React", "PostgreSQL")
+    assert vacancy.description == "Build backend and frontend features for an AI platform."
     assert "Stack:" not in vacancy.description
     assert "Location:" not in vacancy.description
