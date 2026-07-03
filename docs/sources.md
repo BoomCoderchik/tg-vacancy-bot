@@ -34,7 +34,7 @@
 
 ## Planned Source Pattern
 
-New sources should be added as `SourceAdapter` implementations in `tg_vacancy_bot/sources.py` or split into a `sources/` package when the file gets too large.
+New sources should be added as `SourceAdapter` implementations under `tg_vacancy_bot/sources/adapters/` and registered in `tg_vacancy_bot/sources/registry.py`.
 
 Each adapter should:
 

@@ -28,8 +28,8 @@
 - `tg_vacancy_bot/telegram_origin.py`
   - Extracts public `https://t.me/...` links from forwarded Telegram channel metadata.
 
-- `tg_vacancy_bot/sources.py`
-  - Source adapters for real job APIs and public feeds.
+- `tg_vacancy_bot/sources/`
+  - Source adapter package for real job APIs and public feeds.
   - Keyed APIs are enabled only when credentials exist.
 
 - `tg_vacancy_bot/source_polling.py`
