@@ -21,6 +21,7 @@
 - `tg_vacancy_bot/bot.py`
   - Telegram message handlers.
   - Supports `FORWARDED_MODE=normalize` and `FORWARDED_MODE=copy`.
+  - Provides `/help` and `/status` operator commands.
 
 - `tg_vacancy_bot/parser.py`
   - Extracts URL, title, stack, location, salary, and source from free-form vacancy text.

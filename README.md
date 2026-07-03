@@ -68,6 +68,11 @@ In `copy` mode, the bot copies the original message to the target channel.
 
 In `normalize` mode, messages that do not look like IT vacancies are skipped. Use `copy` mode if you want every forwarded message to be copied as-is.
 
+## Bot Commands
+
+- `/start` or `/help`: shows the forwarding instructions.
+- `/status`: shows the active forwarding mode, target chat, polling interval, and enabled sources without exposing secrets.
+
 ## LinkedIn Note
 
 This project does not bypass LinkedIn restrictions or scrape LinkedIn directly. LinkedIn links can still be handled when a user forwards a post or sends a LinkedIn URL to the bot.

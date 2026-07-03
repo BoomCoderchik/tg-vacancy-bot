@@ -7,7 +7,7 @@ from dataclasses import replace
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart
+from aiogram.filters import Command
 from aiogram.types import Message
 
 from .config import Settings
@@ -21,15 +21,39 @@ from .telegram_origin import forwarded_public_post_url
 logger = logging.getLogger(__name__)
 
 
+def build_status_text(settings: Settings) -> str:
+    source_states = [
+        f"Remotive={'on' if settings.enable_remotive else 'off'}",
+        f"Arbeitnow={'on' if settings.enable_arbeitnow else 'off'}",
+        f"RemoteOK={'on' if settings.enable_remoteok else 'off'}",
+        f"HN={'on' if settings.enable_hn_who_is_hiring else 'off'}",
+        f"Adzuna={'on' if settings.adzuna_app_id and settings.adzuna_app_key else 'off'}",
+        f"Jooble={'on' if settings.jooble_api_key else 'off'}",
+    ]
+    return "\n".join(
+        [
+            "TG Vacancy Bot status",
+            f"Forwarded mode: {settings.forwarded_mode}",
+            f"Target chat: {settings.target_chat_id or 'not configured'}",
+            f"Source polling interval: {settings.source_poll_interval_seconds}s",
+            "Sources: " + ", ".join(source_states),
+        ]
+    )
+
+
 def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
     dp = Dispatcher()
 
-    @dp.message(CommandStart())
+    @dp.message(Command("start", "help"))
     async def start(message: Message) -> None:
         await message.answer(
             "Пришли или перешли мне вакансию. Я опубликую ее в целевой канал "
             "как карточку или скопирую оригинал, в зависимости от FORWARDED_MODE."
         )
+
+    @dp.message(Command("status"))
+    async def status(message: Message) -> None:
+        await message.answer(build_status_text(settings))
 
     @dp.message(F.text | F.caption)
     async def handle_message(message: Message, bot: Bot) -> None:
