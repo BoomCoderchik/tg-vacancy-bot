@@ -1,0 +1,27 @@
+[project]
+name = "tg-vacancy-bot"
+version = "0.1.0"
+description = "Telegram vacancy aggregator bot with forwarded-message intake and public job source adapters."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "aiogram>=3.10,<4",
+    "aiohttp>=3.9,<4",
+    "beautifulsoup4>=4.12,<5",
+    "feedparser>=6.0,<7",
+    "pydantic>=2.7,<3",
+    "pydantic-settings>=2.3,<3",
+    "python-dotenv>=1.0,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2,<9",
+]
+
+[project.scripts]
+tg-vacancy-bot = "tg_vacancy_bot.app:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

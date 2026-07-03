@@ -1,0 +1,38 @@
+from functools import lru_cache
+from typing import Literal
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    telegram_bot_token: str = Field(default="", alias="TELEGRAM_BOT_TOKEN")
+    target_chat_id: str = Field(default="", alias="TARGET_CHAT_ID")
+    forwarded_mode: Literal["normalize", "copy"] = Field(default="normalize", alias="FORWARDED_MODE")
+    database_path: str = Field(default="data/vacancies.sqlite3", alias="DATABASE_PATH")
+
+    enable_remotive: bool = Field(default=True, alias="ENABLE_REMOTIVE")
+    enable_arbeitnow: bool = Field(default=True, alias="ENABLE_ARBEITNOW")
+    enable_remoteok: bool = Field(default=True, alias="ENABLE_REMOTEOK")
+    enable_hn_who_is_hiring: bool = Field(default=True, alias="ENABLE_HN_WHO_IS_HIRING")
+
+    adzuna_app_id: str = Field(default="", alias="ADZUNA_APP_ID")
+    adzuna_app_key: str = Field(default="", alias="ADZUNA_APP_KEY")
+    jooble_api_key: str = Field(default="", alias="JOOBLE_API_KEY")
+
+    def require_runtime(self) -> None:
+        missing = []
+        if not self.telegram_bot_token:
+            missing.append("TELEGRAM_BOT_TOKEN")
+        if not self.target_chat_id:
+            missing.append("TARGET_CHAT_ID")
+        if missing:
+            joined = ", ".join(missing)
+            raise RuntimeError(f"Missing required environment variables: {joined}")
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
