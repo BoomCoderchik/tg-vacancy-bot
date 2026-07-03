@@ -1,0 +1,46 @@
+# Sources
+
+## Implemented
+
+- Remotive API
+  - Enabled with `ENABLE_REMOTIVE=true`.
+  - No key required.
+
+- Arbeitnow API
+  - Enabled with `ENABLE_ARBEITNOW=true`.
+  - No key required.
+
+- RemoteOK API
+  - Enabled with `ENABLE_REMOTEOK=true`.
+  - No key required.
+
+- Hacker News "Who is Hiring"
+  - Enabled with `ENABLE_HN_WHO_IS_HIRING=true`.
+  - Uses Algolia HN API to locate the latest thread and parse candidate comments.
+
+- Adzuna API
+  - Enabled only when `ADZUNA_APP_ID` and `ADZUNA_APP_KEY` are set.
+  - Query configured by `ADZUNA_COUNTRY`, `ADZUNA_QUERY`, and `ADZUNA_LOCATION`.
+
+- Jooble API
+  - Enabled only when `JOOBLE_API_KEY` is set.
+  - Query configured by `JOOBLE_KEYWORDS` and `JOOBLE_LOCATION`.
+
+## Intake Sources
+
+- Direct or forwarded Telegram messages to the bot.
+- Public Telegram channel origins when Telegram exposes forward metadata.
+- LinkedIn URLs only when supplied by the user via a message or forwarded text.
+
+## Planned Source Pattern
+
+New sources should be added as `SourceAdapter` implementations in `tg_vacancy_bot/sources.py` or split into a `sources/` package when the file gets too large.
+
+Each adapter should:
+
+- Call a real documented API/feed/page where automated access is allowed.
+- Return `Vacancy` objects.
+- Use timeouts.
+- Let the polling layer handle exceptions.
+- Avoid fake fallback records.
+- Add tests for adapter registration, filtering, or response mapping.

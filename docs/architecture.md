@@ -1,0 +1,69 @@
+# Architecture
+
+## Runtime Modes
+
+- `tg-vacancy-bot run`
+  - Starts Telegram long polling.
+  - Handles sent or forwarded vacancy messages.
+  - Runs background public-source polling when `SOURCE_POLL_INTERVAL_SECONDS > 0`.
+
+- `tg-vacancy-bot poll-once`
+  - Fetches configured public sources once.
+  - Publishes new deduplicated vacancies to `TARGET_CHAT_ID`.
+  - Useful for external schedulers or manual testing.
+
+## Modules
+
+- `tg_vacancy_bot/config.py`
+  - Loads private runtime configuration from `.env`.
+  - Requires `TELEGRAM_BOT_TOKEN` and `TARGET_CHAT_ID` for real publishing.
+
+- `tg_vacancy_bot/bot.py`
+  - Telegram message handlers.
+  - Supports `FORWARDED_MODE=normalize` and `FORWARDED_MODE=copy`.
+
+- `tg_vacancy_bot/parser.py`
+  - Extracts URL, title, stack, location, salary, and source from free-form vacancy text.
+
+- `tg_vacancy_bot/telegram_origin.py`
+  - Extracts public `https://t.me/...` links from forwarded Telegram channel metadata.
+
+- `tg_vacancy_bot/sources.py`
+  - Source adapters for real job APIs and public feeds.
+  - Keyed APIs are enabled only when credentials exist.
+
+- `tg_vacancy_bot/source_polling.py`
+  - Shared background source polling and publishing loop.
+
+- `tg_vacancy_bot/storage.py`
+  - SQLite deduplication by stable vacancy fingerprint.
+
+- `tg_vacancy_bot/formatting.py`
+  - Telegram HTML card formatting.
+
+## External Services
+
+The bot depends on real Telegram access:
+
+- `TELEGRAM_BOT_TOKEN` from BotFather.
+- `TARGET_CHAT_ID` for the target channel/group.
+- Bot admin rights in the target channel/group.
+
+Optional source credentials:
+
+- `ADZUNA_APP_ID` and `ADZUNA_APP_KEY`.
+- `JOOBLE_API_KEY`.
+
+Do not replace missing external services with fake data. If a token, chat ID, API key, or permission is missing, report the missing service and stop that integration path until it is configured.
+
+## Telegram Forwarding
+
+For `@it_jobs_board`-style intake:
+
+- If you forward a message to the bot in `normalize` mode, it parses the text and publishes a clean card.
+- If the forwarded source is a public Telegram channel, the card link can point back to the original `t.me/channel/message_id`.
+- If `FORWARDED_MODE=copy`, the bot copies the original incoming message to the target chat.
+
+## LinkedIn Boundary
+
+The project does not bypass LinkedIn rules or scrape LinkedIn directly. LinkedIn posts can enter the system when a user forwards text or sends a LinkedIn URL to the bot.
