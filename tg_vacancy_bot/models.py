@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import datetime
 
 
 @dataclass(frozen=True)
@@ -11,6 +12,7 @@ class Vacancy:
     company: str | None = None
     stack: tuple[str, ...] = field(default_factory=tuple)
     salary: str | None = None
+    published_at: datetime | None = None
     raw_text: str = ""
 
     @property

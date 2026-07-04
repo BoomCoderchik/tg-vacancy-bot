@@ -4,6 +4,7 @@ from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.parser import extract_stack
 
 from ..base import SourceAdapter, html_to_text, source_session
+from ..dates import parse_source_datetime
 
 
 class ArbeitnowAdapter(SourceAdapter):
@@ -29,6 +30,7 @@ class ArbeitnowAdapter(SourceAdapter):
                     source=self.name,
                     url=item.get("url"),
                     stack=tuple(dict.fromkeys([*tags, *extract_stack(text)])),
+                    published_at=parse_source_datetime(item.get("created_at")),
                     raw_text=text,
                 )
             )

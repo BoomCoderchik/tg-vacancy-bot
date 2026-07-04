@@ -5,6 +5,7 @@ from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.parser import extract_stack
 
 from ..base import SourceAdapter, html_to_text, source_session
+from ..dates import parse_source_datetime
 
 
 class JoobleAdapter(SourceAdapter):
@@ -37,6 +38,7 @@ class JoobleAdapter(SourceAdapter):
                     url=item.get("link"),
                     salary=item.get("salary"),
                     stack=extract_stack(" ".join([item.get("title", ""), description])),
+                    published_at=parse_source_datetime(item.get("updated")),
                     raw_text=description,
                 )
             )

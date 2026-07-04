@@ -13,6 +13,16 @@ def test_settings_reads_source_poll_interval() -> None:
     assert settings.source_max_publish_per_poll == 5
 
 
+def test_settings_reads_source_max_age_hours() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        SOURCE_MAX_AGE_HOURS="12",
+    )
+
+    assert settings.source_max_age_hours == 12
+
+
 def test_settings_reads_description_localization_options() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",

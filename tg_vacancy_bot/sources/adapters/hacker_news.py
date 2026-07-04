@@ -4,6 +4,7 @@ from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.parser import extract_stack
 
 from ..base import SourceAdapter, html_to_text, source_session
+from ..dates import parse_source_datetime
 from ..filters import looks_like_it_vacancy
 
 
@@ -40,6 +41,7 @@ class HackerNewsWhoIsHiringAdapter(SourceAdapter):
                     url=f"https://news.ycombinator.com/item?id={child.get('id')}",
                     location=None,
                     stack=extract_stack(text),
+                    published_at=parse_source_datetime(child.get("created_at") or child.get("created_at_i")),
                     raw_text=text,
                 )
             )

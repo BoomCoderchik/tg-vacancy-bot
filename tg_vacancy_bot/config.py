@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     database_path: str = Field(default="data/vacancies.sqlite3", alias="DATABASE_PATH")
     source_poll_interval_seconds: int = Field(default=900, alias="SOURCE_POLL_INTERVAL_SECONDS")
     source_max_publish_per_poll: int = Field(default=20, alias="SOURCE_MAX_PUBLISH_PER_POLL")
+    source_max_age_hours: int = Field(default=48, alias="SOURCE_MAX_AGE_HOURS")
     localize_descriptions: bool = Field(default=False, alias="LOCALIZE_DESCRIPTIONS")
 
     enable_remotive: bool = Field(default=True, alias="ENABLE_REMOTIVE")

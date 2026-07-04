@@ -5,6 +5,7 @@ from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.parser import extract_stack
 
 from ..base import SourceAdapter, html_to_text, source_session
+from ..dates import parse_source_datetime
 
 
 class AdzunaAdapter(SourceAdapter):
@@ -47,6 +48,7 @@ class AdzunaAdapter(SourceAdapter):
                     url=item.get("redirect_url"),
                     salary=_format_adzuna_salary(item),
                     stack=extract_stack(" ".join([item.get("title", ""), description])),
+                    published_at=parse_source_datetime(item.get("created")),
                     raw_text=description,
                 )
             )
