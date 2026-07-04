@@ -8,10 +8,25 @@ Telegram bot for collecting IT vacancies from forwarded messages and public job 
 - Publishes to a configured Telegram channel/group.
 - Supports two forwarded-message modes:
   - `normalize`: parse text and publish a clean vacancy card.
-  - `copy`: copy the original message to the target channel.
+  - `copy`: copy the original message to the target channel after the same allowed-vacancy intake check.
+- Publishes only development/design/AI vacancies: backend, frontend, fullstack, design, LLM, AI, and clear software developer/engineer roles.
 - Stores message fingerprints in SQLite to avoid duplicates.
 - Includes initial source adapters for Remotive, Arbeitnow, RemoteOK, and Hacker News "Who is Hiring".
 - Polls configured public sources in the background while the bot is running.
+
+## Near-Real-Time Parser Mode
+
+For an always-on vacancy parser, run the bot continuously with source polling enabled:
+
+```dotenv
+SOURCE_POLL_INTERVAL_SECONDS=60
+SOURCE_MAX_AGE_HOURS=48
+SOURCE_MAX_PUBLISH_PER_POLL=20
+```
+
+The bot does not wait for manual forwarding in this mode. It polls real configured sources, publishes vacancies that are new to the bot, skips repeats through SQLite deduplication, and drops dated source vacancies older than `SOURCE_MAX_AGE_HOURS`. Vacancies from sources without a publication date are not assigned a fake date; they rely on source ordering, the publish limit, and deduplication.
+
+Sixty-second polling is near-real-time for ordinary job APIs. Truly instant publishing requires a source-provided webhook or stream.
 
 ## Required Telegram Setup
 
@@ -64,7 +79,7 @@ For free web-hosting deployment, use:
 tg-vacancy-bot run-web
 ```
 
-This runs the same Telegram bot and source polling loop with a small HTTP health endpoint for platforms that require an open port. See `docs/deployment.md`.
+This runs the same Telegram bot and source polling loop with a small HTTP health endpoint for platforms that require an open port. For reliable free always-on parsing, prefer the VM path in `docs/deployment.md`.
 
 To translate vacancy descriptions into Russian and compress long source text before publishing, set:
 
@@ -115,7 +130,7 @@ IT Job Board
 
 In `copy` mode, the bot copies the original message to the target channel.
 
-In `normalize` mode, messages that do not look like IT vacancies are skipped. Use `copy` mode if you want every forwarded message to be copied as-is.
+Messages that do not look like allowed development/design/AI vacancies are skipped before publishing. In `copy` mode, the bot still applies this intake check, then copies the original accepted message as-is.
 
 ## Bot Commands
 

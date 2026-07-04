@@ -44,6 +44,7 @@
   - Loads private runtime configuration from `.env`.
   - Requires `TELEGRAM_BOT_TOKEN` and `TARGET_CHAT_ID` for real publishing.
   - Supports optional `OPERATOR_USER_IDS` for publish access control.
+  - Controls source polling with `SOURCE_POLL_INTERVAL_SECONDS`, `SOURCE_MAX_PUBLISH_PER_POLL`, and `SOURCE_MAX_AGE_HOURS`.
   - Supports optional OpenAI/OpenAI-compatible description localization with `LOCALIZE_DESCRIPTIONS`, `OPENAI_API_KEY`, `OPENAI_MODEL`, and `OPENAI_BASE_URL`.
 
 - `tg_vacancy_bot/access_control.py`
@@ -75,7 +76,7 @@
   - Reads labeled fields such as `Location`, `Локация`, `Stack`, `Стек`, `Salary`, `Зарплата`, and `Company`.
 
 - `tg_vacancy_bot/intake.py`
-  - Rejects forwarded text that does not look like an IT vacancy before formatting/publishing.
+  - Rejects forwarded text that does not look like an allowed development/design/AI vacancy before formatting/publishing.
 
 - `tg_vacancy_bot/telegram_origin.py`
   - Extracts public `https://t.me/...` links from forwarded Telegram channel metadata.
@@ -83,10 +84,13 @@
 - `tg_vacancy_bot/sources/`
   - Source adapter package for real job APIs and public feeds.
   - Keyed APIs are enabled only when credentials exist.
+  - Parses publication dates when sources provide them and leaves `published_at=None` when they do not.
 
 - `tg_vacancy_bot/source_polling.py`
   - Shared background source polling and publishing loop.
   - Applies the per-poll source publishing limit.
+  - Publishes only source vacancies that pass the development/design/AI filter.
+  - Filters dated source vacancies by `SOURCE_MAX_AGE_HOURS` before publishing while preserving undated vacancies for dedupe-based handling.
 
 - `tg_vacancy_bot/storage.py`
   - SQLite deduplication by stable vacancy fingerprint.
@@ -126,9 +130,9 @@ Do not replace missing external services with fake data. If a token, chat ID, AP
 For `@it_jobs_board`-style intake:
 
 - If you forward a message to the bot in `normalize` mode, it parses the text and publishes a clean card.
-- In `normalize` mode, obvious non-vacancy messages are skipped.
+- Obvious non-vacancy messages and vacancies outside the allowed development/design/AI scope are skipped.
 - If the forwarded source is a public Telegram channel, the card link can point back to the original `t.me/channel/message_id`.
-- If `FORWARDED_MODE=copy`, the bot copies the original incoming message to the target chat.
+- If `FORWARDED_MODE=copy`, the bot applies the same allowed-vacancy intake check and then copies the original incoming message to the target chat.
 - If `OPERATOR_USER_IDS` is set, unauthorized users are rejected before copy/normalize publishing.
 - `/whoami` remains available so an operator can discover their Telegram user ID for `OPERATOR_USER_IDS`.
 

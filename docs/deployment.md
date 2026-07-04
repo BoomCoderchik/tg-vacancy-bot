@@ -1,35 +1,57 @@
 # Deployment
 
-This project must run as a real Telegram vacancy aggregator. Do not deploy it with
-fake Telegram publishing, fake source results, or placeholder vacancies.
+This project must run as a real Telegram vacancy aggregator. Do not deploy it
+with fake Telegram publishing, fake source results, in-memory demo fallbacks, or
+placeholder vacancies.
 
-## Recommended Free Path: Koyeb Web Service
+## Recommended Free Path: Always-On VM
 
-The bot is a long-running process, so use:
+Use a free VM for the primary production setup:
 
-```bash
-tg-vacancy-bot run-web
+- Google Cloud Free Tier `e2-micro` VM.
+- Oracle Cloud Always Free VM.
+
+A VM is a better default than free web services for this bot because it can run
+as a real long-lived process, keep its SQLite database on persistent disk, and
+poll sources every 60 seconds without relying on web traffic.
+
+Recommended production source settings:
+
+```dotenv
+DATABASE_PATH=data/vacancies.sqlite3
+SOURCE_POLL_INTERVAL_SECONDS=60
+SOURCE_MAX_PUBLISH_PER_POLL=20
+SOURCE_MAX_AGE_HOURS=48
 ```
 
-This starts the normal Telegram long polling and background source polling, plus
-an HTTP health endpoint:
+Sixty-second polling is near-real-time for ordinary job APIs. Instant delivery
+is only possible when a source provides a webhook or stream.
 
-- `GET /`
-- `GET /health`
+## Ubuntu VM Setup
 
-The endpoint exists so free web hosts can route traffic to the process and so an
-external uptime monitor can keep the service active.
+Install system packages:
 
-### Koyeb Settings
+```bash
+sudo apt-get update
+sudo apt-get install -y python3 python3-venv python3-pip git
+```
 
-- Deployment type: Dockerfile
-- Instance: Free
-- Region: Frankfurt or Washington, D.C.
-- Port: use Koyeb's detected `$PORT`
-- Run command: leave empty if the Dockerfile is used, or set `tg-vacancy-bot run-web`
-- Health check path: `/health`
+Clone the repository and install the bot:
 
-Add environment variables from `.env` in the Koyeb dashboard. Do not commit `.env`.
+```bash
+git clone <your-repo-url> tg-vacancy-bot
+cd tg-vacancy-bot
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+Create `.env` from `.env.example` and fill real credentials:
+
+```bash
+cp .env.example .env
+nano .env
+```
 
 Required:
 
@@ -39,54 +61,86 @@ TARGET_CHAT_ID=...
 OPERATOR_USER_IDS=...
 FORWARDED_MODE=normalize
 DATABASE_PATH=data/vacancies.sqlite3
-SOURCE_POLL_INTERVAL_SECONDS=900
+SOURCE_POLL_INTERVAL_SECONDS=60
 SOURCE_MAX_PUBLISH_PER_POLL=20
+SOURCE_MAX_AGE_HOURS=48
 ```
 
-Source toggles:
+Validate the real Telegram integration before starting the service:
 
-```dotenv
-ENABLE_REMOTIVE=true
-ENABLE_ARBEITNOW=true
-ENABLE_REMOTEOK=true
-ENABLE_HN_WHO_IS_HIRING=true
+```bash
+.venv/bin/tg-vacancy-bot check-telegram
 ```
 
-Optional keyed sources:
+Run manually once to confirm startup:
 
-```dotenv
-ADZUNA_APP_ID=
-ADZUNA_APP_KEY=
-JOOBLE_API_KEY=
+```bash
+.venv/bin/tg-vacancy-bot run
 ```
 
-Optional localization:
+Stop it with `Ctrl+C` after confirming it starts. Then configure systemd.
 
-```dotenv
-LOCALIZE_DESCRIPTIONS=false
-OPENAI_API_KEY=
-OPENAI_MODEL=gpt-4.1-mini
-OPENAI_BASE_URL=
+## systemd Service
+
+Create `/etc/systemd/system/tg-vacancy-bot.service`:
+
+```ini
+[Unit]
+Description=TG Vacancy Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ubuntu/tg-vacancy-bot
+EnvironmentFile=/home/ubuntu/tg-vacancy-bot/.env
+ExecStart=/home/ubuntu/tg-vacancy-bot/.venv/bin/tg-vacancy-bot run
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
 ```
 
-### Keep-Alive
+Adjust `WorkingDirectory`, `EnvironmentFile`, and `ExecStart` if you cloned the
+repo somewhere else or use a different Linux user.
 
-Koyeb Free web services can scale to zero when they receive no traffic. Configure
-a free uptime monitor, such as UptimeRobot or cron-job.org, to request:
+Enable and start the service:
 
-```text
-https://<your-koyeb-service>.koyeb.app/health
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable tg-vacancy-bot
+sudo systemctl start tg-vacancy-bot
+sudo systemctl status tg-vacancy-bot
 ```
 
-Use an interval shorter than the provider's idle timeout.
+Watch logs:
 
-## Production Caveat
+```bash
+journalctl -u tg-vacancy-bot -f
+```
 
-The current deduplication store is SQLite. On free web services without a
-persistent volume, the local SQLite file can be lost on restarts, redeploys, or
-scale-to-zero events. If this happens, old vacancies may be published again until
-the store is rebuilt.
+SQLite should stay on the VM persistent disk, for example
+`DATABASE_PATH=data/vacancies.sqlite3`. Do not place it on ephemeral storage.
 
-For stronger production behavior, use a paid service with persistent disk or add
-a real external database-backed `VacancyStore`. Do not replace this with an
-in-memory store or demo data.
+## Optional Web-Service Fallback
+
+`tg-vacancy-bot run-web` exists for platforms that require an HTTP port:
+
+```bash
+tg-vacancy-bot run-web
+```
+
+It starts the same Telegram bot and source polling loop plus:
+
+- `GET /`
+- `GET /health`
+
+Koyeb Free can be useful for quick experiments, but it can scale to zero. That
+can delay near-real-time polling and can lose SQLite state if no persistent disk
+is available. Render Free has similar sleep behavior and is not recommended as
+the primary always-on parser path.
+
+GitHub Actions schedules are also not a replacement for this use case: they are
+not a long-running server and the schedule granularity is too coarse for
+near-real-time polling.
