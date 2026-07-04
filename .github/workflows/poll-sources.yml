@@ -1,0 +1,60 @@
+name: Poll vacancy sources
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: poll-vacancy-sources
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TARGET_CHAT_ID: ${{ secrets.TARGET_CHAT_ID }}
+      OPERATOR_USER_IDS: ${{ secrets.OPERATOR_USER_IDS }}
+      FORWARDED_MODE: normalize
+      DATABASE_PATH: data/vacancies.sqlite3
+      SOURCE_POLL_INTERVAL_SECONDS: "0"
+      SOURCE_MAX_PUBLISH_PER_POLL: ${{ secrets.SOURCE_MAX_PUBLISH_PER_POLL }}
+      LOCALIZE_DESCRIPTIONS: ${{ secrets.LOCALIZE_DESCRIPTIONS }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+      OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+      ENABLE_REMOTIVE: ${{ secrets.ENABLE_REMOTIVE }}
+      ENABLE_ARBEITNOW: ${{ secrets.ENABLE_ARBEITNOW }}
+      ENABLE_REMOTEOK: ${{ secrets.ENABLE_REMOTEOK }}
+      ENABLE_HN_WHO_IS_HIRING: ${{ secrets.ENABLE_HN_WHO_IS_HIRING }}
+      ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
+      ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
+      ADZUNA_COUNTRY: ${{ secrets.ADZUNA_COUNTRY }}
+      ADZUNA_QUERY: ${{ secrets.ADZUNA_QUERY }}
+      ADZUNA_LOCATION: ${{ secrets.ADZUNA_LOCATION }}
+      JOOBLE_API_KEY: ${{ secrets.JOOBLE_API_KEY }}
+      JOOBLE_KEYWORDS: ${{ secrets.JOOBLE_KEYWORDS }}
+      JOOBLE_LOCATION: ${{ secrets.JOOBLE_LOCATION }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Restore deduplication database
+        uses: actions/cache@v4
+        with:
+          path: data/vacancies.sqlite3
+          key: vacancy-db-${{ github.run_id }}
+          restore-keys: |
+            vacancy-db-
+
+      - name: Install bot
+        run: pip install .
+
+      - name: Poll and publish new vacancies
+        run: tg-vacancy-bot poll-once
