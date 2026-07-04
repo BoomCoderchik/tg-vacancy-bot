@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from aiogram import Bot
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.exceptions import TelegramRetryAfter
 
 from .config import Settings
 from .description_localization import localize_vacancy_description
@@ -46,12 +48,23 @@ class TelegramPublisher:
                     exc,
                 )
                 public_vacancy = vacancy
-            await self.bot.send_message(
-                chat_id=self.settings.target_chat_id,
-                text=format_vacancy_card(public_vacancy),
-                parse_mode=ParseMode.HTML,
-                disable_web_page_preview=True,
-            )
+            try:
+                await self.bot.send_message(
+                    chat_id=self.settings.target_chat_id,
+                    text=format_vacancy_card(public_vacancy),
+                    parse_mode=ParseMode.HTML,
+                    disable_web_page_preview=True,
+                )
+            except TelegramRetryAfter as exc:
+                retry_after = int(getattr(exc, "retry_after", 1))
+                logger.warning("Telegram flood control hit; retrying in %s seconds", retry_after)
+                await asyncio.sleep(retry_after + 1)
+                await self.bot.send_message(
+                    chat_id=self.settings.target_chat_id,
+                    text=format_vacancy_card(public_vacancy),
+                    parse_mode=ParseMode.HTML,
+                    disable_web_page_preview=True,
+                )
             if self.store.mark_published(vacancy):
                 published += 1
         return published

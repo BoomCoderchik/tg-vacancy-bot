@@ -44,7 +44,11 @@ async def poll_once() -> None:
     try:
         total = 0
         published = 0
+        max_publish = settings.source_max_publish_per_poll
         for adapter in build_adapters(settings):
+            if max_publish > 0 and published >= max_publish:
+                logging.info("Source poll publish limit reached: %s", max_publish)
+                break
             try:
                 vacancies = await adapter.fetch()
             except Exception:
@@ -52,7 +56,12 @@ async def poll_once() -> None:
                 continue
             filtered = filter_it_vacancies(vacancies)
             total += len(filtered)
-            published += await publisher.publish_new(filtered, fallback_to_original_on_localization_error=True)
+            remaining = max_publish - published if max_publish > 0 else len(filtered)
+            publishable = filtered[:remaining]
+            published += await publisher.publish_new(
+                publishable,
+                fallback_to_original_on_localization_error=True,
+            )
             logging.info("%s: fetched=%s filtered=%s", adapter.name, len(vacancies), len(filtered))
         logging.info("Done. candidates=%s published=%s", total, published)
     finally:

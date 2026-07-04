@@ -1,6 +1,7 @@
 import asyncio
 
 import pytest
+from aiogram.exceptions import TelegramRetryAfter
 
 from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
@@ -67,3 +68,34 @@ def test_publish_new_can_fallback_to_original_on_localization_error(monkeypatch)
     assert published == 1
     assert "Remote Python role" in publisher.bot.sent_messages[0]
     assert publisher.store.published == [vacancy]
+
+
+def test_publish_new_retries_after_telegram_flood_control(monkeypatch) -> None:
+    publisher = build_publisher()
+    vacancy = Vacancy(title="Python Engineer", description="Remote Python role", source="Fake")
+    sleeps = []
+
+    async def fake_localize(vacancy, settings):
+        return vacancy
+
+    async def fake_sleep(seconds):
+        sleeps.append(seconds)
+
+    class RetryBot:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def send_message(self, **kwargs) -> None:
+            self.calls += 1
+            if self.calls == 1:
+                raise TelegramRetryAfter(method=object(), message="Too Many Requests", retry_after=2)
+
+    publisher.bot = RetryBot()
+    monkeypatch.setattr("tg_vacancy_bot.publisher.localize_vacancy_description", fake_localize)
+    monkeypatch.setattr("tg_vacancy_bot.publisher.asyncio.sleep", fake_sleep)
+
+    published = asyncio.run(publisher.publish_new([vacancy]))
+
+    assert published == 1
+    assert sleeps == [3]
+    assert publisher.bot.calls == 2
