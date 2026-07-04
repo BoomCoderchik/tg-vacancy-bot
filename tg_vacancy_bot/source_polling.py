@@ -7,6 +7,7 @@ from aiogram import Bot
 from aiogram.enums import ParseMode
 
 from .config import Settings
+from .description_localization import localize_vacancy_description
 from .formatting import format_vacancy_card
 from .sources import build_adapters, filter_it_vacancies
 from .storage import VacancyStore
@@ -30,9 +31,19 @@ async def poll_sources_once(bot: Bot, settings: Settings, store: VacancyStore) -
                 return published
             if store.seen(vacancy):
                 continue
+            try:
+                public_vacancy = await localize_vacancy_description(vacancy, settings)
+            except Exception as exc:
+                logger.warning(
+                    "%s: description localization failed for %r; publishing original description: %s",
+                    adapter.name,
+                    vacancy.title,
+                    exc,
+                )
+                public_vacancy = vacancy
             await bot.send_message(
                 chat_id=settings.target_chat_id,
-                text=format_vacancy_card(vacancy),
+                text=format_vacancy_card(public_vacancy),
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True,
             )

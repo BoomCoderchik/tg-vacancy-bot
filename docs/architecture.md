@@ -8,6 +8,11 @@
   - Runs background public-source polling when `SOURCE_POLL_INTERVAL_SECONDS > 0`.
   - Limits source publications per cycle with `SOURCE_MAX_PUBLISH_PER_POLL`.
 
+- `tg-vacancy-bot run-web`
+  - Starts the same Telegram long polling and background public-source polling as `run`.
+  - Exposes `GET /` and `GET /health` for web-hosting health checks.
+  - Reads the listening port from `PORT`, defaulting to `8080`.
+
 - `tg-vacancy-bot init-env`
   - Creates `.env` from `.env.example`.
   - Refuses to overwrite an existing `.env`.
@@ -39,6 +44,7 @@
   - Loads private runtime configuration from `.env`.
   - Requires `TELEGRAM_BOT_TOKEN` and `TARGET_CHAT_ID` for real publishing.
   - Supports optional `OPERATOR_USER_IDS` for publish access control.
+  - Supports optional OpenAI/OpenAI-compatible description localization with `LOCALIZE_DESCRIPTIONS`, `OPENAI_API_KEY`, `OPENAI_MODEL`, and `OPENAI_BASE_URL`.
 
 - `tg_vacancy_bot/access_control.py`
   - Parses operator allowlists and checks whether a sender may publish through the bot.
@@ -59,6 +65,10 @@
   - Telegram message handlers.
   - Supports `FORWARDED_MODE=normalize` and `FORWARDED_MODE=copy`.
   - Provides `/help`, `/whoami`, and `/status` operator commands.
+
+- `tg_vacancy_bot/deployment.py`
+  - Hosts the minimal HTTP health endpoint used by web-service deployments.
+  - Runs the bot process alongside the health endpoint without changing Telegram publishing behavior.
 
 - `tg_vacancy_bot/parser.py`
   - Extracts URL, title, stack, location, salary, and source from free-form vacancy text.
@@ -84,6 +94,10 @@
 - `tg_vacancy_bot/formatting.py`
   - Telegram HTML card formatting.
 
+- `tg_vacancy_bot/description_localization.py`
+  - Uses the real OpenAI API or an OpenAI-compatible endpoint to translate vacancy descriptions to Russian and compress long source text before normalized cards are published.
+  - Raises a configuration error when localization is enabled without `OPENAI_API_KEY`.
+
 ## External Services
 
 The bot depends on real Telegram access:
@@ -97,6 +111,13 @@ Optional source credentials:
 
 - `ADZUNA_APP_ID` and `ADZUNA_APP_KEY`.
 - `JOOBLE_API_KEY`.
+
+Optional OpenAI localization:
+
+- `LOCALIZE_DESCRIPTIONS=true`.
+- `OPENAI_API_KEY` for the real OpenAI or OpenAI-compatible API.
+- `OPENAI_MODEL`, defaulting to `gpt-4.1-mini`.
+- `OPENAI_BASE_URL`, optional. For OpenRouter, use `https://openrouter.ai/api/v1`.
 
 Do not replace missing external services with fake data. If a token, chat ID, API key, or permission is missing, report the missing service and stop that integration path until it is configured.
 

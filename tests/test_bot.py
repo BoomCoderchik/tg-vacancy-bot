@@ -8,6 +8,8 @@ def test_build_status_text_does_not_expose_bot_token() -> None:
         TARGET_CHAT_ID="@target",
         ENABLE_REMOTIVE=True,
         ENABLE_ARBEITNOW=False,
+        OPERATOR_USER_IDS="",
+        LOCALIZE_DESCRIPTIONS="true",
         ADZUNA_APP_ID="app",
         ADZUNA_APP_KEY="key",
     )
@@ -18,6 +20,7 @@ def test_build_status_text_does_not_expose_bot_token() -> None:
     assert "Target chat: @target" in text
     assert "Forwarded mode: normalize" in text
     assert "Operator allowlist: off" in text
+    assert "Description localization: on" in text
     assert "Remotive=on" in text
     assert "Arbeitnow=off" in text
     assert "Adzuna=on" in text

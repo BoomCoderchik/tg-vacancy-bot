@@ -58,6 +58,25 @@ tg-vacancy-bot poll-once
 When `SOURCE_POLL_INTERVAL_SECONDS` is greater than `0`, `tg-vacancy-bot run` also polls configured public sources in the background while it listens for forwarded messages.
 `SOURCE_MAX_PUBLISH_PER_POLL` limits how many source vacancies can be published in one polling cycle, which prevents first-run flooding.
 
+For free web-hosting deployment, use:
+
+```powershell
+tg-vacancy-bot run-web
+```
+
+This runs the same Telegram bot and source polling loop with a small HTTP health endpoint for platforms that require an open port. See `docs/deployment.md`.
+
+To translate vacancy descriptions into Russian and compress long source text before publishing, set:
+
+```dotenv
+LOCALIZE_DESCRIPTIONS=true
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4.1-mini
+OPENAI_BASE_URL=
+```
+
+This uses the real OpenAI API, or an OpenAI-compatible endpoint such as OpenRouter, for normalized cards from forwarded messages, `publish-message`, and public source polling. For OpenRouter, use `OPENAI_BASE_URL=https://openrouter.ai/api/v1` and set `OPENAI_MODEL` to the OpenRouter model slug. If localization is enabled without `OPENAI_API_KEY`, publishing stops with a clear configuration error instead of using fake or placeholder text.
+
 To preview how a forwarded vacancy will be normalized before posting:
 
 ```powershell

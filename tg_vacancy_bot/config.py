@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     database_path: str = Field(default="data/vacancies.sqlite3", alias="DATABASE_PATH")
     source_poll_interval_seconds: int = Field(default=900, alias="SOURCE_POLL_INTERVAL_SECONDS")
     source_max_publish_per_poll: int = Field(default=20, alias="SOURCE_MAX_PUBLISH_PER_POLL")
+    localize_descriptions: bool = Field(default=False, alias="LOCALIZE_DESCRIPTIONS")
 
     enable_remotive: bool = Field(default=True, alias="ENABLE_REMOTIVE")
     enable_arbeitnow: bool = Field(default=True, alias="ENABLE_ARBEITNOW")
@@ -32,6 +33,10 @@ class Settings(BaseSettings):
     jooble_api_key: str = Field(default="", alias="JOOBLE_API_KEY")
     jooble_keywords: str = Field(default="software developer", alias="JOOBLE_KEYWORDS")
     jooble_location: str = Field(default="", alias="JOOBLE_LOCATION")
+
+    openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
+    openai_model: str = Field(default="gpt-4.1-mini", alias="OPENAI_MODEL")
+    openai_base_url: str = Field(default="", alias="OPENAI_BASE_URL")
 
     @property
     def operator_user_ids(self) -> tuple[int, ...]:

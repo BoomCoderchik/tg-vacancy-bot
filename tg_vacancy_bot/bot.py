@@ -12,9 +12,11 @@ from aiogram.types import Message
 
 from .access_control import is_authorized_user
 from .config import Settings
+from .description_localization import localize_vacancy_description
 from .formatting import format_vacancy_card
 from .intake import looks_like_vacancy_message
 from .parser import parse_message_to_vacancy
+from .runtime_lock import SingleInstanceLock, bot_run_lock_path
 from .source_polling import poll_sources_forever
 from .storage import VacancyStore
 from .telegram_origin import forwarded_public_post_url
@@ -35,9 +37,10 @@ def build_status_text(settings: Settings) -> str:
         [
             "TG Vacancy Bot status",
             f"Forwarded mode: {settings.forwarded_mode}",
-            f"Target chat: {settings.target_chat_id or 'not configured'}",
-            f"Operator allowlist: {'on' if settings.operator_user_ids else 'off'}",
-            f"Source polling interval: {settings.source_poll_interval_seconds}s",
+        f"Target chat: {settings.target_chat_id or 'not configured'}",
+        f"Operator allowlist: {'on' if settings.operator_user_ids else 'off'}",
+        f"Description localization: {'on' if settings.localize_descriptions else 'off'}",
+        f"Source polling interval: {settings.source_poll_interval_seconds}s",
             "Sources: " + ", ".join(source_states),
         ]
     )
@@ -100,7 +103,14 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             await message.reply("Похоже, эта вакансия уже публиковалась.")
             return
 
-        card = format_vacancy_card(vacancy)
+        try:
+            public_vacancy = await localize_vacancy_description(vacancy, settings)
+        except RuntimeError as exc:
+            logger.exception("Description localization failed")
+            await message.reply(f"Не смог подготовить русское описание: {exc}")
+            return
+
+        card = format_vacancy_card(public_vacancy)
         await bot.send_message(
             chat_id=settings.target_chat_id,
             text=card,
@@ -122,23 +132,25 @@ async def run_bot(settings: Settings) -> None:
     settings.require_runtime()
     logging.basicConfig(level=logging.INFO)
 
-    store = VacancyStore(settings.database_path)
-    bot = Bot(
-        token=settings.telegram_bot_token,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
-    )
-    dp = create_dispatcher(settings, store)
-    polling_task = asyncio.create_task(poll_sources_forever(bot, settings, store))
+    lock_path = bot_run_lock_path(settings.database_path, settings.telegram_bot_token)
+    with SingleInstanceLock(lock_path):
+        store = VacancyStore(settings.database_path)
+        bot = Bot(
+            token=settings.telegram_bot_token,
+            default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+        )
+        dp = create_dispatcher(settings, store)
+        polling_task = asyncio.create_task(poll_sources_forever(bot, settings, store))
 
-    try:
-        await dp.start_polling(bot)
-    finally:
-        polling_task.cancel()
         try:
-            await polling_task
-        except asyncio.CancelledError:
-            pass
-        await bot.session.close()
+            await dp.start_polling(bot)
+        finally:
+            polling_task.cancel()
+            try:
+                await polling_task
+            except asyncio.CancelledError:
+                pass
+            await bot.session.close()
 
 
 def run_bot_sync(settings: Settings) -> None:

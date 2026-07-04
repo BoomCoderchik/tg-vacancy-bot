@@ -9,6 +9,7 @@ dependencies = [
     "aiohttp>=3.9,<4",
     "beautifulsoup4>=4.12,<5",
     "feedparser>=6.0,<7",
+    "openai>=1.99,<2",
     "pydantic>=2.7,<3",
     "pydantic-settings>=2.3,<3",
     "python-dotenv>=1.0,<2",
@@ -21,6 +22,9 @@ dev = [
 
 [project.scripts]
 tg-vacancy-bot = "tg_vacancy_bot.app:main"
+
+[tool.setuptools.packages.find]
+include = ["tg_vacancy_bot*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
