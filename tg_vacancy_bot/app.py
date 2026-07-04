@@ -52,7 +52,7 @@ async def poll_once() -> None:
                 continue
             filtered = filter_it_vacancies(vacancies)
             total += len(filtered)
-            published += await publisher.publish_new(filtered)
+            published += await publisher.publish_new(filtered, fallback_to_original_on_localization_error=True)
             logging.info("%s: fetched=%s filtered=%s", adapter.name, len(vacancies), len(filtered))
         logging.info("Done. candidates=%s published=%s", total, published)
     finally:
