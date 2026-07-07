@@ -45,13 +45,14 @@ async def poll_sources_once(bot: Bot, settings: Settings, store: VacancyStore) -
             try:
                 public_vacancy = await localize_vacancy_description(vacancy, settings)
             except Exception as exc:
+                # Keep scheduled source posts Russian-only when localization is enabled.
                 logger.warning(
-                    "%s: description localization failed for %r; publishing original description: %s",
+                    "%s: description localization failed for %r; skipping publication: %s",
                     adapter.name,
                     vacancy.title,
                     exc,
                 )
-                public_vacancy = vacancy
+                continue
             await bot.send_message(
                 chat_id=settings.target_chat_id,
                 text=format_vacancy_card(public_vacancy),

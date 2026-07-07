@@ -75,6 +75,12 @@
   - Extracts URL, title, stack, location, salary, and source from free-form vacancy text.
   - Reads labeled fields such as `Location`, `Локация`, `Stack`, `Стек`, `Salary`, `Зарплата`, and `Company`.
 
+- `tg_vacancy_bot/linkedin_posts.py`
+  - Classifies and normalizes already-available LinkedIn user-post records.
+  - Requires an explicit hiring-intent phrase plus a developer/designer role.
+  - Rejects candidate posts, course ads, resumes, generic hiring commentary, and records without LinkedIn URLs.
+  - Produces `Vacancy` objects with `result_type="linkedin_user_post"` so the existing dedupe and publishing pipeline can be reused.
+
 - `tg_vacancy_bot/intake.py`
   - Rejects forwarded text that does not look like an allowed development/design/AI vacancy before formatting/publishing.
 
@@ -85,11 +91,13 @@
   - Source adapter package for real job APIs and public feeds.
   - Keyed APIs are enabled only when credentials exist.
   - Parses publication dates when sources provide them and leaves `published_at=None` when they do not.
+  - Includes an optional LinkedIn user-post adapter that reads only from a configured authorized JSON feed and never scrapes LinkedIn directly.
 
 - `tg_vacancy_bot/source_polling.py`
   - Shared background source polling and publishing loop.
   - Applies the per-poll source publishing limit.
   - Publishes only source vacancies that pass the development/design/AI filter.
+  - Skips publishing a vacancy when required description localization fails, so English originals do not leak into localized channel posts.
   - Filters dated source vacancies by `SOURCE_MAX_AGE_HOURS` before publishing while preserving undated vacancies for dedupe-based handling.
 
 - `tg_vacancy_bot/storage.py`
@@ -115,6 +123,7 @@ Optional source credentials:
 
 - `ADZUNA_APP_ID` and `ADZUNA_APP_KEY`.
 - `JOOBLE_API_KEY`.
+- `ENABLE_LINKEDIN_USER_POSTS=true` and `LINKEDIN_USER_POSTS_FEED_URL` for an authorized JSON feed of LinkedIn user posts.
 
 Optional OpenAI localization:
 
@@ -138,4 +147,4 @@ For `@it_jobs_board`-style intake:
 
 ## LinkedIn Boundary
 
-The project does not bypass LinkedIn rules or scrape LinkedIn directly. LinkedIn posts can enter the system when a user forwards text or sends a LinkedIn URL to the bot.
+The project does not bypass LinkedIn rules or scrape LinkedIn directly. LinkedIn posts can enter the system when a user forwards text or sends a LinkedIn URL to the bot, or through `LINKEDIN_USER_POSTS_FEED_URL` when that URL points to an official API, webhook, export, or external service that is authorized to provide LinkedIn post data.

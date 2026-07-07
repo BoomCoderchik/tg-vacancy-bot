@@ -54,6 +54,34 @@ TECH_KEYWORDS = [
     "LLM",
 ]
 
+STACK_EVIDENCE_TERMS = [
+    "build",
+    "develop",
+    "implement",
+    "maintain",
+    "deploy",
+    "integrate",
+    "use",
+    "using",
+    "work with",
+    "working with",
+    "experience with",
+    "experience in",
+    "proficient in",
+    "knowledge of",
+    "apis",
+    "services",
+    "admin screens",
+    "работаем с",
+    "используем",
+    "опыт с",
+    "опыт работы с",
+    "разработка на",
+    "пишем на",
+    "сервисы",
+    "api",
+]
+
 TITLE_HINT_RE = re.compile(
     r"(?P<title>(senior|middle|junior|lead|staff|principal)?\s*"
     r"[\w+#./ -]{0,40}(developer|engineer|devops|qa|designer|analyst|architect|разработчик|инженер|тестировщик)"
@@ -106,6 +134,20 @@ def extract_stack(text: str) -> tuple[str, ...]:
     return tuple(found)
 
 
+def extract_explicit_stack_from_description(text: str) -> tuple[str, ...]:
+    stack: list[str] = []
+    for sentence in re.split(r"[\n.!?]+", text):
+        lower = sentence.lower()
+        if not any(term in lower for term in STACK_EVIDENCE_TERMS):
+            continue
+        for item in extract_stack(sentence):
+            if item in {"AI", "ML", "LLM", "QA", "DevOps"}:
+                continue
+            if item not in stack:
+                stack.append(item)
+    return tuple(stack)
+
+
 def extract_labeled_fields(text: str) -> dict[str, str]:
     fields: dict[str, str] = {}
     for line in text.splitlines():
@@ -118,6 +160,13 @@ def extract_labeled_fields(text: str) -> dict[str, str]:
             if label in aliases and value:
                 fields.setdefault(field_name, value[:500])
                 break
+    inline_stack = re.search(
+        r"(?:^|[.\n]\s*)(?:stack|tech stack|skills)\s*[:：]\s*(?P<value>[^.\n]+)",
+        text,
+        re.IGNORECASE,
+    )
+    if inline_stack:
+        fields.setdefault("stack", inline_stack.group("value").strip()[:500])
     return fields
 
 
@@ -210,8 +259,12 @@ def parse_message_to_vacancy(text: str, fallback_source: str = "Telegram") -> Va
     title = guess_title(without_urls or cleaned)
     location = labeled_fields.get("location") or guess_location(without_urls)
     salary = labeled_fields.get("salary") or guess_salary(without_urls)
-    stack = parse_stack_value(labeled_fields["stack"]) if "stack" in labeled_fields else extract_stack(without_urls)
     description = labeled_fields.get("description") or remove_labeled_lines(without_urls)
+    stack = (
+        parse_stack_value(labeled_fields["stack"])
+        if "stack" in labeled_fields
+        else extract_explicit_stack_from_description(description)
+    )
 
     if description.startswith(title):
         description = description[len(title) :].strip(" \n:-")

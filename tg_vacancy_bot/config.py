@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     enable_arbeitnow: bool = Field(default=True, alias="ENABLE_ARBEITNOW")
     enable_remoteok: bool = Field(default=True, alias="ENABLE_REMOTEOK")
     enable_hn_who_is_hiring: bool = Field(default=True, alias="ENABLE_HN_WHO_IS_HIRING")
+    enable_linkedin_user_posts: bool = Field(default=False, alias="ENABLE_LINKEDIN_USER_POSTS")
+    linkedin_user_posts_feed_url: str = Field(default="", alias="LINKEDIN_USER_POSTS_FEED_URL")
 
     adzuna_app_id: str = Field(default="", alias="ADZUNA_APP_ID")
     adzuna_app_key: str = Field(default="", alias="ADZUNA_APP_KEY")

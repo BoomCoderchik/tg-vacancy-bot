@@ -32,11 +32,20 @@
   - Query configured by `JOOBLE_KEYWORDS` and `JOOBLE_LOCATION`.
   - Publication date: parsed from `updated` when present.
 
+- LinkedIn user posts authorized JSON feed
+  - Enabled only when `ENABLE_LINKEDIN_USER_POSTS=true` and `LINKEDIN_USER_POSTS_FEED_URL` is set.
+  - The feed must be produced by an official API, webhook, export, or external service that is allowed to provide LinkedIn post data.
+  - The adapter accepts a top-level JSON array, or an object with `posts`, `items`, `data`, or `results`.
+  - Records should provide `url` or `link`, `text` or `content`, optional `published_at`, and optional `author`.
+  - Publication date: parsed from `published_at`, `publishedAt`, `created_at`, `createdAt`, or `date` when present.
+  - Filtering requires explicit hiring intent and an allowed developer/designer role.
+  - Direct LinkedIn scraping and browser automation are intentionally not implemented.
+
 ## Intake Sources
 
 - Direct or forwarded Telegram messages to the bot.
 - Public Telegram channel origins when Telegram exposes forward metadata.
-- LinkedIn URLs only when supplied by the user via a message or forwarded text.
+- LinkedIn URLs when supplied by the user via a message or forwarded text, or when provided by the authorized LinkedIn user-post JSON feed.
 
 ## Planned Source Pattern
 

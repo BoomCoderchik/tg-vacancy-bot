@@ -41,7 +41,7 @@ def build_publisher() -> TelegramPublisher:
     return publisher
 
 
-def test_publish_new_raises_localization_error_by_default(monkeypatch) -> None:
+def test_publish_new_raises_when_localization_fails(monkeypatch) -> None:
     publisher = build_publisher()
     vacancy = Vacancy(title="Python Engineer", description="Remote Python role", source="Fake")
 
@@ -52,22 +52,8 @@ def test_publish_new_raises_localization_error_by_default(monkeypatch) -> None:
 
     with pytest.raises(RuntimeError, match="empty localized description"):
         asyncio.run(publisher.publish_new([vacancy]))
-
-
-def test_publish_new_can_fallback_to_original_on_localization_error(monkeypatch) -> None:
-    publisher = build_publisher()
-    vacancy = Vacancy(title="Python Engineer", description="Remote Python role", source="Fake")
-
-    async def fake_localize(vacancy, settings):
-        raise RuntimeError("OpenAI returned an empty localized description.")
-
-    monkeypatch.setattr("tg_vacancy_bot.publisher.localize_vacancy_description", fake_localize)
-
-    published = asyncio.run(publisher.publish_new([vacancy], fallback_to_original_on_localization_error=True))
-
-    assert published == 1
-    assert "Remote Python role" in publisher.bot.sent_messages[0]
-    assert publisher.store.published == [vacancy]
+    assert publisher.bot.sent_messages == []
+    assert publisher.store.published == []
 
 
 def test_publish_new_retries_after_telegram_flood_control(monkeypatch) -> None:

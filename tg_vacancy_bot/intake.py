@@ -3,7 +3,7 @@ from __future__ import annotations
 from urllib.parse import urlparse
 
 from .parser import extract_stack, extract_urls
-from .sources.filters import looks_like_it_vacancy
+from .sources.filters import looks_like_development_vacancy
 
 
 JOB_TERMS = [
@@ -38,11 +38,19 @@ def looks_like_vacancy_message(text: str) -> bool:
         return False
 
     lower = normalized.lower()
-    if looks_like_it_vacancy(normalized):
+    if looks_like_development_vacancy(normalized):
         return True
-    if extract_stack(normalized) and any(term in lower for term in JOB_TERMS):
+    if (
+        extract_stack(normalized)
+        and any(term in lower for term in JOB_TERMS)
+        and looks_like_development_vacancy(normalized)
+    ):
         return True
-    if any(term in lower for term in JOB_TERMS) and any(_is_vacancy_domain(url) for url in extract_urls(normalized)):
+    if (
+        any(term in lower for term in JOB_TERMS)
+        and any(_is_vacancy_domain(url) for url in extract_urls(normalized))
+        and looks_like_development_vacancy(normalized)
+    ):
         return True
     return False
 

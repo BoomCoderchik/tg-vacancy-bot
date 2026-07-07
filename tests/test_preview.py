@@ -22,7 +22,7 @@ https://www.linkedin.com/posts/example
 """
     )
 
-    assert "<b>IT Job Board</b>" in card
+    assert "IT Job Board" not in card
     assert "Senior Backend Engineer" in card
     assert "Python, FastAPI" in card
 
@@ -64,3 +64,14 @@ def test_parse_publishable_message_returns_vacancy() -> None:
     assert "Python Engineer" in vacancy.title
     assert vacancy.source == "Telegram"
     assert "Python" in vacancy.stack
+
+
+def test_parse_publishable_message_returns_linkedin_user_post() -> None:
+    vacancy = parse_publishable_message(
+        "We're hiring a React developer to join our team. "
+        "https://www.linkedin.com/feed/update/urn:li:activity:123/"
+    )
+
+    assert vacancy.result_type == "linkedin_user_post"
+    assert vacancy.role == "React developer"
+    assert vacancy.url == "https://www.linkedin.com/feed/update/urn:li:activity:123/"

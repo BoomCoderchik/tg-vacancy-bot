@@ -42,7 +42,7 @@ def test_poll_once_respects_global_publish_limit(monkeypatch, tmp_path) -> None:
         def __init__(self, settings, store) -> None:
             pass
 
-        async def publish_new(self, vacancies, *, fallback_to_original_on_localization_error=False):
+        async def publish_new(self, vacancies):
             published_batches.append(list(vacancies))
             return len(vacancies)
 

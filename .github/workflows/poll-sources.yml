@@ -21,7 +21,7 @@ jobs:
       DATABASE_PATH: data/vacancies.sqlite3
       SOURCE_POLL_INTERVAL_SECONDS: "0"
       SOURCE_MAX_PUBLISH_PER_POLL: ${{ secrets.SOURCE_MAX_PUBLISH_PER_POLL }}
-      LOCALIZE_DESCRIPTIONS: ${{ secrets.LOCALIZE_DESCRIPTIONS }}
+      LOCALIZE_DESCRIPTIONS: "true"
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
       OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
@@ -55,6 +55,35 @@ jobs:
 
       - name: Install bot
         run: pip install .
+
+      # Production posts must use the current compact card, not the old channel label.
+      - name: Verify production card formatting
+        run: |
+          python - <<'PY'
+          from tg_vacancy_bot.formatting import format_vacancy_card
+          from tg_vacancy_bot.models import Vacancy
+
+          card = format_vacancy_card(
+              Vacancy(
+                  title="Senior Backend Engineer",
+                  description="Build APIs.",
+                  source="Format check",
+                  location="Remote",
+                  stack=("Python", "FastAPI"),
+              )
+          )
+          assert "IT Job Board" not in card
+          assert "<b>Локация</b>" in card
+          assert "<b>Стек</b>" in card
+          PY
+
+      # If translation is required, stop before Telegram publishing when OpenAI is unavailable.
+      - name: Verify localization configuration
+        run: |
+          if [ "${LOCALIZE_DESCRIPTIONS}" = "true" ] && [ -z "${OPENAI_API_KEY}" ]; then
+            echo "LOCALIZE_DESCRIPTIONS=true but OPENAI_API_KEY is not configured."
+            exit 1
+          fi
 
       - name: Poll and publish new vacancies
         run: tg-vacancy-bot poll-once

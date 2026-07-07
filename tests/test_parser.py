@@ -85,3 +85,46 @@ Build product features.
 
     assert vacancy.title == "Senior Full-Stack Engineer"
     assert vacancy.description == "Build product features."
+
+
+def test_parse_message_extracts_stack_from_explicit_description_evidence() -> None:
+    text = """
+Senior Backend Engineer
+Location: Remote
+
+Description:
+Build Python APIs and React admin screens for a fintech platform.
+"""
+
+    vacancy = parse_message_to_vacancy(text)
+
+    assert vacancy.stack == ("Python", "React")
+
+
+def test_parse_message_without_stack_evidence_keeps_stack_empty() -> None:
+    text = """
+Senior Backend Engineer
+Location: Remote
+
+Description:
+Build product features for an AI software platform.
+"""
+
+    vacancy = parse_message_to_vacancy(text)
+
+    assert vacancy.stack == ()
+
+
+def test_parse_message_with_explicit_stack_uses_only_stack_field() -> None:
+    text = """
+Senior Backend Engineer
+Location: Remote
+Stack: Python, FastAPI
+
+Description:
+Build services that deploy to AWS and store data in PostgreSQL.
+"""
+
+    vacancy = parse_message_to_vacancy(text)
+
+    assert vacancy.stack == ("Python", "FastAPI")

@@ -27,12 +27,7 @@ class TelegramPublisher:
             default=DefaultBotProperties(parse_mode=ParseMode.HTML),
         )
 
-    async def publish_new(
-        self,
-        vacancies: list[Vacancy],
-        *,
-        fallback_to_original_on_localization_error: bool = False,
-    ) -> int:
+    async def publish_new(self, vacancies: list[Vacancy]) -> int:
         published = 0
         for vacancy in vacancies:
             if self.store.seen(vacancy):
@@ -40,14 +35,13 @@ class TelegramPublisher:
             try:
                 public_vacancy = await localize_vacancy_description(vacancy, self.settings)
             except Exception as exc:
-                if not fallback_to_original_on_localization_error:
-                    raise
                 logger.warning(
-                    "Description localization failed for %r; publishing original description: %s",
+                    "Description localization failed for %r; skipping publication: %s",
                     vacancy.title,
                     exc,
                 )
-                public_vacancy = vacancy
+                # Fail command-style publishing so CI exposes broken localization.
+                raise
             try:
                 await self.bot.send_message(
                     chat_id=self.settings.target_chat_id,

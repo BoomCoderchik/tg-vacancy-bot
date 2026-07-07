@@ -92,6 +92,8 @@ OPENAI_BASE_URL=
 
 This uses the real OpenAI API, or an OpenAI-compatible endpoint such as OpenRouter, for normalized cards from forwarded messages, `publish-message`, and public source polling. For OpenRouter, use `OPENAI_BASE_URL=https://openrouter.ai/api/v1` and set `OPENAI_MODEL` to the OpenRouter model slug. If localization is enabled without `OPENAI_API_KEY`, publishing stops with a clear configuration error instead of using fake or placeholder text.
 
+The scheduled GitHub Actions source poll requires localization to be available before it posts to Telegram. If `OPENAI_API_KEY` is missing or the formatter regresses to the old card style, the workflow fails before publishing.
+
 To preview how a forwarded vacancy will be normalized before posting:
 
 ```powershell
@@ -115,17 +117,17 @@ tg-vacancy-bot publish-message --file .\sample-message.txt
 Send or forward a vacancy message to the bot. In `normalize` mode, the bot will publish a card like:
 
 ```text
-IT Job Board
 💼 Senior Full-Stack Engineer
 
 📍 Локация: Удаленно
 
 🧠 Стек: Python, FastAPI, React, AWS
 
-Описание:
+Описание
 ...
 
 🔗 Смотреть вакансию
+▫️ Источник: Telegram
 ```
 
 In `copy` mode, the bot copies the original message to the target channel.
@@ -141,3 +143,41 @@ Messages that do not look like allowed development/design/AI vacancies are skipp
 ## LinkedIn Note
 
 This project does not bypass LinkedIn restrictions or scrape LinkedIn directly. LinkedIn links can still be handled when a user forwards a post or sends a LinkedIn URL to the bot.
+
+## LinkedIn User Posts
+
+The bot can publish relevant LinkedIn user posts as `linkedin_user_post` results when the posts come from an allowed source. It does not log in to LinkedIn, automate a browser, or scrape LinkedIn pages.
+
+To enable automated intake, provide a JSON feed produced by an official API, webhook, export, or external service that is allowed to supply LinkedIn post data:
+
+```dotenv
+ENABLE_LINKEDIN_USER_POSTS=true
+LINKEDIN_USER_POSTS_FEED_URL=https://authorized.example/linkedin-posts.json
+```
+
+Leave `ENABLE_LINKEDIN_USER_POSTS=false` or keep `LINKEDIN_USER_POSTS_FEED_URL` empty to disable this source.
+
+Accepted feed shape:
+
+```json
+{
+  "posts": [
+    {
+      "url": "https://www.linkedin.com/feed/update/urn:li:activity:123/",
+      "text": "We're hiring a React developer to join our team.",
+      "published_at": "2026-07-07T07:30:00Z",
+      "author": "Jane Hiring"
+    }
+  ]
+}
+```
+
+The adapter also accepts a top-level JSON array, or list fields named `items`, `data`, or `results`.
+
+LinkedIn post filtering requires:
+
+- a LinkedIn URL;
+- explicit hiring intent such as `we're hiring`, `looking for a backend engineer`, `need a UI/UX designer`, or `hiring React developer`;
+- an allowed developer or designer role such as frontend, backend, fullstack, mobile, React, Vue, Angular, Node.js, Python, PHP, Java, UI/UX, product, or graphic designer.
+
+The bot rejects candidate posts like `looking for job`, course ads, resumes, general hiring commentary, and posts without an explicit candidate-search intent. Duplicates are skipped through the same SQLite URL fingerprint store used for vacancies. Dated LinkedIn posts older than `SOURCE_MAX_AGE_HOURS` are skipped.

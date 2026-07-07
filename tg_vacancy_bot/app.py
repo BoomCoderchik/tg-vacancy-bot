@@ -6,6 +6,7 @@ import logging
 import sys
 from pathlib import Path
 from collections.abc import Sequence
+from datetime import UTC, datetime
 
 from .bot import run_bot_sync
 from .console import write_stdout
@@ -15,6 +16,7 @@ from .env_setup import init_env_file
 from .preview import parse_publishable_message, preview_message_card_async
 from .publisher import TelegramPublisher
 from .sources import build_adapters, filter_it_vacancies
+from .sources.freshness import filter_fresh_vacancies
 from .storage import VacancyStore
 from .telegram_check import check_telegram_access, format_check_result
 
@@ -54,14 +56,15 @@ async def poll_once() -> None:
             except Exception:
                 logging.exception("%s: source fetch failed", adapter.name)
                 continue
-            filtered = filter_it_vacancies(vacancies)
+            filtered = filter_fresh_vacancies(
+                filter_it_vacancies(vacancies),
+                max_age_hours=settings.source_max_age_hours,
+                current_time=datetime.now(UTC),
+            )
             total += len(filtered)
             remaining = max_publish - published if max_publish > 0 else len(filtered)
             publishable = filtered[:remaining]
-            published += await publisher.publish_new(
-                publishable,
-                fallback_to_original_on_localization_error=True,
-            )
+            published += await publisher.publish_new(publishable)
             logging.info("%s: fetched=%s filtered=%s", adapter.name, len(vacancies), len(filtered))
         logging.info("Done. candidates=%s published=%s", total, published)
     finally:

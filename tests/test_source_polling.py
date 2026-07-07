@@ -81,7 +81,7 @@ def test_poll_sources_once_localizes_description_before_sending(monkeypatch) -> 
     assert store.published[0].description == "Remote Python role"
 
 
-def test_poll_sources_once_publishes_original_when_localization_fails(monkeypatch) -> None:
+def test_poll_sources_once_skips_vacancy_when_localization_fails(monkeypatch) -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
@@ -100,9 +100,9 @@ def test_poll_sources_once_publishes_original_when_localization_fails(monkeypatc
 
     published = asyncio.run(poll_sources_once(bot, settings, store))
 
-    assert published == 1
-    assert "Remote Python role" in bot.sent_messages[0]
-    assert store.published[0].description == "Remote Python role"
+    assert published == 0
+    assert bot.sent_messages == []
+    assert store.published == []
 
 
 def test_poll_sources_once_skips_stale_published_vacancies(monkeypatch) -> None:

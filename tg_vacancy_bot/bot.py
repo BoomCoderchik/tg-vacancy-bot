@@ -15,7 +15,7 @@ from .config import Settings
 from .description_localization import localize_vacancy_description
 from .formatting import format_vacancy_card
 from .intake import looks_like_vacancy_message
-from .parser import parse_message_to_vacancy
+from .preview import parse_publishable_message
 from .runtime_lock import SingleInstanceLock, bot_run_lock_path
 from .source_polling import poll_sources_forever
 from .storage import VacancyStore
@@ -30,6 +30,7 @@ def build_status_text(settings: Settings) -> str:
         f"Arbeitnow={'on' if settings.enable_arbeitnow else 'off'}",
         f"RemoteOK={'on' if settings.enable_remoteok else 'off'}",
         f"HN={'on' if settings.enable_hn_who_is_hiring else 'off'}",
+        f"LinkedIn user posts={'on' if settings.enable_linkedin_user_posts and settings.linkedin_user_posts_feed_url else 'off'}",
         f"Adzuna={'on' if settings.adzuna_app_id and settings.adzuna_app_key else 'off'}",
         f"Jooble={'on' if settings.jooble_api_key else 'off'}",
     ]
@@ -80,6 +81,11 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             await message.reply("Not authorized.")
             return
 
+        text = message.text or message.caption or ""
+        if not looks_like_vacancy_message(text):
+            await message.reply("I skipped this message because it does not look like an allowed development vacancy.")
+            return
+
         if settings.forwarded_mode == "copy":
             await bot.copy_message(
                 chat_id=settings.target_chat_id,
@@ -89,12 +95,7 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             await message.reply("Скопировал сообщение в канал.")
             return
 
-        text = message.text or message.caption or ""
-        if not looks_like_vacancy_message(text):
-            await message.reply("I skipped this message because it does not look like an IT vacancy.")
-            return
-
-        vacancy = parse_message_to_vacancy(text)
+        vacancy = parse_publishable_message(text)
         if not vacancy.url:
             origin_url = forwarded_public_post_url(message)
             if origin_url:
