@@ -87,10 +87,11 @@ To translate vacancy descriptions into Russian and compress long source text bef
 LOCALIZE_DESCRIPTIONS=true
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4.1-mini
+OPENAI_FALLBACK_MODELS=
 OPENAI_BASE_URL=
 ```
 
-This uses the real OpenAI API, or an OpenAI-compatible endpoint such as OpenRouter, for normalized cards from forwarded messages, `publish-message`, and public source polling. For OpenRouter, use `OPENAI_BASE_URL=https://openrouter.ai/api/v1` and set `OPENAI_MODEL` to the OpenRouter model slug. If localization is enabled without `OPENAI_API_KEY`, publishing stops with a clear configuration error instead of using fake or placeholder text.
+This uses the real OpenAI API, or an OpenAI-compatible endpoint such as OpenRouter, for normalized cards from forwarded messages, `publish-message`, and public source polling. For OpenRouter, use `OPENAI_BASE_URL=https://openrouter.ai/api/v1` and set `OPENAI_MODEL` to an OpenRouter model slug such as `qwen/qwen3.6-plus:free`. When OpenRouter is configured and `OPENAI_FALLBACK_MODELS` is empty, the bot automatically retries empty or failed localization responses with `qwen/qwen3.6-plus:free` and `openrouter/free`. You can override that chain with a comma-separated `OPENAI_FALLBACK_MODELS` value. If localization is enabled without `OPENAI_API_KEY`, publishing stops with a clear configuration error instead of using fake or placeholder text.
 
 The scheduled GitHub Actions source poll requires localization to be available before it posts to Telegram. If `OPENAI_API_KEY` is missing or the formatter regresses to the old card style, the workflow fails before publishing.
 

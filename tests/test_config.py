@@ -37,3 +37,25 @@ def test_settings_reads_description_localization_options() -> None:
     assert settings.openai_api_key == "test-key"
     assert settings.openai_model == "test-model"
     assert settings.openai_base_url == "https://openrouter.ai/api/v1"
+
+
+def test_settings_uses_openrouter_free_fallback_models_by_default() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        OPENAI_BASE_URL="https://openrouter.ai/api/v1",
+        OPENAI_FALLBACK_MODELS="",
+    )
+
+    assert settings.openai_fallback_models == ("qwen/qwen3.6-plus:free", "openrouter/free")
+
+
+def test_settings_reads_configured_openai_fallback_models() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        OPENAI_FALLBACK_MODELS="openrouter/free, google/gemma-4-31b-it:free",
+        OPENAI_BASE_URL="https://openrouter.ai/api/v1",
+    )
+
+    assert settings.openai_fallback_models == ("openrouter/free", "google/gemma-4-31b-it:free")

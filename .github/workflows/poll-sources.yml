@@ -24,6 +24,7 @@ jobs:
       LOCALIZE_DESCRIPTIONS: "true"
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+      OPENAI_FALLBACK_MODELS: ${{ secrets.OPENAI_FALLBACK_MODELS }}
       OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
       ENABLE_REMOTIVE: ${{ secrets.ENABLE_REMOTIVE }}
       ENABLE_ARBEITNOW: ${{ secrets.ENABLE_ARBEITNOW }}

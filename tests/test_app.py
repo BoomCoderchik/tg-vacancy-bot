@@ -57,4 +57,48 @@ def test_poll_once_respects_global_publish_limit(monkeypatch, tmp_path) -> None:
 
     asyncio.run(poll_once())
 
-    assert [len(batch) for batch in published_batches] == [2]
+    assert [len(batch) for batch in published_batches] == [1, 1]
+
+
+def test_poll_once_skips_vacancy_when_localization_fails(monkeypatch, tmp_path) -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        DATABASE_PATH=str(tmp_path / "vacancies.sqlite3"),
+        SOURCE_MAX_PUBLISH_PER_POLL="2",
+        LOCALIZE_DESCRIPTIONS="true",
+        OPENAI_API_KEY="test-key",
+    )
+    attempted = []
+
+    class FakeAdapter:
+        name = "Fake"
+
+        async def fetch(self):
+            return [
+                Vacancy(title="UI/UX Designer", description="Design ecommerce flows.", source="Fake"),
+                Vacancy(title="Python Engineer", description="Remote Python role", source="Fake"),
+            ]
+
+    class FakePublisher:
+        def __init__(self, settings, store) -> None:
+            pass
+
+        async def publish_new(self, vacancies):
+            attempted.extend(vacancies)
+            if vacancies[0].title == "UI/UX Designer":
+                raise RuntimeError("OpenAI returned an empty localized description.")
+            return len(vacancies)
+
+        async def close(self) -> None:
+            pass
+
+    monkeypatch.setattr("tg_vacancy_bot.app.get_settings", lambda: settings)
+    monkeypatch.setattr("tg_vacancy_bot.app.build_adapters", lambda _: [FakeAdapter()])
+    monkeypatch.setattr("tg_vacancy_bot.app.TelegramPublisher", FakePublisher)
+
+    import asyncio
+
+    asyncio.run(poll_once())
+
+    assert [vacancy.title for vacancy in attempted] == ["UI/UX Designer", "Python Engineer"]

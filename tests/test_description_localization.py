@@ -46,6 +46,28 @@ class FailingOpenAIClient:
         self.chat = FailingChat()
 
 
+class EmptyThenGoodResponses:
+    def __init__(self) -> None:
+        self.models: list[str] = []
+
+    async def create(self, **kwargs):
+        self.models.append(kwargs["model"])
+        content = "" if len(self.models) == 1 else "Короткое русское описание."
+        message = type("Message", (), {"content": content})()
+        choice = type("Choice", (), {"message": message})()
+        return type("Response", (), {"choices": [choice]})()
+
+
+class EmptyThenGoodChat:
+    def __init__(self) -> None:
+        self.completions = EmptyThenGoodResponses()
+
+
+class EmptyThenGoodOpenAIClient:
+    def __init__(self) -> None:
+        self.chat = EmptyThenGoodChat()
+
+
 def test_openai_localizer_requests_russian_compressed_description() -> None:
     client = FakeOpenAIClient()
     localizer = OpenAIDescriptionLocalizer(api_key="test-key", model="test-model", client=client)
@@ -61,6 +83,21 @@ def test_openai_localizer_requests_russian_compressed_description() -> None:
     assert "только исходное описание" in request["messages"][0]["content"].lower()
     assert request["messages"][1]["content"] == "Wir suchen einen Python Entwickler fuer Remote Backend Arbeit."
     assert request["max_tokens"] <= 300
+
+
+def test_openai_localizer_uses_fallback_model_when_primary_returns_empty_text() -> None:
+    client = EmptyThenGoodOpenAIClient()
+    localizer = OpenAIDescriptionLocalizer(
+        api_key="test-key",
+        model="bad-free-model",
+        fallback_models=("openrouter/free",),
+        client=client,
+    )
+
+    text = asyncio.run(localizer.localize("Design ecommerce flows."))
+
+    assert text == "Короткое русское описание."
+    assert client.chat.completions.models == ["bad-free-model", "openrouter/free"]
 
 
 def test_openai_localizer_wraps_api_errors() -> None:

@@ -39,11 +39,23 @@ class Settings(BaseSettings):
 
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4.1-mini", alias="OPENAI_MODEL")
+    openai_fallback_models_raw: str = Field(default="", alias="OPENAI_FALLBACK_MODELS")
     openai_base_url: str = Field(default="", alias="OPENAI_BASE_URL")
 
     @property
     def operator_user_ids(self) -> tuple[int, ...]:
         return parse_operator_user_ids(self.operator_user_ids_raw)
+
+    @property
+    def openai_fallback_models(self) -> tuple[str, ...]:
+        configured = tuple(
+            model.strip() for model in self.openai_fallback_models_raw.split(",") if model.strip()
+        )
+        if configured:
+            return configured
+        if "openrouter.ai" in self.openai_base_url.lower():
+            return ("qwen/qwen3.6-plus:free", "openrouter/free")
+        return ()
 
     def require_runtime(self) -> None:
         missing = []

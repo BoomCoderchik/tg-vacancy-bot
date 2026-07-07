@@ -45,7 +45,7 @@
   - Requires `TELEGRAM_BOT_TOKEN` and `TARGET_CHAT_ID` for real publishing.
   - Supports optional `OPERATOR_USER_IDS` for publish access control.
   - Controls source polling with `SOURCE_POLL_INTERVAL_SECONDS`, `SOURCE_MAX_PUBLISH_PER_POLL`, and `SOURCE_MAX_AGE_HOURS`.
-  - Supports optional OpenAI/OpenAI-compatible description localization with `LOCALIZE_DESCRIPTIONS`, `OPENAI_API_KEY`, `OPENAI_MODEL`, and `OPENAI_BASE_URL`.
+  - Supports optional OpenAI/OpenAI-compatible description localization with `LOCALIZE_DESCRIPTIONS`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_FALLBACK_MODELS`, and `OPENAI_BASE_URL`.
 
 - `tg_vacancy_bot/access_control.py`
   - Parses operator allowlists and checks whether a sender may publish through the bot.
@@ -130,6 +130,7 @@ Optional OpenAI localization:
 - `LOCALIZE_DESCRIPTIONS=true`.
 - `OPENAI_API_KEY` for the real OpenAI or OpenAI-compatible API.
 - `OPENAI_MODEL`, defaulting to `gpt-4.1-mini`.
+- `OPENAI_FALLBACK_MODELS`, optional comma-separated fallback model list. For OpenRouter, the default fallback chain is `qwen/qwen3.6-plus:free,openrouter/free`.
 - `OPENAI_BASE_URL`, optional. For OpenRouter, use `https://openrouter.ai/api/v1`.
 
 Do not replace missing external services with fake data. If a token, chat ID, API key, or permission is missing, report the missing service and stop that integration path until it is configured.

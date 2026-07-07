@@ -30,10 +30,12 @@ class OpenAIDescriptionLocalizer:
         self,
         api_key: str,
         model: str,
+        fallback_models: tuple[str, ...] = (),
         base_url: str = "",
         client: object | None = None,
     ) -> None:
         self.model = model
+        self.fallback_models = fallback_models
         if client is None:
             try:
                 from openai import AsyncOpenAI
@@ -46,22 +48,30 @@ class OpenAIDescriptionLocalizer:
         self.client = client
 
     async def localize(self, description: str) -> str:
-        try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": LOCALIZATION_INSTRUCTIONS},
-                    {"role": "user", "content": description},
-                ],
-                max_tokens=MAX_OUTPUT_TOKENS,
-                temperature=0.2,
-            )
-        except Exception as exc:
-            raise RuntimeError(format_openai_error(exc)) from exc
-        text = normalize_localized_description(response.choices[0].message.content or "")
-        if not text:
+        errors: list[str] = []
+        for model in unique_models((self.model, *self.fallback_models)):
+            try:
+                response = await self.client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": LOCALIZATION_INSTRUCTIONS},
+                        {"role": "user", "content": description},
+                    ],
+                    max_tokens=MAX_OUTPUT_TOKENS,
+                    temperature=0.2,
+                )
+            except Exception as exc:
+                errors.append(format_openai_error(exc))
+                continue
+
+            text = normalize_localized_description(response.choices[0].message.content or "")
+            if text:
+                return text
+            errors.append(f"{model} returned an empty localized description.")
+
+        if errors == [f"{self.model} returned an empty localized description."]:
             raise RuntimeError("OpenAI returned an empty localized description.")
-        return text
+        raise RuntimeError(f"OpenAI description localization failed after fallback attempts: {'; '.join(errors)}")
 
 
 async def localize_vacancy_description(
@@ -77,6 +87,7 @@ async def localize_vacancy_description(
     localizer = localizer or OpenAIDescriptionLocalizer(
         api_key=settings.openai_api_key,
         model=settings.openai_model,
+        fallback_models=settings.openai_fallback_models,
         base_url=settings.openai_base_url,
     )
     description = await localizer.localize(vacancy.description)
@@ -88,6 +99,14 @@ def normalize_localized_description(text: str) -> str:
     if len(normalized) <= MAX_LOCALIZED_DESCRIPTION_CHARS:
         return normalized
     return normalized[: MAX_LOCALIZED_DESCRIPTION_CHARS - 1].rstrip() + "..."
+
+
+def unique_models(models: tuple[str, ...]) -> tuple[str, ...]:
+    result = []
+    for model in models:
+        if model and model not in result:
+            result.append(model)
+    return tuple(result)
 
 
 def format_openai_error(exc: Exception) -> str:

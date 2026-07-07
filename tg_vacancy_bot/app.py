@@ -64,7 +64,16 @@ async def poll_once() -> None:
             total += len(filtered)
             remaining = max_publish - published if max_publish > 0 else len(filtered)
             publishable = filtered[:remaining]
-            published += await publisher.publish_new(publishable)
+            for vacancy in publishable:
+                try:
+                    published += await publisher.publish_new([vacancy])
+                except RuntimeError as exc:
+                    logging.warning(
+                        "%s: publication skipped for %r: %s",
+                        adapter.name,
+                        vacancy.title,
+                        exc,
+                    )
             logging.info("%s: fetched=%s filtered=%s", adapter.name, len(vacancies), len(filtered))
         logging.info("Done. candidates=%s published=%s", total, published)
     finally:
