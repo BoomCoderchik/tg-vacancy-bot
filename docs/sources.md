@@ -22,6 +22,36 @@
   - Uses Algolia HN API to locate the latest thread and parse candidate comments.
   - Publication date: parsed from comment timestamp fields when present.
 
+- Jobicy API
+  - Enabled with `ENABLE_JOBICY=true`.
+  - No key required.
+  - Uses the public `https://jobicy.com/api/v2/remote-jobs?tag=dev` endpoint.
+  - Publication date: parsed from `pubDate` when present.
+
+- We Work Remotely Programming RSS
+  - Enabled with `ENABLE_WE_WORK_REMOTELY=true`.
+  - No key required.
+  - Uses the public programming RSS feed.
+  - Publication date: parsed from RSS `pubDate` when present.
+
+- Himalayas RSS
+  - Enabled with `ENABLE_HIMALAYAS=true`.
+  - No key required.
+  - Uses the public remote jobs RSS feed.
+  - Publication date: parsed from RSS `pubDate` when present.
+
+- Real Work From Anywhere RSS
+  - Enabled with `ENABLE_REAL_WORK_FROM_ANYWHERE=true`.
+  - No key required.
+  - Uses the public remote jobs RSS feed.
+  - Publication date: parsed from RSS `pubDate` when present.
+
+- JobsCollider RSS
+  - Enabled with `ENABLE_JOBSCOLLIDER=true`.
+  - No key required.
+  - Uses the public remote jobs RSS feed.
+  - Publication date: parsed from RSS `pubDate` when present.
+
 - Adzuna API
   - Enabled only when `ADZUNA_APP_ID` and `ADZUNA_APP_KEY` are set.
   - Query configured by `ADZUNA_COUNTRY`, `ADZUNA_QUERY`, and `ADZUNA_LOCATION`.

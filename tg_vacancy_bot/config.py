@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     enable_arbeitnow: bool = Field(default=True, alias="ENABLE_ARBEITNOW")
     enable_remoteok: bool = Field(default=True, alias="ENABLE_REMOTEOK")
     enable_hn_who_is_hiring: bool = Field(default=True, alias="ENABLE_HN_WHO_IS_HIRING")
+    enable_jobicy: bool = Field(default=True, alias="ENABLE_JOBICY")
+    enable_we_work_remotely: bool = Field(default=True, alias="ENABLE_WE_WORK_REMOTELY")
+    enable_himalayas: bool = Field(default=True, alias="ENABLE_HIMALAYAS")
+    enable_real_work_from_anywhere: bool = Field(default=True, alias="ENABLE_REAL_WORK_FROM_ANYWHERE")
+    enable_jobscollider: bool = Field(default=True, alias="ENABLE_JOBSCOLLIDER")
     enable_linkedin_user_posts: bool = Field(default=False, alias="ENABLE_LINKEDIN_USER_POSTS")
     linkedin_user_posts_feed_url: str = Field(default="", alias="LINKEDIN_USER_POSTS_FEED_URL")
 

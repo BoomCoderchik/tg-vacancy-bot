@@ -121,6 +121,7 @@ The bot depends on real Telegram access:
 
 Optional source credentials:
 
+- No-key sources are controlled by `ENABLE_REMOTIVE`, `ENABLE_ARBEITNOW`, `ENABLE_REMOTEOK`, `ENABLE_HN_WHO_IS_HIRING`, `ENABLE_JOBICY`, `ENABLE_WE_WORK_REMOTELY`, `ENABLE_HIMALAYAS`, `ENABLE_REAL_WORK_FROM_ANYWHERE`, and `ENABLE_JOBSCOLLIDER`.
 - `ADZUNA_APP_ID` and `ADZUNA_APP_KEY`.
 - `JOOBLE_API_KEY`.
 - `ENABLE_LINKEDIN_USER_POSTS=true` and `LINKEDIN_USER_POSTS_FEED_URL` for an authorized JSON feed of LinkedIn user posts.

@@ -11,7 +11,7 @@ Telegram bot for collecting IT vacancies from forwarded messages and public job 
   - `copy`: copy the original message to the target channel after the same allowed-vacancy intake check.
 - Publishes only development/design/AI vacancies: backend, frontend, fullstack, design, LLM, AI, and clear software developer/engineer roles.
 - Stores message fingerprints in SQLite to avoid duplicates.
-- Includes initial source adapters for Remotive, Arbeitnow, RemoteOK, and Hacker News "Who is Hiring".
+- Includes source adapters for Remotive, Arbeitnow, RemoteOK, Hacker News "Who is Hiring", Jobicy, We Work Remotely, Himalayas, Real Work From Anywhere, and JobsCollider.
 - Polls configured public sources in the background while the bot is running.
 
 ## Near-Real-Time Parser Mode

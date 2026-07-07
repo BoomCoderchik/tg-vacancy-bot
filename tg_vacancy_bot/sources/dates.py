@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 
 
 def parse_source_datetime(value: object) -> datetime | None:
@@ -23,6 +24,11 @@ def parse_source_datetime(value: object) -> datetime | None:
     try:
         return _to_utc(datetime.fromisoformat(normalized))
     except ValueError:
+        pass
+
+    try:
+        return _to_utc(parsedate_to_datetime(text))
+    except (TypeError, ValueError, IndexError, OverflowError):
         return None
 
 
