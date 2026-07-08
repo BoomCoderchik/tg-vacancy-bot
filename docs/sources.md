@@ -70,16 +70,24 @@
   - Optional `JOBSPY_LINKEDIN_PROXIES` is passed through to JobSpy as a comma-separated proxy list.
   - Publication date: parsed from JobSpy `date_posted` when present.
 
+- LinkedIn Hiring Posts
+  - Enabled only when `ENABLE_LINKEDIN_POST_SEARCH=true` and `SERPAPI_API_KEY` are set.
+  - Uses SerpApi Google Search (`https://serpapi.com/search.json`) to find publicly indexed LinkedIn post URLs, not LinkedIn Jobs pages.
+  - Query configured by `LINKEDIN_POST_SEARCH_QUERY`, `LINKEDIN_POST_SEARCH_LOCATION`, and `LINKEDIN_POST_SEARCH_RESULTS_WANTED`.
+  - Maps search `title`, `snippet`, `link`, and optional `date` into a short `Vacancy` card with source `LinkedIn Hiring Posts`.
+  - Drops results that are not `linkedin.com/posts/...` or `linkedin.com/feed/update/...`.
+
 ## Intake Sources
 
 - Direct or forwarded Telegram messages to the bot.
 - Public Telegram channel origins when Telegram exposes forward metadata.
 - LinkedIn URLs supplied manually by an operator via sent or forwarded vacancy text.
 - LinkedIn links discovered by the opt-in JobSpy LinkedIn source.
+- LinkedIn post links discovered by the opt-in SerpApi-backed hiring-post search source.
 
 ## LinkedIn Boundary
 
-The only automatic LinkedIn source is `JobSpyLinkedInAdapter`, and it must remain explicitly opt-in. Browser automation, account-based crawling, fake LinkedIn fallback rows, and undocumented LinkedIn scraping paths remain out of scope.
+The only automatic LinkedIn sources are `LinkedInPostSearchAdapter` for public hiring posts and `JobSpyLinkedInAdapter` for LinkedIn Jobs, and both must remain explicitly opt-in. Browser automation, account-based crawling, fake LinkedIn fallback rows, and undocumented LinkedIn scraping paths remain out of scope.
 
 ## Planned Source Pattern
 
@@ -88,7 +96,7 @@ New sources should be added as `SourceAdapter` implementations under `tg_vacancy
 Each adapter should:
 
 - Call a real documented API/feed/page where automated access is allowed.
-- For LinkedIn, use only the documented JobSpy adapter path unless project instructions are changed again.
+- For LinkedIn, use only the documented SerpApi hiring-post adapter or JobSpy Jobs adapter unless project instructions are changed again.
 - Return `Vacancy` objects.
 - Use timeouts.
 - Let the polling layer handle exceptions.

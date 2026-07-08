@@ -35,6 +35,19 @@ class Settings(BaseSettings):
     enable_real_work_from_anywhere: bool = Field(default=True, alias="ENABLE_REAL_WORK_FROM_ANYWHERE")
     enable_jobscollider: bool = Field(default=True, alias="ENABLE_JOBSCOLLIDER")
     enable_jobspy_linkedin: bool = Field(default=False, alias="ENABLE_JOBSPY_LINKEDIN")
+    enable_linkedin_post_search: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SEARCH")
+    serpapi_api_key: str = Field(default="", alias="SERPAPI_API_KEY")
+    linkedin_post_search_query: str = Field(
+        default=(
+            '(site:linkedin.com/posts OR site:linkedin.com/feed/update) '
+            '("ищем" OR "ищет" OR "в команду" OR "we are hiring" OR "we\'re hiring" OR hiring) '
+            '(frontend OR "front-end" OR backend OR fullstack OR "full-stack" OR designer OR '
+            '"AI engineer" OR "ML engineer" OR "LLM engineer" OR разработчик OR инженер)'
+        ),
+        alias="LINKEDIN_POST_SEARCH_QUERY",
+    )
+    linkedin_post_search_location: str = Field(default="Kazakhstan", alias="LINKEDIN_POST_SEARCH_LOCATION")
+    linkedin_post_search_results_wanted: int = Field(default=10, alias="LINKEDIN_POST_SEARCH_RESULTS_WANTED")
     jobspy_linkedin_query: str = Field(
         default='backend OR frontend OR fullstack OR designer OR "AI engineer" OR "ML engineer" OR "LLM engineer"',
         alias="JOBSPY_LINKEDIN_QUERY",
