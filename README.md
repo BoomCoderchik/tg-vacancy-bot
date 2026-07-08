@@ -11,7 +11,7 @@ Telegram bot for collecting IT vacancies from forwarded messages and public job 
   - `copy`: copy the original message to the target channel after the same allowed-vacancy intake check.
 - Publishes only development/design/AI vacancies: backend, frontend, fullstack, design, LLM, AI, and clear software developer/engineer roles.
 - Stores message fingerprints in SQLite to avoid duplicates.
-- Includes source adapters for Remotive, Arbeitnow, RemoteOK, Hacker News "Who is Hiring", Jobicy, We Work Remotely, Himalayas, Real Work From Anywhere, JobsCollider, Adzuna, and Jooble.
+- Includes source adapters for Remotive, Arbeitnow, RemoteOK, Hacker News "Who is Hiring", Jobicy, We Work Remotely, Himalayas, Real Work From Anywhere, JobsCollider, Adzuna, Jooble, and opt-in JobSpy LinkedIn link discovery.
 - Polls configured public sources in the background while the bot is running.
 
 ## Near-Real-Time Parser Mode
@@ -27,6 +27,24 @@ SOURCE_MAX_PUBLISH_PER_POLL=20
 The bot does not wait for manual forwarding in this mode. It polls real configured sources, publishes vacancies that are new to the bot, skips repeats through SQLite deduplication, and drops dated source vacancies older than `SOURCE_MAX_AGE_HOURS`. Vacancies from sources without a publication date are not assigned a fake date; they rely on source ordering, the publish limit, and deduplication.
 
 Sixty-second polling is near-real-time for ordinary job APIs. Truly instant publishing requires a source-provided webhook or stream.
+
+## JobSpy LinkedIn Link Discovery
+
+LinkedIn discovery is available as an explicit opt-in source through [JobSpy](https://github.com/speedyapply/JobSpy). It is intended to send new LinkedIn job links in the configured development/design/AI search scope through the same source polling flow as the other adapters: intake filter, freshness filter, SQLite deduplication, publication limit, and Telegram publishing.
+
+Enable it only when you accept LinkedIn's operational risk around automated access:
+
+```dotenv
+ENABLE_JOBSPY_LINKEDIN=true
+JOBSPY_LINKEDIN_QUERY=backend OR frontend OR fullstack OR designer OR "AI engineer" OR "ML engineer" OR "LLM engineer"
+JOBSPY_LINKEDIN_LOCATION=Worldwide
+JOBSPY_LINKEDIN_RESULTS_WANTED=20
+JOBSPY_LINKEDIN_HOURS_OLD=48
+JOBSPY_LINKEDIN_FETCH_DESCRIPTION=false
+JOBSPY_LINKEDIN_PROXIES=
+```
+
+By default this publishes lightweight link cards from JobSpy search results. Set `JOBSPY_LINKEDIN_FETCH_DESCRIPTION=true` only if you want JobSpy to request each LinkedIn job page for fuller descriptions; that mode is slower and more likely to be rate-limited. No LinkedIn account login or browser automation is used.
 
 ## Required Telegram Setup
 
@@ -129,6 +147,6 @@ Messages that do not look like allowed development/design/AI vacancies are skipp
 
 ## LinkedIn Boundary
 
-This project does not bypass LinkedIn restrictions, scrape LinkedIn directly, log in with a LinkedIn account, or automate a browser against LinkedIn pages.
+This project now permits the documented, opt-in JobSpy LinkedIn source for link discovery. It does not log in with a LinkedIn account, automate a browser, invent vacancies, or publish fake fallback records when LinkedIn blocks or returns no results.
 
-There is no automatic LinkedIn source adapter, feed intake, webhook, or LinkedIn API polling in the current version. LinkedIn links are handled only when an operator manually sends or forwards vacancy text containing a LinkedIn URL to the Telegram bot. In that case the normal forwarded-message parser can keep the URL and mark the vacancy source as `LinkedIn`.
+LinkedIn links can also enter when an operator manually sends or forwards vacancy text containing a LinkedIn URL to the Telegram bot. In that case the normal forwarded-message parser can keep the URL and mark the vacancy source as `LinkedIn`.

@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.sources import build_adapters, filter_it_vacancies
+from tg_vacancy_bot.sources.adapters.jobspy_linkedin import JobSpyLinkedInAdapter
 from tg_vacancy_bot.sources.adapters.jobicy import JobicyAdapter
 from tg_vacancy_bot.sources.rss import RssFeedAdapter, RssFeedConfig
 
@@ -47,6 +48,27 @@ def test_build_adapters_adds_keyed_sources_with_credentials() -> None:
     names = [adapter.name for adapter in build_adapters(settings)]
 
     assert names == ["Adzuna", "Jooble"]
+
+
+def test_build_adapters_adds_jobspy_linkedin_when_enabled() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_REMOTIVE=False,
+        ENABLE_ARBEITNOW=False,
+        ENABLE_REMOTEOK=False,
+        ENABLE_HN_WHO_IS_HIRING=False,
+        ENABLE_JOBICY=False,
+        ENABLE_WE_WORK_REMOTELY=False,
+        ENABLE_HIMALAYAS=False,
+        ENABLE_REAL_WORK_FROM_ANYWHERE=False,
+        ENABLE_JOBSCOLLIDER=False,
+        ENABLE_JOBSPY_LINKEDIN=True,
+    )
+
+    names = [adapter.name for adapter in build_adapters(settings)]
+
+    assert names == ["JobSpy LinkedIn"]
 
 
 def test_build_adapters_adds_no_key_sources_by_default() -> None:
@@ -140,6 +162,79 @@ def test_rss_feed_adapter_maps_public_feed_item(monkeypatch) -> None:
             stack=("Python", "FastAPI"),
             published_at=datetime(2026, 7, 6, 16, 25, 2, tzinfo=UTC),
             raw_text="Remote backend work with Python and FastAPI.",
+        )
+    ]
+
+
+def test_jobspy_linkedin_adapter_maps_jobspy_records(monkeypatch) -> None:
+    calls = []
+
+    class FakeFrame:
+        def to_dict(self, orient: str):
+            assert orient == "records"
+            return [
+                {
+                    "title": "Senior Backend Engineer",
+                    "company": "Example Co",
+                    "job_url": "https://www.linkedin.com/jobs/view/123",
+                    "location": "Remote",
+                    "description": "Build Python APIs with FastAPI.",
+                    "date_posted": "2026-07-08",
+                    "is_remote": True,
+                    "job_type": "fulltime",
+                    "emails": ["jobs@example.com"],
+                },
+                {
+                    "title": "",
+                    "job_url": "",
+                },
+            ]
+
+    def fake_scrape_jobs(**kwargs):
+        calls.append(kwargs)
+        return FakeFrame()
+
+    monkeypatch.setattr(
+        "tg_vacancy_bot.sources.adapters.jobspy_linkedin._load_scrape_jobs",
+        lambda: fake_scrape_jobs,
+    )
+
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        JOBSPY_LINKEDIN_QUERY="backend OR frontend",
+        JOBSPY_LINKEDIN_LOCATION="Worldwide",
+        JOBSPY_LINKEDIN_RESULTS_WANTED="5",
+        JOBSPY_LINKEDIN_HOURS_OLD="24",
+        JOBSPY_LINKEDIN_PROXIES="http://proxy-a,http://proxy-b",
+    )
+
+    vacancies = asyncio.run(JobSpyLinkedInAdapter(settings).fetch())
+
+    assert calls == [
+        {
+            "site_name": "linkedin",
+            "search_term": "backend OR frontend",
+            "location": "Worldwide",
+            "results_wanted": 5,
+            "hours_old": 24,
+            "is_remote": True,
+            "linkedin_fetch_description": False,
+            "proxies": ["http://proxy-a", "http://proxy-b"],
+            "verbose": 0,
+        }
+    ]
+    assert vacancies == [
+        Vacancy(
+            title="Senior Backend Engineer",
+            company="Example Co",
+            location="Remote",
+            description="Build Python APIs with FastAPI.",
+            source="JobSpy LinkedIn",
+            url="https://www.linkedin.com/jobs/view/123",
+            stack=("LinkedIn", "Remote", "fulltime", "jobs@example.com"),
+            published_at=datetime(2026, 7, 8, tzinfo=UTC),
+            raw_text="Senior Backend Engineer Example Co Remote Build Python APIs with FastAPI.",
         )
     ]
 

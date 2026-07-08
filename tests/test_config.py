@@ -23,6 +23,28 @@ def test_settings_reads_source_max_age_hours() -> None:
     assert settings.source_max_age_hours == 12
 
 
+def test_settings_reads_jobspy_linkedin_options() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_JOBSPY_LINKEDIN="true",
+        JOBSPY_LINKEDIN_QUERY="backend OR frontend",
+        JOBSPY_LINKEDIN_LOCATION="Worldwide",
+        JOBSPY_LINKEDIN_RESULTS_WANTED="7",
+        JOBSPY_LINKEDIN_HOURS_OLD="24",
+        JOBSPY_LINKEDIN_FETCH_DESCRIPTION="true",
+        JOBSPY_LINKEDIN_PROXIES="http://proxy-a, http://proxy-b",
+    )
+
+    assert settings.enable_jobspy_linkedin is True
+    assert settings.jobspy_linkedin_query == "backend OR frontend"
+    assert settings.jobspy_linkedin_location == "Worldwide"
+    assert settings.jobspy_linkedin_results_wanted == 7
+    assert settings.jobspy_linkedin_hours_old == 24
+    assert settings.jobspy_linkedin_fetch_description is True
+    assert settings.jobspy_linkedin_proxies == ("http://proxy-a", "http://proxy-b")
+
+
 def test_settings_reads_description_localization_options() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",

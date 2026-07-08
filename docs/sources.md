@@ -62,15 +62,24 @@
   - Query configured by `JOOBLE_KEYWORDS` and `JOOBLE_LOCATION`.
   - Publication date: parsed from `updated` when present.
 
+- JobSpy LinkedIn
+  - Enabled with `ENABLE_JOBSPY_LINKEDIN=true`; disabled by default.
+  - Uses `python-jobspy` with `site_name="linkedin"`.
+  - Query configured by `JOBSPY_LINKEDIN_QUERY`, `JOBSPY_LINKEDIN_LOCATION`, `JOBSPY_LINKEDIN_RESULTS_WANTED`, and `JOBSPY_LINKEDIN_HOURS_OLD`.
+  - `JOBSPY_LINKEDIN_FETCH_DESCRIPTION=false` publishes lightweight link cards from search results; `true` lets JobSpy request individual LinkedIn job pages for descriptions.
+  - Optional `JOBSPY_LINKEDIN_PROXIES` is passed through to JobSpy as a comma-separated proxy list.
+  - Publication date: parsed from JobSpy `date_posted` when present.
+
 ## Intake Sources
 
 - Direct or forwarded Telegram messages to the bot.
 - Public Telegram channel origins when Telegram exposes forward metadata.
-- LinkedIn URLs only when supplied manually by an operator via sent or forwarded vacancy text.
+- LinkedIn URLs supplied manually by an operator via sent or forwarded vacancy text.
+- LinkedIn links discovered by the opt-in JobSpy LinkedIn source.
 
 ## LinkedIn Boundary
 
-There is no automatic LinkedIn source adapter, feed intake, webhook, browser automation, account-based crawler, or LinkedIn API polling in the current version. Direct LinkedIn scraping and browser automation remain intentionally out of scope.
+The only automatic LinkedIn source is `JobSpyLinkedInAdapter`, and it must remain explicitly opt-in. Browser automation, account-based crawling, fake LinkedIn fallback rows, and undocumented LinkedIn scraping paths remain out of scope.
 
 ## Planned Source Pattern
 
@@ -79,6 +88,7 @@ New sources should be added as `SourceAdapter` implementations under `tg_vacancy
 Each adapter should:
 
 - Call a real documented API/feed/page where automated access is allowed.
+- For LinkedIn, use only the documented JobSpy adapter path unless project instructions are changed again.
 - Return `Vacancy` objects.
 - Use timeouts.
 - Let the polling layer handle exceptions.

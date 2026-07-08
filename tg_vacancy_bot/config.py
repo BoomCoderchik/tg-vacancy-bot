@@ -34,6 +34,19 @@ class Settings(BaseSettings):
     enable_himalayas: bool = Field(default=True, alias="ENABLE_HIMALAYAS")
     enable_real_work_from_anywhere: bool = Field(default=True, alias="ENABLE_REAL_WORK_FROM_ANYWHERE")
     enable_jobscollider: bool = Field(default=True, alias="ENABLE_JOBSCOLLIDER")
+    enable_jobspy_linkedin: bool = Field(default=False, alias="ENABLE_JOBSPY_LINKEDIN")
+    jobspy_linkedin_query: str = Field(
+        default='backend OR frontend OR fullstack OR designer OR "AI engineer" OR "ML engineer" OR "LLM engineer"',
+        alias="JOBSPY_LINKEDIN_QUERY",
+    )
+    jobspy_linkedin_location: str = Field(default="Worldwide", alias="JOBSPY_LINKEDIN_LOCATION")
+    jobspy_linkedin_results_wanted: int = Field(default=20, alias="JOBSPY_LINKEDIN_RESULTS_WANTED")
+    jobspy_linkedin_hours_old: int = Field(default=48, alias="JOBSPY_LINKEDIN_HOURS_OLD")
+    jobspy_linkedin_fetch_description: bool = Field(
+        default=False,
+        alias="JOBSPY_LINKEDIN_FETCH_DESCRIPTION",
+    )
+    jobspy_linkedin_proxies_raw: str = Field(default="", alias="JOBSPY_LINKEDIN_PROXIES")
     adzuna_app_id: str = Field(default="", alias="ADZUNA_APP_ID")
     adzuna_app_key: str = Field(default="", alias="ADZUNA_APP_KEY")
     adzuna_country: str = Field(default="us", alias="ADZUNA_COUNTRY")
@@ -66,6 +79,10 @@ class Settings(BaseSettings):
                 )
             )
         return unique_models((*configured, OPENAI_RELIABLE_TRANSLATION_FALLBACK_MODEL))
+
+    @property
+    def jobspy_linkedin_proxies(self) -> tuple[str, ...]:
+        return tuple(proxy.strip() for proxy in self.jobspy_linkedin_proxies_raw.split(",") if proxy.strip())
 
     def require_runtime(self) -> None:
         missing = []

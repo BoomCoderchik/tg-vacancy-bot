@@ -46,6 +46,7 @@
   - Supports optional `OPERATOR_USER_IDS` for publish access control.
   - Controls source polling with `SOURCE_POLL_INTERVAL_SECONDS`, `SOURCE_MAX_PUBLISH_PER_POLL`, and `SOURCE_MAX_AGE_HOURS`.
   - Supports optional OpenAI/OpenAI-compatible description localization with `LOCALIZE_DESCRIPTIONS`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_FALLBACK_MODELS`, and `OPENAI_BASE_URL`.
+  - Supports opt-in JobSpy LinkedIn discovery with `ENABLE_JOBSPY_LINKEDIN`, `JOBSPY_LINKEDIN_QUERY`, `JOBSPY_LINKEDIN_LOCATION`, `JOBSPY_LINKEDIN_RESULTS_WANTED`, `JOBSPY_LINKEDIN_HOURS_OLD`, `JOBSPY_LINKEDIN_FETCH_DESCRIPTION`, and `JOBSPY_LINKEDIN_PROXIES`.
 
 - `tg_vacancy_bot/access_control.py`
   - Parses operator allowlists and checks whether a sender may publish through the bot.
@@ -117,6 +118,7 @@ The bot depends on real Telegram access:
 Optional source credentials:
 
 - No-key sources are controlled by `ENABLE_REMOTIVE`, `ENABLE_ARBEITNOW`, `ENABLE_REMOTEOK`, `ENABLE_HN_WHO_IS_HIRING`, `ENABLE_JOBICY`, `ENABLE_WE_WORK_REMOTELY`, `ENABLE_HIMALAYAS`, `ENABLE_REAL_WORK_FROM_ANYWHERE`, and `ENABLE_JOBSCOLLIDER`.
+- JobSpy LinkedIn is controlled by `ENABLE_JOBSPY_LINKEDIN=false` by default plus `JOBSPY_LINKEDIN_*` search options. It requires the `python-jobspy` dependency but no project API key.
 - `ADZUNA_APP_ID` and `ADZUNA_APP_KEY`.
 - `JOOBLE_API_KEY`.
 
@@ -143,4 +145,6 @@ For `@it_jobs_board`-style intake:
 
 ## LinkedIn Boundary
 
-The project does not bypass LinkedIn rules, scrape LinkedIn directly, log in with a LinkedIn account, or automate a browser against LinkedIn pages. LinkedIn content can enter the system only when an operator manually sends or forwards vacancy text containing a LinkedIn URL to the Telegram bot. There is no automatic LinkedIn source adapter, feed intake, webhook, or LinkedIn API polling in the current version.
+The project permits one automatic LinkedIn path: the documented `JobSpyLinkedInAdapter`, enabled only with `ENABLE_JOBSPY_LINKEDIN=true`. It calls JobSpy from the source adapter layer, maps real JobSpy rows into `Vacancy`, and lets source polling handle relevance filtering, freshness, deduplication, localization, and Telegram publication.
+
+The adapter is link-focused by default (`JOBSPY_LINKEDIN_FETCH_DESCRIPTION=false`) and does not use a LinkedIn account or browser automation. If LinkedIn blocks, rate-limits, or returns no rows, the source path fails or returns no publishable vacancies; it must not create fake vacancies or placeholder records.

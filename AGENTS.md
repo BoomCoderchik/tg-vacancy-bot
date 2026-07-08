@@ -19,4 +19,4 @@ When adding a source:
 - Add focused tests.
 - Document required env variables or access.
 
-Do not implement direct LinkedIn scraping or browser automation that bypasses LinkedIn restrictions. LinkedIn content may enter through user-forwarded text/links or an officially approved integration.
+LinkedIn automation is allowed only through the documented, opt-in JobSpy LinkedIn source in this project. Do not add browser automation, account login flows, fake LinkedIn results, or undocumented LinkedIn scraping paths.
