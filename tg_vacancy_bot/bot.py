@@ -30,9 +30,6 @@ def build_status_text(settings: Settings) -> str:
         f"Arbeitnow={'on' if settings.enable_arbeitnow else 'off'}",
         f"RemoteOK={'on' if settings.enable_remoteok else 'off'}",
         f"HN={'on' if settings.enable_hn_who_is_hiring else 'off'}",
-        f"LinkedIn user posts={'on' if settings.enable_linkedin_user_posts and settings.linkedin_user_posts_feed_url else 'off'}",
-        f"LinkedIn webhook={'on' if settings.linkedin_user_posts_webhook_token else 'off'}",
-        f"LinkedIn API={'on' if settings.linkedin_api_access_token and settings.linkedin_api_author_urns else 'off'}",
         f"Adzuna={'on' if settings.adzuna_app_id and settings.adzuna_app_key else 'off'}",
         f"Jooble={'on' if settings.jooble_api_key else 'off'}",
     ]

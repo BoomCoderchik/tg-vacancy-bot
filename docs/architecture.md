@@ -11,7 +11,6 @@
 - `tg-vacancy-bot run-web`
   - Starts the same Telegram long polling and background public-source polling as `run`.
   - Exposes `GET /` and `GET /health` for web-hosting health checks.
-  - Exposes `POST /linkedin/user-posts` when `LINKEDIN_USER_POSTS_WEBHOOK_TOKEN` is set, so an authorized LinkedIn post provider can push records for immediate publishing.
   - Reads the listening port from `PORT`, defaulting to `8080`.
 
 - `tg-vacancy-bot init-env`
@@ -47,6 +46,7 @@
   - Supports optional `OPERATOR_USER_IDS` for publish access control.
   - Controls source polling with `SOURCE_POLL_INTERVAL_SECONDS`, `SOURCE_MAX_PUBLISH_PER_POLL`, and `SOURCE_MAX_AGE_HOURS`.
   - Supports optional OpenAI/OpenAI-compatible description localization with `LOCALIZE_DESCRIPTIONS`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_FALLBACK_MODELS`, and `OPENAI_BASE_URL`.
+  - Supports opt-in JobSpy LinkedIn discovery with `ENABLE_JOBSPY_LINKEDIN`, `JOBSPY_LINKEDIN_QUERY`, `JOBSPY_LINKEDIN_LOCATION`, `JOBSPY_LINKEDIN_RESULTS_WANTED`, `JOBSPY_LINKEDIN_HOURS_OLD`, `JOBSPY_LINKEDIN_FETCH_DESCRIPTION`, and `JOBSPY_LINKEDIN_PROXIES`.
 
 - `tg_vacancy_bot/access_control.py`
   - Parses operator allowlists and checks whether a sender may publish through the bot.
@@ -70,19 +70,12 @@
 
 - `tg_vacancy_bot/deployment.py`
   - Hosts the minimal HTTP health endpoint used by web-service deployments.
-  - Hosts the authenticated LinkedIn user-post webhook for authorized push-style intake.
   - Runs the bot process alongside the health endpoint without changing Telegram publishing behavior.
 
 - `tg_vacancy_bot/parser.py`
   - Extracts URL, title, stack, location, salary, and source from free-form vacancy text.
-  - Reads labeled fields such as `Location`, `Локация`, `Stack`, `Стек`, `Salary`, `Зарплата`, and `Company`.
-
-- `tg_vacancy_bot/linkedin_posts.py`
-  - Classifies and normalizes already-available LinkedIn user-post records.
-  - Requires an explicit hiring-intent phrase plus a developer/designer role.
-  - Rejects candidate posts, course ads, resumes, generic hiring commentary, and records without LinkedIn URLs.
-  - Extracts records from feed/webhook payloads shaped as a single object, top-level array, or `posts`/`items`/`data`/`results` list.
-  - Produces `Vacancy` objects with `result_type="linkedin_user_post"` so the existing dedupe and publishing pipeline can be reused.
+  - Reads labeled fields such as `Location`, `Stack`, `Salary`, and `Company`.
+  - Marks manually supplied LinkedIn URLs as source `LinkedIn`.
 
 - `tg_vacancy_bot/intake.py`
   - Rejects forwarded text that does not look like an allowed development/design/AI vacancy before formatting/publishing.
@@ -94,8 +87,6 @@
   - Source adapter package for real job APIs and public feeds.
   - Keyed APIs are enabled only when credentials exist.
   - Parses publication dates when sources provide them and leaves `published_at=None` when they do not.
-  - Includes an optional LinkedIn user-post adapter that reads only from a configured authorized JSON feed and never scrapes LinkedIn directly.
-  - Includes an optional LinkedIn Posts API adapter that calls the official LinkedIn API only when an access token and author URNs are configured.
 
 - `tg_vacancy_bot/source_polling.py`
   - Shared background source polling and publishing loop.
@@ -127,18 +118,16 @@ The bot depends on real Telegram access:
 Optional source credentials:
 
 - No-key sources are controlled by `ENABLE_REMOTIVE`, `ENABLE_ARBEITNOW`, `ENABLE_REMOTEOK`, `ENABLE_HN_WHO_IS_HIRING`, `ENABLE_JOBICY`, `ENABLE_WE_WORK_REMOTELY`, `ENABLE_HIMALAYAS`, `ENABLE_REAL_WORK_FROM_ANYWHERE`, and `ENABLE_JOBSCOLLIDER`.
+- JobSpy LinkedIn is controlled by `ENABLE_JOBSPY_LINKEDIN=false` by default plus `JOBSPY_LINKEDIN_*` search options. It requires the `python-jobspy` dependency but no project API key.
 - `ADZUNA_APP_ID` and `ADZUNA_APP_KEY`.
 - `JOOBLE_API_KEY`.
-- `ENABLE_LINKEDIN_USER_POSTS=true` and `LINKEDIN_USER_POSTS_FEED_URL` for an authorized JSON feed of LinkedIn user posts.
-- `LINKEDIN_USER_POSTS_WEBHOOK_TOKEN` for authorized push-style LinkedIn user-post intake through `run-web`.
-- `LINKEDIN_API_ACCESS_TOKEN`, `LINKEDIN_API_AUTHOR_URNS`, and optional `LINKEDIN_API_VERSION` for official LinkedIn Posts API polling.
 
 Optional OpenAI localization:
 
 - `LOCALIZE_DESCRIPTIONS=true`.
 - `OPENAI_API_KEY` for the real OpenAI or OpenAI-compatible API.
 - `OPENAI_MODEL`, defaulting to `gpt-4.1-mini`.
-- `OPENAI_FALLBACK_MODELS`, optional comma-separated fallback model list. For OpenRouter, the default fallback chain is `qwen/qwen3.6-plus:free,openrouter/free,openai/gpt-4.1-mini`.
+- `OPENAI_FALLBACK_MODELS`, optional comma-separated fallback model list.
 - `OPENAI_BASE_URL`, optional. For OpenRouter, use `https://openrouter.ai/api/v1`.
 
 Do not replace missing external services with fake data. If a token, chat ID, API key, or permission is missing, report the missing service and stop that integration path until it is configured.
@@ -156,4 +145,6 @@ For `@it_jobs_board`-style intake:
 
 ## LinkedIn Boundary
 
-The project does not bypass LinkedIn rules or scrape LinkedIn directly. LinkedIn posts can enter the system when a user forwards text or sends a LinkedIn URL to the bot, through `LINKEDIN_USER_POSTS_FEED_URL` when that URL points to an official API, webhook, export, or external service that is authorized to provide LinkedIn post data, through the authenticated `/linkedin/user-posts` webhook when such a provider pushes already-available post data to the bot, or through official LinkedIn Posts API polling when the operator has LinkedIn-approved access for the configured author URNs.
+The project permits one automatic LinkedIn path: the documented `JobSpyLinkedInAdapter`, enabled only with `ENABLE_JOBSPY_LINKEDIN=true`. It calls JobSpy from the source adapter layer, maps real JobSpy rows into `Vacancy`, and lets source polling handle relevance filtering, freshness, deduplication, localization, and Telegram publication.
+
+The adapter is link-focused by default (`JOBSPY_LINKEDIN_FETCH_DESCRIPTION=false`) and does not use a LinkedIn account or browser automation. If LinkedIn blocks, rate-limits, or returns no rows, the source path fails or returns no publishable vacancies; it must not create fake vacancies or placeholder records.

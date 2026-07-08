@@ -17,22 +17,20 @@ def test_store_marks_duplicates(tmp_path) -> None:
     assert store.mark_published(vacancy) is False
 
 
-def test_store_deduplicates_linkedin_user_posts_by_url(tmp_path) -> None:
+def test_store_deduplicates_linked_vacancies_by_url(tmp_path) -> None:
     store = VacancyStore(str(tmp_path / "vacancies.sqlite3"))
     first = Vacancy(
         title="Looking for a backend engineer",
         description="Looking for a backend engineer to join our team.",
-        source="LinkedIn user posts",
+        source="LinkedIn",
         url="https://www.linkedin.com/feed/update/urn:li:activity:123/",
-        result_type="linkedin_user_post",
         role="backend engineer",
     )
     duplicate = Vacancy(
         title="Hiring backend engineer",
         description="Hiring backend engineer for our team.",
-        source="LinkedIn user posts",
+        source="LinkedIn",
         url="https://www.linkedin.com/feed/update/urn:li:activity:123/",
-        result_type="linkedin_user_post",
         role="backend engineer",
     )
 

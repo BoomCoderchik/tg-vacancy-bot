@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Literal
 
 
-ResultType = Literal["vacancy", "linkedin_user_post"]
+ResultType = Literal["vacancy"]
 
 
 @dataclass(frozen=True)

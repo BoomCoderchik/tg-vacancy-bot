@@ -34,13 +34,19 @@ class Settings(BaseSettings):
     enable_himalayas: bool = Field(default=True, alias="ENABLE_HIMALAYAS")
     enable_real_work_from_anywhere: bool = Field(default=True, alias="ENABLE_REAL_WORK_FROM_ANYWHERE")
     enable_jobscollider: bool = Field(default=True, alias="ENABLE_JOBSCOLLIDER")
-    enable_linkedin_user_posts: bool = Field(default=False, alias="ENABLE_LINKEDIN_USER_POSTS")
-    linkedin_user_posts_feed_url: str = Field(default="", alias="LINKEDIN_USER_POSTS_FEED_URL")
-    linkedin_user_posts_webhook_token: str = Field(default="", alias="LINKEDIN_USER_POSTS_WEBHOOK_TOKEN")
-    linkedin_api_access_token: str = Field(default="", alias="LINKEDIN_API_ACCESS_TOKEN")
-    linkedin_api_author_urns_raw: str = Field(default="", alias="LINKEDIN_API_AUTHOR_URNS")
-    linkedin_api_version: str = Field(default="202606", alias="LINKEDIN_API_VERSION")
-
+    enable_jobspy_linkedin: bool = Field(default=False, alias="ENABLE_JOBSPY_LINKEDIN")
+    jobspy_linkedin_query: str = Field(
+        default='backend OR frontend OR fullstack OR designer OR "AI engineer" OR "ML engineer" OR "LLM engineer"',
+        alias="JOBSPY_LINKEDIN_QUERY",
+    )
+    jobspy_linkedin_location: str = Field(default="Worldwide", alias="JOBSPY_LINKEDIN_LOCATION")
+    jobspy_linkedin_results_wanted: int = Field(default=20, alias="JOBSPY_LINKEDIN_RESULTS_WANTED")
+    jobspy_linkedin_hours_old: int = Field(default=48, alias="JOBSPY_LINKEDIN_HOURS_OLD")
+    jobspy_linkedin_fetch_description: bool = Field(
+        default=False,
+        alias="JOBSPY_LINKEDIN_FETCH_DESCRIPTION",
+    )
+    jobspy_linkedin_proxies_raw: str = Field(default="", alias="JOBSPY_LINKEDIN_PROXIES")
     adzuna_app_id: str = Field(default="", alias="ADZUNA_APP_ID")
     adzuna_app_key: str = Field(default="", alias="ADZUNA_APP_KEY")
     adzuna_country: str = Field(default="us", alias="ADZUNA_COUNTRY")
@@ -61,14 +67,6 @@ class Settings(BaseSettings):
         return parse_operator_user_ids(self.operator_user_ids_raw)
 
     @property
-    def linkedin_api_author_urns(self) -> tuple[str, ...]:
-        return tuple(
-            urn.strip()
-            for urn in self.linkedin_api_author_urns_raw.replace(";", ",").split(",")
-            if urn.strip()
-        )
-
-    @property
     def openai_fallback_models(self) -> tuple[str, ...]:
         configured = tuple(
             model.strip() for model in self.openai_fallback_models_raw.split(",") if model.strip()
@@ -81,6 +79,10 @@ class Settings(BaseSettings):
                 )
             )
         return unique_models((*configured, OPENAI_RELIABLE_TRANSLATION_FALLBACK_MODEL))
+
+    @property
+    def jobspy_linkedin_proxies(self) -> tuple[str, ...]:
+        return tuple(proxy.strip() for proxy in self.jobspy_linkedin_proxies_raw.split(",") if proxy.strip())
 
     def require_runtime(self) -> None:
         missing = []

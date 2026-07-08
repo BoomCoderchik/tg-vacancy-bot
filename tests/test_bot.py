@@ -12,11 +12,6 @@ def test_build_status_text_does_not_expose_bot_token() -> None:
         LOCALIZE_DESCRIPTIONS="true",
         ADZUNA_APP_ID="app",
         ADZUNA_APP_KEY="key",
-        ENABLE_LINKEDIN_USER_POSTS=True,
-        LINKEDIN_USER_POSTS_FEED_URL="https://authorized.example/linkedin-posts.json",
-        LINKEDIN_USER_POSTS_WEBHOOK_TOKEN="webhook-secret",
-        LINKEDIN_API_ACCESS_TOKEN="linkedin-token",
-        LINKEDIN_API_AUTHOR_URNS="urn:li:person:abc",
     )
 
     text = build_status_text(settings)
@@ -29,12 +24,7 @@ def test_build_status_text_does_not_expose_bot_token() -> None:
     assert "Remotive=on" in text
     assert "Arbeitnow=off" in text
     assert "Adzuna=on" in text
-    assert "LinkedIn user posts=on" in text
-    assert "LinkedIn webhook=on" in text
-    assert "LinkedIn API=on" in text
-    assert "authorized.example" not in text
-    assert "webhook-secret" not in text
-    assert "linkedin-token" not in text
+    assert "LinkedIn" not in text
 
 
 def test_format_whoami_text_returns_user_id() -> None:

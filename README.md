@@ -11,9 +11,8 @@ Telegram bot for collecting IT vacancies from forwarded messages and public job 
   - `copy`: copy the original message to the target channel after the same allowed-vacancy intake check.
 - Publishes only development/design/AI vacancies: backend, frontend, fullstack, design, LLM, AI, and clear software developer/engineer roles.
 - Stores message fingerprints in SQLite to avoid duplicates.
-- Includes source adapters for Remotive, Arbeitnow, RemoteOK, Hacker News "Who is Hiring", Jobicy, We Work Remotely, Himalayas, Real Work From Anywhere, and JobsCollider.
+- Includes source adapters for Remotive, Arbeitnow, RemoteOK, Hacker News "Who is Hiring", Jobicy, We Work Remotely, Himalayas, Real Work From Anywhere, JobsCollider, Adzuna, Jooble, and opt-in JobSpy LinkedIn link discovery.
 - Polls configured public sources in the background while the bot is running.
-- Can receive authorized LinkedIn user-post JSON through `run-web` and publish matching hiring posts immediately.
 
 ## Near-Real-Time Parser Mode
 
@@ -27,7 +26,25 @@ SOURCE_MAX_PUBLISH_PER_POLL=20
 
 The bot does not wait for manual forwarding in this mode. It polls real configured sources, publishes vacancies that are new to the bot, skips repeats through SQLite deduplication, and drops dated source vacancies older than `SOURCE_MAX_AGE_HOURS`. Vacancies from sources without a publication date are not assigned a fake date; they rely on source ordering, the publish limit, and deduplication.
 
-Sixty-second polling is near-real-time for ordinary job APIs. Truly instant publishing requires a source-provided webhook or stream. For LinkedIn user posts, use the inbound `/linkedin/user-posts` webhook with an authorized LinkedIn data provider.
+Sixty-second polling is near-real-time for ordinary job APIs. Truly instant publishing requires a source-provided webhook or stream.
+
+## JobSpy LinkedIn Link Discovery
+
+LinkedIn discovery is available as an explicit opt-in source through [JobSpy](https://github.com/speedyapply/JobSpy). It is intended to send new LinkedIn job links in the configured development/design/AI search scope through the same source polling flow as the other adapters: intake filter, freshness filter, SQLite deduplication, publication limit, and Telegram publishing.
+
+Enable it only when you accept LinkedIn's operational risk around automated access:
+
+```dotenv
+ENABLE_JOBSPY_LINKEDIN=true
+JOBSPY_LINKEDIN_QUERY=backend OR frontend OR fullstack OR designer OR "AI engineer" OR "ML engineer" OR "LLM engineer"
+JOBSPY_LINKEDIN_LOCATION=Worldwide
+JOBSPY_LINKEDIN_RESULTS_WANTED=20
+JOBSPY_LINKEDIN_HOURS_OLD=48
+JOBSPY_LINKEDIN_FETCH_DESCRIPTION=false
+JOBSPY_LINKEDIN_PROXIES=
+```
+
+By default this publishes lightweight link cards from JobSpy search results. Set `JOBSPY_LINKEDIN_FETCH_DESCRIPTION=true` only if you want JobSpy to request each LinkedIn job page for fuller descriptions; that mode is slower and more likely to be rate-limited. No LinkedIn account login or browser automation is used.
 
 ## Required Telegram Setup
 
@@ -74,21 +91,15 @@ tg-vacancy-bot poll-once
 When `SOURCE_POLL_INTERVAL_SECONDS` is greater than `0`, `tg-vacancy-bot run` also polls configured public sources in the background while it listens for forwarded messages.
 `SOURCE_MAX_PUBLISH_PER_POLL` limits how many source vacancies can be published in one polling cycle, which prevents first-run flooding.
 
-For free web-hosting deployment, use:
+For web-hosting deployment, use:
 
 ```powershell
 tg-vacancy-bot run-web
 ```
 
-This runs the same Telegram bot and source polling loop with a small HTTP health endpoint for platforms that require an open port. For reliable free always-on parsing, prefer the VM path in `docs/deployment.md`.
+This runs the same Telegram bot and source polling loop with `GET /` and `GET /health` endpoints for platforms that require an open port. For reliable always-on parsing, prefer the VM path in `docs/deployment.md`.
 
-When `LINKEDIN_USER_POSTS_WEBHOOK_TOKEN` is set, `run-web` also accepts authorized LinkedIn user-post payloads at:
-
-```text
-POST /linkedin/user-posts
-Authorization: Bearer <LINKEDIN_USER_POSTS_WEBHOOK_TOKEN>
-Content-Type: application/json
-```
+## Description Localization
 
 To translate vacancy descriptions into Russian and compress long source text before publishing, set:
 
@@ -100,9 +111,9 @@ OPENAI_FALLBACK_MODELS=
 OPENAI_BASE_URL=
 ```
 
-This uses the real OpenAI API, or an OpenAI-compatible endpoint such as OpenRouter, for normalized cards from forwarded messages, `publish-message`, and public source polling. For OpenRouter, use `OPENAI_BASE_URL=https://openrouter.ai/api/v1` and set `OPENAI_MODEL` to an OpenRouter model slug such as `qwen/qwen3.6-plus:free`. When OpenRouter is configured and `OPENAI_FALLBACK_MODELS` is empty, the bot automatically retries empty or failed localization responses with `qwen/qwen3.6-plus:free`, `openrouter/free`, and a stronger `openai/gpt-4.1-mini` fallback. You can prepend or override the free fallback chain with a comma-separated `OPENAI_FALLBACK_MODELS` value; the bot still appends the stronger translation fallback. If localization is enabled without `OPENAI_API_KEY`, publishing stops with a clear configuration error instead of using fake or placeholder text. If a model returns the original non-Russian description instead of Russian text, that response is rejected and the next fallback model is tried.
+This uses the real OpenAI API, or an OpenAI-compatible endpoint such as OpenRouter, for normalized cards from forwarded messages, `publish-message`, and public source polling. If localization is enabled without `OPENAI_API_KEY`, publishing stops with a clear configuration error instead of using fake or placeholder text.
 
-GitHub Actions source polling is disabled by default after moving production polling to an always-on VPS. The checked-in workflow is manual-only and should not be used as the primary parser schedule while `tg-vacancy-bot run` is active on the server.
+## Preview And Manual Publish
 
 To preview how a forwarded vacancy will be normalized before posting:
 
@@ -124,23 +135,7 @@ tg-vacancy-bot publish-message --file .\sample-message.txt
 
 ## Forwarded Message Flow
 
-Send or forward a vacancy message to the bot. In `normalize` mode, the bot will publish a card like:
-
-```text
-💼 Senior Full-Stack Engineer
-
-📍 Локация: Удаленно
-
-🧠 Стек: Python, FastAPI, React, AWS
-
-Описание
-...
-
-🔗 Смотреть вакансию
-▫️ Источник: Telegram
-```
-
-In `copy` mode, the bot copies the original message to the target channel.
+Send or forward a vacancy message to the bot. In `normalize` mode, the bot parses the text into a compact vacancy card and publishes it to the target chat. In `copy` mode, the bot copies the original message to the target channel.
 
 Messages that do not look like allowed development/design/AI vacancies are skipped before publishing. In `copy` mode, the bot still applies this intake check, then copies the original accepted message as-is.
 
@@ -150,81 +145,8 @@ Messages that do not look like allowed development/design/AI vacancies are skipp
 - `/whoami`: returns your Telegram user ID for `OPERATOR_USER_IDS`.
 - `/status`: shows the active forwarding mode, target chat, polling interval, and enabled sources without exposing secrets.
 
-## LinkedIn Note
+## LinkedIn Boundary
 
-This project does not bypass LinkedIn restrictions or scrape LinkedIn directly. LinkedIn links can still be handled when a user forwards a post or sends a LinkedIn URL to the bot.
+This project now permits the documented, opt-in JobSpy LinkedIn source for link discovery. It does not log in with a LinkedIn account, automate a browser, invent vacancies, or publish fake fallback records when LinkedIn blocks or returns no results.
 
-## LinkedIn User Posts
-
-The bot can publish relevant LinkedIn user posts as `linkedin_user_post` results when the posts come from an allowed source. It does not log in to LinkedIn, automate a browser, or scrape LinkedIn pages.
-
-To enable automated intake, provide a JSON feed produced by an official API, webhook, export, or external service that is allowed to supply LinkedIn post data:
-
-```dotenv
-ENABLE_LINKEDIN_USER_POSTS=true
-LINKEDIN_USER_POSTS_FEED_URL=https://authorized.example/linkedin-posts.json
-```
-
-Leave `ENABLE_LINKEDIN_USER_POSTS=false` or keep `LINKEDIN_USER_POSTS_FEED_URL` empty to disable this source.
-
-If you have LinkedIn-approved API access, the bot can poll the official LinkedIn Posts API directly:
-
-```dotenv
-LINKEDIN_API_ACCESS_TOKEN=...
-LINKEDIN_API_AUTHOR_URNS=urn:li:person:abc123,urn:li:organization:123456
-LINKEDIN_API_VERSION=202606
-```
-
-The configured token must be allowed to read posts for those authors. Personal authors normally require `r_member_social`; organization authors require `r_organization_social`. This is official API polling, not page scraping, and it still uses the same filtering, localization, SQLite deduplication, and Telegram publishing pipeline.
-
-For faster push-style intake, keep `tg-vacancy-bot run-web` online and set:
-
-```dotenv
-LINKEDIN_USER_POSTS_WEBHOOK_TOKEN=use-a-long-random-secret
-```
-
-Then configure the authorized LinkedIn provider to POST each available user post to `/linkedin/user-posts`. The webhook accepts the same JSON shape as the feed and returns counts:
-
-```json
-{
-  "received": 1,
-  "accepted": 1,
-  "published": 1
-}
-```
-
-Accepted feed shape:
-
-```json
-{
-  "posts": [
-    {
-      "url": "https://www.linkedin.com/feed/update/urn:li:activity:123/",
-      "text": "We're hiring a React developer to join our team.",
-      "published_at": "2026-07-07T07:30:00Z",
-      "author": "Jane Hiring"
-    }
-  ]
-}
-```
-
-The adapter also accepts a top-level JSON array, or list fields named `items`, `data`, or `results`.
-
-The webhook also accepts a single post object:
-
-```json
-{
-  "url": "https://www.linkedin.com/posts/example",
-  "text": "Ищем Junior Front-End Developer в команду DAP. Angular, TypeScript.",
-  "published_at": "2026-07-07T07:30:00Z",
-  "author": "Jane Hiring"
-}
-```
-
-LinkedIn post filtering requires:
-
-- a LinkedIn URL;
-- explicit hiring intent such as `we're hiring`, `looking for a backend engineer`, `need a UI/UX designer`, or `hiring React developer`;
-- an allowed developer or designer role such as frontend, backend, fullstack, mobile, React, Vue, Angular, Node.js, Python, PHP, Java, UI/UX, product, or graphic designer.
-
-The bot rejects candidate posts like `looking for job`, course ads, resumes, general hiring commentary, and posts without an explicit candidate-search intent. Duplicates are skipped through the same SQLite URL fingerprint store used for vacancies. Dated LinkedIn posts older than `SOURCE_MAX_AGE_HOURS` are skipped.
+LinkedIn links can also enter when an operator manually sends or forwards vacancy text containing a LinkedIn URL to the Telegram bot. In that case the normal forwarded-message parser can keep the URL and mark the vacancy source as `LinkedIn`.
