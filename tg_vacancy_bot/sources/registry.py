@@ -10,6 +10,7 @@ from .adapters.jobicy import JobicyAdapter
 from .adapters.jobscollider import JobsColliderAdapter
 from .adapters.jobspy_linkedin import JobSpyLinkedInAdapter
 from .adapters.jooble import JoobleAdapter
+from .adapters.linkedin_post_scraper import LinkedInPostScraperAdapter
 from .adapters.linkedin_post_search import LinkedInPostSearchAdapter
 from .adapters.real_work_from_anywhere import RealWorkFromAnywhereAdapter
 from .adapters.remoteok import RemoteOkAdapter
@@ -40,6 +41,8 @@ def build_adapters(settings: Settings) -> list[SourceAdapter]:
         adapters.append(JobsColliderAdapter())
     if settings.enable_linkedin_post_search and settings.serpapi_api_key:
         adapters.append(LinkedInPostSearchAdapter(settings))
+    if settings.enable_linkedin_post_scraper:
+        adapters.append(LinkedInPostScraperAdapter(settings))
     if settings.enable_jobspy_linkedin:
         adapters.append(JobSpyLinkedInAdapter(settings))
     if settings.adzuna_app_id and settings.adzuna_app_key:

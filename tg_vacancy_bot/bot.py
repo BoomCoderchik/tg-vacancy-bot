@@ -31,6 +31,7 @@ def build_status_text(settings: Settings) -> str:
         f"RemoteOK={'on' if settings.enable_remoteok else 'off'}",
         f"HN={'on' if settings.enable_hn_who_is_hiring else 'off'}",
         f"LinkedInPosts={_linkedin_post_search_state(settings)}",
+        f"LinkedInPostScraper={'on' if settings.enable_linkedin_post_scraper else 'off'}",
         f"JobSpyLinkedIn={'on' if settings.enable_jobspy_linkedin else 'off'}",
         f"Adzuna={'on' if settings.adzuna_app_id and settings.adzuna_app_key else 'off'}",
         f"Jooble={'on' if settings.jooble_api_key else 'off'}",

@@ -216,6 +216,7 @@ def test_poll_sources_once_warns_when_linkedin_posts_enabled_without_serpapi_key
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
         ENABLE_LINKEDIN_POST_SEARCH=True,
+        ENABLE_LINKEDIN_POST_SCRAPER=False,
         SERPAPI_API_KEY="",
     )
 

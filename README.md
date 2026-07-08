@@ -11,7 +11,7 @@ Telegram bot for collecting IT vacancies from forwarded messages and public job 
   - `copy`: copy the original message to the target channel after the same allowed-vacancy intake check.
 - Publishes only development/design/AI vacancies: backend, frontend, fullstack, design, LLM, AI, and clear software developer/engineer roles.
 - Stores message fingerprints in SQLite to avoid duplicates.
-- Includes source adapters for Remotive, Arbeitnow, RemoteOK, Hacker News "Who is Hiring", Jobicy, We Work Remotely, Himalayas, Real Work From Anywhere, JobsCollider, Adzuna, Jooble, opt-in LinkedIn hiring-post search, and opt-in JobSpy LinkedIn Jobs discovery.
+- Includes source adapters for Remotive, Arbeitnow, RemoteOK, Hacker News "Who is Hiring", Jobicy, We Work Remotely, Himalayas, Real Work From Anywhere, JobsCollider, Adzuna, Jooble, opt-in LinkedIn hiring-post search, opt-in free LinkedIn hiring-post scraping, and opt-in JobSpy LinkedIn Jobs discovery.
 - Polls configured public sources in the background while the bot is running.
 
 ## Near-Real-Time Parser Mode
@@ -41,6 +41,19 @@ LINKEDIN_POST_SEARCH_RESULTS_WANTED=10
 ```
 
 This source uses SerpApi Google Search results for publicly indexed LinkedIn post URLs. It publishes only real search results with a short snippet-based summary and the LinkedIn post link. If `SERPAPI_API_KEY` is missing, the source is not registered.
+
+## Free LinkedIn Hiring Post Scraper
+
+To avoid paid search APIs, enable the free scraper source:
+
+```dotenv
+ENABLE_LINKEDIN_POST_SCRAPER=true
+LINKEDIN_POST_SCRAPER_QUERY=site:linkedin.com/posts hiring developer || site:linkedin.com/posts "ищем" разработчик || site:linkedin.com/feed/update hiring frontend
+LINKEDIN_POST_SCRAPER_LOCATION=Kazakhstan
+LINKEDIN_POST_SCRAPER_RESULTS_WANTED=10
+```
+
+This source scrapes public search-result HTML and keeps only real `linkedin.com/posts/...` and `linkedin.com/feed/update/...` links. It does not require an API key and does not create placeholder vacancies. Use `||` to separate fallback search queries. Because it depends on public search-result markup, it can be less stable than SerpApi and may return no rows when the search engine changes HTML or rate-limits requests.
 
 ## JobSpy LinkedIn Jobs Discovery
 
@@ -173,6 +186,6 @@ Messages that do not look like allowed development/design/AI vacancies are skipp
 
 ## LinkedIn Boundary
 
-This project now permits two documented, opt-in LinkedIn paths: SerpApi-backed public hiring-post search and JobSpy-backed LinkedIn Jobs discovery. It does not log in with a LinkedIn account, automate a browser, invent vacancies, or publish fake fallback records when LinkedIn blocks or returns no results.
+This project now permits three documented, opt-in LinkedIn paths: SerpApi-backed public hiring-post search, free public search-result scraping for hiring posts, and JobSpy-backed LinkedIn Jobs discovery. It does not log in with a LinkedIn account, invent vacancies, or publish fake fallback records when LinkedIn or a search provider blocks or returns no results.
 
 LinkedIn links can also enter when an operator manually sends or forwards vacancy text containing a LinkedIn URL to the Telegram bot. In that case the normal forwarded-message parser can keep the URL and mark the vacancy source as `LinkedIn`.

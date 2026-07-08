@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.sources import build_adapters, filter_it_vacancies
+from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import LinkedInPostScraperAdapter
 from tg_vacancy_bot.sources.adapters.linkedin_post_search import LinkedInPostSearchAdapter
 from tg_vacancy_bot.sources.adapters.jobspy_linkedin import JobSpyLinkedInAdapter
 from tg_vacancy_bot.sources.adapters.jobicy import JobicyAdapter
@@ -23,6 +24,7 @@ def test_build_adapters_skips_keyed_sources_without_credentials() -> None:
         ENABLE_HIMALAYAS=False,
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
+        ENABLE_LINKEDIN_POST_SCRAPER=False,
     )
 
     assert build_adapters(settings) == []
@@ -41,6 +43,7 @@ def test_build_adapters_adds_keyed_sources_with_credentials() -> None:
         ENABLE_HIMALAYAS=False,
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
+        ENABLE_LINKEDIN_POST_SCRAPER=False,
         ADZUNA_APP_ID="app",
         ADZUNA_APP_KEY="key",
         JOOBLE_API_KEY="jooble",
@@ -64,6 +67,7 @@ def test_build_adapters_adds_jobspy_linkedin_when_enabled() -> None:
         ENABLE_HIMALAYAS=False,
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
+        ENABLE_LINKEDIN_POST_SCRAPER=False,
         ENABLE_JOBSPY_LINKEDIN=True,
     )
 
@@ -87,6 +91,7 @@ def test_build_adapters_adds_linkedin_post_search_with_serpapi_key() -> None:
         ENABLE_JOBSCOLLIDER=False,
         ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SEARCH=True,
+        ENABLE_LINKEDIN_POST_SCRAPER=False,
         SERPAPI_API_KEY="serp-key",
     )
 
@@ -110,9 +115,33 @@ def test_build_adapters_skips_linkedin_post_search_without_serpapi_key() -> None
         ENABLE_JOBSCOLLIDER=False,
         ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SEARCH=True,
+        ENABLE_LINKEDIN_POST_SCRAPER=False,
     )
 
     assert build_adapters(settings) == []
+
+
+def test_build_adapters_adds_linkedin_post_scraper_without_api_key() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_REMOTIVE=False,
+        ENABLE_ARBEITNOW=False,
+        ENABLE_REMOTEOK=False,
+        ENABLE_HN_WHO_IS_HIRING=False,
+        ENABLE_JOBICY=False,
+        ENABLE_WE_WORK_REMOTELY=False,
+        ENABLE_HIMALAYAS=False,
+        ENABLE_REAL_WORK_FROM_ANYWHERE=False,
+        ENABLE_JOBSCOLLIDER=False,
+        ENABLE_JOBSPY_LINKEDIN=False,
+        ENABLE_LINKEDIN_POST_SEARCH=False,
+        ENABLE_LINKEDIN_POST_SCRAPER=True,
+    )
+
+    names = [adapter.name for adapter in build_adapters(settings)]
+
+    assert names == ["LinkedIn Hiring Post Scraper"]
 
 
 def test_build_adapters_adds_no_key_sources_by_default() -> None:
@@ -123,6 +152,7 @@ def test_build_adapters_adds_no_key_sources_by_default() -> None:
         ENABLE_ARBEITNOW=False,
         ENABLE_REMOTEOK=False,
         ENABLE_HN_WHO_IS_HIRING=False,
+        ENABLE_LINKEDIN_POST_SCRAPER=False,
     )
 
     names = [adapter.name for adapter in build_adapters(settings)]
@@ -365,6 +395,104 @@ def test_linkedin_post_search_adapter_maps_public_post_results(monkeypatch) -> N
             ),
         )
     ]
+
+
+def test_linkedin_post_scraper_maps_public_search_html(monkeypatch) -> None:
+    calls = []
+    html = """
+    <html>
+      <body>
+        <a class="result__a" href="/l/?uddg=https%3A%2F%2Fwww.linkedin.com%2Fposts%2Fexample_hiring-junior-frontend-activity-123">
+          Ищем Junior Front-End Developer в команду DAP | LinkedIn
+        </a>
+        <a class="result__snippet">
+          г. Алматы. Ищем Junior Front-End Developer. Angular от 1 года, TypeScript, HTML/CSS.
+        </a>
+        <a class="result__a" href="https://www.linkedin.com/jobs/view/123">
+          Senior Backend Engineer
+        </a>
+        <a class="result__snippet">Regular LinkedIn job page, not a post.</a>
+      </body>
+    </html>
+    """
+
+    class FakeSession:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        def get(self, url: str, params: dict):
+            calls.append((url, params))
+            return _FakeResponse(text_data=html)
+
+    monkeypatch.setattr(
+        "tg_vacancy_bot.sources.adapters.linkedin_post_scraper.source_session",
+        lambda headers=None: FakeSession(),
+    )
+
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_LINKEDIN_POST_SCRAPER=True,
+        LINKEDIN_POST_SCRAPER_QUERY='site:linkedin.com/posts "Ищем" frontend',
+        LINKEDIN_POST_SCRAPER_LOCATION="Kazakhstan",
+        LINKEDIN_POST_SCRAPER_RESULTS_WANTED="5",
+    )
+
+    vacancies = asyncio.run(LinkedInPostScraperAdapter(settings).fetch())
+
+    assert calls == [
+        (
+            "https://html.duckduckgo.com/html/",
+            {"q": 'site:linkedin.com/posts "Ищем" frontend'},
+        )
+    ]
+    assert vacancies == [
+        Vacancy(
+            title="Ищем Junior Front-End Developer в команду DAP",
+            description="г. Алматы. Ищем Junior Front-End Developer. Angular от 1 года, TypeScript, HTML/CSS.",
+            source="LinkedIn Hiring Post Scraper",
+            url="https://www.linkedin.com/posts/example_hiring-junior-frontend-activity-123",
+            location="Kazakhstan",
+            stack=("LinkedIn post", "frontend", "Angular", "TypeScript"),
+            raw_text=(
+                "Ищем Junior Front-End Developer в команду DAP "
+                "г. Алматы. Ищем Junior Front-End Developer. Angular от 1 года, TypeScript, HTML/CSS."
+            ),
+        )
+    ]
+
+
+def test_linkedin_post_scraper_reports_search_challenge(monkeypatch) -> None:
+    class FakeSession:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        def get(self, url: str, params: dict):
+            return _FakeResponse(text_data='<form id="challenge-form"></form>')
+
+    monkeypatch.setattr(
+        "tg_vacancy_bot.sources.adapters.linkedin_post_scraper.source_session",
+        lambda headers=None: FakeSession(),
+    )
+
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_LINKEDIN_POST_SCRAPER=True,
+    )
+
+    try:
+        asyncio.run(LinkedInPostScraperAdapter(settings).fetch())
+    except RuntimeError as exc:
+        assert "anti-bot challenge" in str(exc)
+    else:
+        raise AssertionError("Expected scraper to report the search provider challenge.")
 
 
 def test_filter_it_vacancies_rejects_courses() -> None:

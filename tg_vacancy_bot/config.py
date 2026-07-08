@@ -10,6 +10,11 @@ from .access_control import parse_operator_user_ids
 OPENAI_RELIABLE_TRANSLATION_FALLBACK_MODEL = "gpt-4.1-mini"
 OPENROUTER_RELIABLE_TRANSLATION_FALLBACK_MODEL = "openai/gpt-4.1-mini"
 OPENROUTER_FREE_FALLBACK_MODELS = ("qwen/qwen3.6-plus:free", "openrouter/free")
+DEFAULT_LINKEDIN_POST_SCRAPER_QUERY = (
+    'site:linkedin.com/posts hiring developer || '
+    'site:linkedin.com/posts "ищем" разработчик || '
+    'site:linkedin.com/feed/update hiring frontend'
+)
 
 
 class Settings(BaseSettings):
@@ -36,6 +41,7 @@ class Settings(BaseSettings):
     enable_jobscollider: bool = Field(default=True, alias="ENABLE_JOBSCOLLIDER")
     enable_jobspy_linkedin: bool = Field(default=False, alias="ENABLE_JOBSPY_LINKEDIN")
     enable_linkedin_post_search: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SEARCH")
+    enable_linkedin_post_scraper: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SCRAPER")
     serpapi_api_key: str = Field(default="", alias="SERPAPI_API_KEY")
     linkedin_post_search_query: str = Field(
         default=(
@@ -48,6 +54,12 @@ class Settings(BaseSettings):
     )
     linkedin_post_search_location: str = Field(default="Kazakhstan", alias="LINKEDIN_POST_SEARCH_LOCATION")
     linkedin_post_search_results_wanted: int = Field(default=10, alias="LINKEDIN_POST_SEARCH_RESULTS_WANTED")
+    linkedin_post_scraper_query: str = Field(
+        default=DEFAULT_LINKEDIN_POST_SCRAPER_QUERY,
+        alias="LINKEDIN_POST_SCRAPER_QUERY",
+    )
+    linkedin_post_scraper_location: str = Field(default="Kazakhstan", alias="LINKEDIN_POST_SCRAPER_LOCATION")
+    linkedin_post_scraper_results_wanted: int = Field(default=10, alias="LINKEDIN_POST_SCRAPER_RESULTS_WANTED")
     jobspy_linkedin_query: str = Field(
         default='backend OR frontend OR fullstack OR designer OR "AI engineer" OR "ML engineer" OR "LLM engineer"',
         alias="JOBSPY_LINKEDIN_QUERY",
