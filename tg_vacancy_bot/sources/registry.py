@@ -47,3 +47,10 @@ def build_adapters(settings: Settings) -> list[SourceAdapter]:
     if settings.jooble_api_key:
         adapters.append(JoobleAdapter(settings))
     return adapters
+
+
+def source_configuration_warnings(settings: Settings) -> list[str]:
+    warnings: list[str] = []
+    if settings.enable_linkedin_post_search and not settings.serpapi_api_key:
+        warnings.append("LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY is missing.")
+    return warnings

@@ -15,7 +15,7 @@ from .deployment import run_web_service_sync
 from .env_setup import init_env_file
 from .preview import parse_publishable_message, preview_message_card_async
 from .publisher import TelegramPublisher
-from .sources import build_adapters, filter_it_vacancies
+from .sources import build_adapters, filter_it_vacancies, source_configuration_warnings
 from .sources.freshness import filter_fresh_vacancies
 from .storage import VacancyStore
 from .telegram_check import check_telegram_access, format_check_result
@@ -47,6 +47,8 @@ async def poll_once() -> None:
         total = 0
         published = 0
         max_publish = settings.source_max_publish_per_poll
+        for warning in source_configuration_warnings(settings):
+            logging.warning(warning)
         for adapter in build_adapters(settings):
             if max_publish > 0 and published >= max_publish:
                 logging.info("Source poll publish limit reached: %s", max_publish)

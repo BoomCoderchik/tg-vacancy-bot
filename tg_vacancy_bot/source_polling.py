@@ -10,7 +10,7 @@ from aiogram.enums import ParseMode
 from .config import Settings
 from .description_localization import localize_vacancy_description
 from .formatting import format_vacancy_card
-from .sources import build_adapters, filter_it_vacancies
+from .sources import build_adapters, filter_it_vacancies, source_configuration_warnings
 from .sources.freshness import filter_fresh_vacancies
 from .storage import VacancyStore
 
@@ -24,6 +24,8 @@ def utcnow() -> datetime:
 async def poll_sources_once(bot: Bot, settings: Settings, store: VacancyStore) -> int:
     published = 0
     max_publish = settings.source_max_publish_per_poll
+    for warning in source_configuration_warnings(settings):
+        logger.warning(warning)
     for adapter in build_adapters(settings):
         try:
             vacancies = await adapter.fetch()
