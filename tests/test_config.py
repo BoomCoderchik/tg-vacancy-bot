@@ -47,7 +47,11 @@ def test_settings_uses_openrouter_free_fallback_models_by_default() -> None:
         OPENAI_FALLBACK_MODELS="",
     )
 
-    assert settings.openai_fallback_models == ("qwen/qwen3.6-plus:free", "openrouter/free")
+    assert settings.openai_fallback_models == (
+        "qwen/qwen3.6-plus:free",
+        "openrouter/free",
+        "openai/gpt-4.1-mini",
+    )
 
 
 def test_settings_reads_configured_openai_fallback_models() -> None:
@@ -58,4 +62,19 @@ def test_settings_reads_configured_openai_fallback_models() -> None:
         OPENAI_BASE_URL="https://openrouter.ai/api/v1",
     )
 
-    assert settings.openai_fallback_models == ("openrouter/free", "google/gemma-4-31b-it:free")
+    assert settings.openai_fallback_models == (
+        "openrouter/free",
+        "google/gemma-4-31b-it:free",
+        "openai/gpt-4.1-mini",
+    )
+
+
+def test_settings_adds_reliable_openai_translation_fallback() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        OPENAI_BASE_URL="",
+        OPENAI_FALLBACK_MODELS="",
+    )
+
+    assert settings.openai_fallback_models == ("gpt-4.1-mini",)

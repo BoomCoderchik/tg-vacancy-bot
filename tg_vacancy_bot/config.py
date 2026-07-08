@@ -7,6 +7,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from .access_control import parse_operator_user_ids
 
 
+OPENAI_RELIABLE_TRANSLATION_FALLBACK_MODEL = "gpt-4.1-mini"
+OPENROUTER_RELIABLE_TRANSLATION_FALLBACK_MODEL = "openai/gpt-4.1-mini"
+OPENROUTER_FREE_FALLBACK_MODELS = ("qwen/qwen3.6-plus:free", "openrouter/free")
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -56,11 +61,14 @@ class Settings(BaseSettings):
         configured = tuple(
             model.strip() for model in self.openai_fallback_models_raw.split(",") if model.strip()
         )
-        if configured:
-            return configured
         if "openrouter.ai" in self.openai_base_url.lower():
-            return ("qwen/qwen3.6-plus:free", "openrouter/free")
-        return ()
+            return unique_models(
+                (
+                    *(configured or OPENROUTER_FREE_FALLBACK_MODELS),
+                    OPENROUTER_RELIABLE_TRANSLATION_FALLBACK_MODEL,
+                )
+            )
+        return unique_models((*configured, OPENAI_RELIABLE_TRANSLATION_FALLBACK_MODEL))
 
     def require_runtime(self) -> None:
         missing = []
@@ -76,3 +84,11 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def unique_models(models: tuple[str, ...]) -> tuple[str, ...]:
+    result = []
+    for model in models:
+        if model and model not in result:
+            result.append(model)
+    return tuple(result)

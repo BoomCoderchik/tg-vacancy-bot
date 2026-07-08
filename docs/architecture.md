@@ -108,6 +108,7 @@
 
 - `tg_vacancy_bot/description_localization.py`
   - Uses the real OpenAI API or an OpenAI-compatible endpoint to translate vacancy descriptions to Russian and compress long source text before normalized cards are published.
+  - Rejects empty localization responses and non-Russian/original-language responses, then tries the next configured fallback model before publishing.
   - Raises a configuration error when localization is enabled without `OPENAI_API_KEY`.
 
 ## External Services
@@ -131,7 +132,7 @@ Optional OpenAI localization:
 - `LOCALIZE_DESCRIPTIONS=true`.
 - `OPENAI_API_KEY` for the real OpenAI or OpenAI-compatible API.
 - `OPENAI_MODEL`, defaulting to `gpt-4.1-mini`.
-- `OPENAI_FALLBACK_MODELS`, optional comma-separated fallback model list. For OpenRouter, the default fallback chain is `qwen/qwen3.6-plus:free,openrouter/free`.
+- `OPENAI_FALLBACK_MODELS`, optional comma-separated fallback model list. For OpenRouter, the default fallback chain is `qwen/qwen3.6-plus:free,openrouter/free,openai/gpt-4.1-mini`.
 - `OPENAI_BASE_URL`, optional. For OpenRouter, use `https://openrouter.ai/api/v1`.
 
 Do not replace missing external services with fake data. If a token, chat ID, API key, or permission is missing, report the missing service and stop that integration path until it is configured.

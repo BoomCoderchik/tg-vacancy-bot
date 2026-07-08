@@ -68,6 +68,29 @@ class EmptyThenGoodOpenAIClient:
         self.chat = EmptyThenGoodChat()
 
 
+class SequenceResponses:
+    def __init__(self, contents: list[str]) -> None:
+        self.contents = contents
+        self.models: list[str] = []
+
+    async def create(self, **kwargs):
+        self.models.append(kwargs["model"])
+        content = self.contents[len(self.models) - 1]
+        message = type("Message", (), {"content": content})()
+        choice = type("Choice", (), {"message": message})()
+        return type("Response", (), {"choices": [choice]})()
+
+
+class SequenceChat:
+    def __init__(self, contents: list[str]) -> None:
+        self.completions = SequenceResponses(contents)
+
+
+class SequenceOpenAIClient:
+    def __init__(self, contents: list[str]) -> None:
+        self.chat = SequenceChat(contents)
+
+
 def test_openai_localizer_requests_russian_compressed_description() -> None:
     client = FakeOpenAIClient()
     localizer = OpenAIDescriptionLocalizer(api_key="test-key", model="test-model", client=client)
@@ -98,6 +121,34 @@ def test_openai_localizer_uses_fallback_model_when_primary_returns_empty_text() 
 
     assert text == "Короткое русское описание."
     assert client.chat.completions.models == ["bad-free-model", "openrouter/free"]
+
+
+def test_openai_localizer_rejects_original_language_response() -> None:
+    original = "Predium baut die fuehrende ESG-Intelligence-Plattform fuer institutionelle Immobilienunternehmen."
+    client = SequenceOpenAIClient([original])
+    localizer = OpenAIDescriptionLocalizer(api_key="test-key", model="bad-model", client=client)
+
+    with pytest.raises(RuntimeError, match="not Russian"):
+        asyncio.run(localizer.localize(original))
+
+    assert client.chat.completions.models == ["bad-model"]
+
+
+def test_openai_localizer_uses_fallback_when_primary_keeps_original_language() -> None:
+    original = "Predium baut die fuehrende ESG-Intelligence-Plattform fuer institutionelle Immobilienunternehmen."
+    russian = "\u041a\u043e\u043c\u043f\u0430\u043d\u0438\u044f \u0440\u0430\u0437\u0432\u0438\u0432\u0430\u0435\u0442 ESG-\u043f\u043b\u0430\u0442\u0444\u043e\u0440\u043c\u0443 \u0434\u043b\u044f \u0438\u043d\u0441\u0442\u0438\u0442\u0443\u0446\u0438\u043e\u043d\u0430\u043b\u044c\u043d\u044b\u0445 \u0438\u043d\u0432\u0435\u0441\u0442\u043e\u0440\u043e\u0432."
+    client = SequenceOpenAIClient([original, russian])
+    localizer = OpenAIDescriptionLocalizer(
+        api_key="test-key",
+        model="bad-model",
+        fallback_models=("reliable-russian-model",),
+        client=client,
+    )
+
+    text = asyncio.run(localizer.localize(original))
+
+    assert text == russian
+    assert client.chat.completions.models == ["bad-model", "reliable-russian-model"]
 
 
 def test_openai_localizer_wraps_api_errors() -> None:

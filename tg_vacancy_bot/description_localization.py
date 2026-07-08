@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from difflib import SequenceMatcher
+import re
 from typing import Protocol
 
 from .config import Settings
@@ -9,6 +11,10 @@ from .models import Vacancy
 
 MAX_LOCALIZED_DESCRIPTION_CHARS = 700
 MAX_OUTPUT_TOKENS = 260
+CYRILLIC_RE = re.compile(r"[\u0400-\u04FF]")
+LETTER_RE = re.compile(r"[A-Za-z\u0400-\u04FF]")
+MIN_RUSSIAN_CYRILLIC_RATIO = 0.35
+MAX_ORIGINAL_SIMILARITY = 0.82
 
 LOCALIZATION_INSTRUCTIONS = """
 Ты редактор Telegram-канала с IT-вакансиями.
@@ -65,9 +71,10 @@ class OpenAIDescriptionLocalizer:
                 continue
 
             text = normalize_localized_description(response.choices[0].message.content or "")
-            if text:
+            rejection_reason = localized_description_rejection_reason(description, text)
+            if rejection_reason is None:
                 return text
-            errors.append(f"{model} returned an empty localized description.")
+            errors.append(f"{model} {rejection_reason}")
 
         if errors == [f"{self.model} returned an empty localized description."]:
             raise RuntimeError("OpenAI returned an empty localized description.")
@@ -99,6 +106,42 @@ def normalize_localized_description(text: str) -> str:
     if len(normalized) <= MAX_LOCALIZED_DESCRIPTION_CHARS:
         return normalized
     return normalized[: MAX_LOCALIZED_DESCRIPTION_CHARS - 1].rstrip() + "..."
+
+
+def localized_description_rejection_reason(original: str, localized: str) -> str | None:
+    if not localized:
+        return "returned an empty localized description."
+    if not source_requires_russian_translation(original):
+        return None
+    if not looks_like_russian(localized):
+        return "returned text that is not Russian."
+    if text_similarity(original, localized) >= MAX_ORIGINAL_SIMILARITY:
+        return "returned the original description instead of a Russian translation."
+    return None
+
+
+def source_requires_russian_translation(text: str) -> bool:
+    letters = LETTER_RE.findall(text)
+    if not letters:
+        return False
+    cyrillic_count = len(CYRILLIC_RE.findall(text))
+    return cyrillic_count / len(letters) < MIN_RUSSIAN_CYRILLIC_RATIO
+
+
+def looks_like_russian(text: str) -> bool:
+    letters = LETTER_RE.findall(text)
+    if not letters:
+        return False
+    cyrillic_count = len(CYRILLIC_RE.findall(text))
+    return cyrillic_count / len(letters) >= MIN_RUSSIAN_CYRILLIC_RATIO
+
+
+def text_similarity(left: str, right: str) -> float:
+    return SequenceMatcher(None, comparable_text(left), comparable_text(right)).ratio()
+
+
+def comparable_text(text: str) -> str:
+    return " ".join(re.findall(r"[a-zA-Z\u0400-\u04FF0-9]+", text.lower()))
 
 
 def unique_models(models: tuple[str, ...]) -> tuple[str, ...]:
