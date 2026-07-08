@@ -29,6 +29,12 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("init-env", help="Create .env from .env.example without overwriting an existing file.")
     subparsers.add_parser("poll-once", help="Poll public sources once and publish new vacancies.")
     subparsers.add_parser("check-sources", help="Check source adapter configuration without publishing.")
+    preview_sources_parser = subparsers.add_parser(
+        "preview-sources",
+        help="Fetch configured sources and print filtered candidates without publishing.",
+    )
+    preview_sources_parser.add_argument("--source", help="Preview only the source with this exact adapter name.")
+    preview_sources_parser.add_argument("--limit", type=int, default=5, help="Maximum candidates to print per source.")
     subparsers.add_parser("check-telegram", help="Validate bot token, target chat access, and posting permissions.")
     preview_parser = subparsers.add_parser("preview-message", help="Parse message text and print the Telegram card HTML.")
     preview_parser.add_argument("--file", help="Read message text from a UTF-8 file instead of stdin.")
@@ -120,6 +126,10 @@ def main(argv: Sequence[str] | None = None) -> None:
             write_stdout(format_source_check(settings))
             return
 
+        if args.command == "preview-sources":
+            write_stdout(asyncio.run(preview_sources(settings, source_name=args.source, limit=args.limit)))
+            return
+
         if args.command == "check-telegram":
             result = asyncio.run(check_telegram_access(settings))
             write_stdout(format_check_result(result))
@@ -152,6 +162,31 @@ def format_source_check(settings) -> str:
             "Registered adapters: " + (", ".join(adapter_names) if adapter_names else "none"),
         ]
     )
+
+
+async def preview_sources(settings, source_name: str | None = None, limit: int = 5) -> str:
+    lines = ["Source preview"]
+    adapters = build_adapters(settings)
+    if source_name:
+        adapters = [adapter for adapter in adapters if adapter.name == source_name]
+    if not adapters:
+        lines.append("No matching registered adapters.")
+        return "\n".join(lines)
+
+    per_source_limit = max(limit, 0)
+    for adapter in adapters:
+        try:
+            vacancies = await adapter.fetch()
+        except Exception as exc:
+            lines.append(f"{adapter.name}: fetch failed: {exc}")
+            continue
+        filtered = filter_it_vacancies(vacancies)
+        lines.append(f"{adapter.name}: fetched={len(vacancies)} filtered={len(filtered)}")
+        for vacancy in filtered[:per_source_limit]:
+            lines.append(f"- {vacancy.title}")
+            if vacancy.url:
+                lines.append(f"  {vacancy.url}")
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":

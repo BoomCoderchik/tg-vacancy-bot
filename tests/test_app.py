@@ -76,6 +76,88 @@ def test_check_sources_reports_registered_linkedin_post_search_without_exposing_
     assert "serp-secret" not in output
 
 
+def test_preview_sources_prints_filtered_candidates_without_publishing(capsys, monkeypatch) -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_REMOTIVE=False,
+        ENABLE_ARBEITNOW=False,
+        ENABLE_REMOTEOK=False,
+        ENABLE_HN_WHO_IS_HIRING=False,
+        ENABLE_JOBICY=False,
+        ENABLE_WE_WORK_REMOTELY=False,
+        ENABLE_HIMALAYAS=False,
+        ENABLE_REAL_WORK_FROM_ANYWHERE=False,
+        ENABLE_JOBSCOLLIDER=False,
+    )
+
+    class FakeAdapter:
+        name = "LinkedIn Hiring Posts"
+
+        async def fetch(self):
+            return [
+                Vacancy(
+                    title="Ищем Junior Front-End Developer",
+                    description="Angular TypeScript role in Almaty.",
+                    source=self.name,
+                    url="https://www.linkedin.com/posts/example",
+                ),
+                Vacancy(
+                    title="Sales Manager",
+                    description="B2B sales role.",
+                    source=self.name,
+                    url="https://www.linkedin.com/posts/sales",
+                ),
+            ]
+
+    class ExplodingPublisher:
+        def __init__(self, settings, store) -> None:
+            raise AssertionError("preview-sources must not create TelegramPublisher")
+
+    monkeypatch.setattr("tg_vacancy_bot.app.get_settings", lambda: settings)
+    monkeypatch.setattr("tg_vacancy_bot.app.build_adapters", lambda _: [FakeAdapter()])
+    monkeypatch.setattr("tg_vacancy_bot.app.TelegramPublisher", ExplodingPublisher)
+
+    main(["preview-sources"])
+
+    output = capsys.readouterr().out
+    assert "Source preview" in output
+    assert "LinkedIn Hiring Posts: fetched=2 filtered=1" in output
+    assert "Ищем Junior Front-End Developer" in output
+    assert "https://www.linkedin.com/posts/example" in output
+    assert "Sales Manager" not in output
+
+
+def test_preview_sources_supports_source_filter_and_limit(capsys, monkeypatch) -> None:
+    settings = Settings(TELEGRAM_BOT_TOKEN="token", TARGET_CHAT_ID="@target")
+
+    class FirstAdapter:
+        name = "First"
+
+        async def fetch(self):
+            return [Vacancy(title="Python Engineer", description="Backend role.", source=self.name)]
+
+    class SecondAdapter:
+        name = "Second"
+
+        async def fetch(self):
+            return [
+                Vacancy(title="Frontend Developer", description="React role.", source=self.name),
+                Vacancy(title="Backend Developer", description="Python role.", source=self.name),
+            ]
+
+    monkeypatch.setattr("tg_vacancy_bot.app.get_settings", lambda: settings)
+    monkeypatch.setattr("tg_vacancy_bot.app.build_adapters", lambda _: [FirstAdapter(), SecondAdapter()])
+
+    main(["preview-sources", "--source", "Second", "--limit", "1"])
+
+    output = capsys.readouterr().out
+    assert "First:" not in output
+    assert "Second: fetched=2 filtered=2" in output
+    assert "Frontend Developer" in output
+    assert "Backend Developer" not in output
+
+
 def test_poll_once_respects_global_publish_limit(monkeypatch, tmp_path) -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
