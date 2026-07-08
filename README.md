@@ -167,6 +167,16 @@ LINKEDIN_USER_POSTS_FEED_URL=https://authorized.example/linkedin-posts.json
 
 Leave `ENABLE_LINKEDIN_USER_POSTS=false` or keep `LINKEDIN_USER_POSTS_FEED_URL` empty to disable this source.
 
+If you have LinkedIn-approved API access, the bot can poll the official LinkedIn Posts API directly:
+
+```dotenv
+LINKEDIN_API_ACCESS_TOKEN=...
+LINKEDIN_API_AUTHOR_URNS=urn:li:person:abc123,urn:li:organization:123456
+LINKEDIN_API_VERSION=202606
+```
+
+The configured token must be allowed to read posts for those authors. Personal authors normally require `r_member_social`; organization authors require `r_organization_social`. This is official API polling, not page scraping, and it still uses the same filtering, localization, SQLite deduplication, and Telegram publishing pipeline.
+
 For faster push-style intake, keep `tg-vacancy-bot run-web` online and set:
 
 ```dotenv

@@ -95,6 +95,7 @@
   - Keyed APIs are enabled only when credentials exist.
   - Parses publication dates when sources provide them and leaves `published_at=None` when they do not.
   - Includes an optional LinkedIn user-post adapter that reads only from a configured authorized JSON feed and never scrapes LinkedIn directly.
+  - Includes an optional LinkedIn Posts API adapter that calls the official LinkedIn API only when an access token and author URNs are configured.
 
 - `tg_vacancy_bot/source_polling.py`
   - Shared background source polling and publishing loop.
@@ -130,6 +131,7 @@ Optional source credentials:
 - `JOOBLE_API_KEY`.
 - `ENABLE_LINKEDIN_USER_POSTS=true` and `LINKEDIN_USER_POSTS_FEED_URL` for an authorized JSON feed of LinkedIn user posts.
 - `LINKEDIN_USER_POSTS_WEBHOOK_TOKEN` for authorized push-style LinkedIn user-post intake through `run-web`.
+- `LINKEDIN_API_ACCESS_TOKEN`, `LINKEDIN_API_AUTHOR_URNS`, and optional `LINKEDIN_API_VERSION` for official LinkedIn Posts API polling.
 
 Optional OpenAI localization:
 
@@ -154,4 +156,4 @@ For `@it_jobs_board`-style intake:
 
 ## LinkedIn Boundary
 
-The project does not bypass LinkedIn rules or scrape LinkedIn directly. LinkedIn posts can enter the system when a user forwards text or sends a LinkedIn URL to the bot, through `LINKEDIN_USER_POSTS_FEED_URL` when that URL points to an official API, webhook, export, or external service that is authorized to provide LinkedIn post data, or through the authenticated `/linkedin/user-posts` webhook when such a provider pushes already-available post data to the bot.
+The project does not bypass LinkedIn rules or scrape LinkedIn directly. LinkedIn posts can enter the system when a user forwards text or sends a LinkedIn URL to the bot, through `LINKEDIN_USER_POSTS_FEED_URL` when that URL points to an official API, webhook, export, or external service that is authorized to provide LinkedIn post data, through the authenticated `/linkedin/user-posts` webhook when such a provider pushes already-available post data to the bot, or through official LinkedIn Posts API polling when the operator has LinkedIn-approved access for the configured author URNs.

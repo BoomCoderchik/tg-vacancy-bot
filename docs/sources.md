@@ -78,12 +78,21 @@
   - Publishes accepted records immediately through the real Telegram publisher and the same SQLite deduplication store.
   - The upstream system must be an official API, webhook, export, or external service that is allowed to provide LinkedIn post data.
 
+- LinkedIn Posts API
+  - Enabled only when `LINKEDIN_API_ACCESS_TOKEN` and `LINKEDIN_API_AUTHOR_URNS` are set.
+  - Uses the official `https://api.linkedin.com/rest/posts` endpoint with `q=author`.
+  - `LINKEDIN_API_AUTHOR_URNS` is a comma- or semicolon-separated list of `urn:li:person:...` or `urn:li:organization:...` author URNs.
+  - `LINKEDIN_API_VERSION` defaults to `202606`.
+  - Requires LinkedIn-approved API access and the permissions LinkedIn requires for the configured authors.
+  - Direct LinkedIn page scraping and browser automation remain intentionally out of scope.
+
 ## Intake Sources
 
 - Direct or forwarded Telegram messages to the bot.
 - Public Telegram channel origins when Telegram exposes forward metadata.
 - LinkedIn URLs when supplied by the user via a message or forwarded text, or when provided by the authorized LinkedIn user-post JSON feed.
 - LinkedIn user-post JSON pushed to `/linkedin/user-posts` by an authorized upstream provider.
+- LinkedIn posts returned by the official LinkedIn Posts API for configured author URNs.
 
 ## Planned Source Pattern
 

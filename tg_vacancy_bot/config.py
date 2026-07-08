@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     enable_linkedin_user_posts: bool = Field(default=False, alias="ENABLE_LINKEDIN_USER_POSTS")
     linkedin_user_posts_feed_url: str = Field(default="", alias="LINKEDIN_USER_POSTS_FEED_URL")
     linkedin_user_posts_webhook_token: str = Field(default="", alias="LINKEDIN_USER_POSTS_WEBHOOK_TOKEN")
+    linkedin_api_access_token: str = Field(default="", alias="LINKEDIN_API_ACCESS_TOKEN")
+    linkedin_api_author_urns_raw: str = Field(default="", alias="LINKEDIN_API_AUTHOR_URNS")
+    linkedin_api_version: str = Field(default="202606", alias="LINKEDIN_API_VERSION")
 
     adzuna_app_id: str = Field(default="", alias="ADZUNA_APP_ID")
     adzuna_app_key: str = Field(default="", alias="ADZUNA_APP_KEY")
@@ -56,6 +59,14 @@ class Settings(BaseSettings):
     @property
     def operator_user_ids(self) -> tuple[int, ...]:
         return parse_operator_user_ids(self.operator_user_ids_raw)
+
+    @property
+    def linkedin_api_author_urns(self) -> tuple[str, ...]:
+        return tuple(
+            urn.strip()
+            for urn in self.linkedin_api_author_urns_raw.replace(";", ",").split(",")
+            if urn.strip()
+        )
 
     @property
     def openai_fallback_models(self) -> tuple[str, ...]:
