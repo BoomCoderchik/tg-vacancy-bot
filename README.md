@@ -102,6 +102,12 @@ To poll public sources once and publish new vacancies:
 tg-vacancy-bot poll-once
 ```
 
+To check which sources are configured without publishing anything:
+
+```powershell
+tg-vacancy-bot check-sources
+```
+
 When `SOURCE_POLL_INTERVAL_SECONDS` is greater than `0`, `tg-vacancy-bot run` also polls configured public sources in the background while it listens for forwarded messages.
 `SOURCE_MAX_PUBLISH_PER_POLL` limits how many source vacancies can be published in one polling cycle, which prevents first-run flooding.
 

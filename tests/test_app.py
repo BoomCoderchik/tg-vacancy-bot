@@ -20,6 +20,62 @@ def test_main_reports_missing_runtime_config(capsys, monkeypatch, tmp_path) -> N
     get_settings.cache_clear()
 
 
+def test_check_sources_reports_missing_linkedin_post_search_key(capsys, monkeypatch) -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_REMOTIVE=False,
+        ENABLE_ARBEITNOW=False,
+        ENABLE_REMOTEOK=False,
+        ENABLE_HN_WHO_IS_HIRING=False,
+        ENABLE_JOBICY=False,
+        ENABLE_WE_WORK_REMOTELY=False,
+        ENABLE_HIMALAYAS=False,
+        ENABLE_REAL_WORK_FROM_ANYWHERE=False,
+        ENABLE_JOBSCOLLIDER=False,
+        ENABLE_LINKEDIN_POST_SEARCH=True,
+        SERPAPI_API_KEY="",
+    )
+    monkeypatch.setattr("tg_vacancy_bot.app.get_settings", lambda: settings)
+
+    main(["check-sources"])
+
+    output = capsys.readouterr().out
+    assert "Source configuration" in output
+    assert "Warnings:\n" in output
+    assert "WARNING: LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY is missing." in output
+    assert "Registered adapters: none" in output
+
+
+def test_check_sources_reports_registered_linkedin_post_search_without_exposing_key(
+    capsys,
+    monkeypatch,
+) -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_REMOTIVE=False,
+        ENABLE_ARBEITNOW=False,
+        ENABLE_REMOTEOK=False,
+        ENABLE_HN_WHO_IS_HIRING=False,
+        ENABLE_JOBICY=False,
+        ENABLE_WE_WORK_REMOTELY=False,
+        ENABLE_HIMALAYAS=False,
+        ENABLE_REAL_WORK_FROM_ANYWHERE=False,
+        ENABLE_JOBSCOLLIDER=False,
+        ENABLE_LINKEDIN_POST_SEARCH=True,
+        SERPAPI_API_KEY="serp-secret",
+    )
+    monkeypatch.setattr("tg_vacancy_bot.app.get_settings", lambda: settings)
+
+    main(["check-sources"])
+
+    output = capsys.readouterr().out
+    assert "Warnings: none" in output
+    assert "Registered adapters: LinkedIn Hiring Posts" in output
+    assert "serp-secret" not in output
+
+
 def test_poll_once_respects_global_publish_limit(monkeypatch, tmp_path) -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",

@@ -28,6 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("run-web", help="Run Telegram bot polling with an HTTP health endpoint.")
     subparsers.add_parser("init-env", help="Create .env from .env.example without overwriting an existing file.")
     subparsers.add_parser("poll-once", help="Poll public sources once and publish new vacancies.")
+    subparsers.add_parser("check-sources", help="Check source adapter configuration without publishing.")
     subparsers.add_parser("check-telegram", help="Validate bot token, target chat access, and posting permissions.")
     preview_parser = subparsers.add_parser("preview-message", help="Parse message text and print the Telegram card HTML.")
     preview_parser.add_argument("--file", help="Read message text from a UTF-8 file instead of stdin.")
@@ -115,6 +116,10 @@ def main(argv: Sequence[str] | None = None) -> None:
             asyncio.run(poll_once())
             return
 
+        if args.command == "check-sources":
+            write_stdout(format_source_check(settings))
+            return
+
         if args.command == "check-telegram":
             result = asyncio.run(check_telegram_access(settings))
             write_stdout(format_check_result(result))
@@ -134,6 +139,19 @@ def main(argv: Sequence[str] | None = None) -> None:
         raise SystemExit(2) from exc
 
     raise SystemExit(f"Unknown command: {args.command}")
+
+
+def format_source_check(settings) -> str:
+    warnings = source_configuration_warnings(settings)
+    adapter_names = [adapter.name for adapter in build_adapters(settings)]
+    warning_lines = ["Warnings: none"] if not warnings else ["Warnings:", *[f"WARNING: {warning}" for warning in warnings]]
+    return "\n".join(
+        [
+            "Source configuration",
+            *warning_lines,
+            "Registered adapters: " + (", ".join(adapter_names) if adapter_names else "none"),
+        ]
+    )
 
 
 if __name__ == "__main__":
