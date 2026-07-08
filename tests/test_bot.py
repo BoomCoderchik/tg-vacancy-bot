@@ -10,6 +10,8 @@ def test_build_status_text_does_not_expose_bot_token() -> None:
         ENABLE_ARBEITNOW=False,
         OPERATOR_USER_IDS="",
         LOCALIZE_DESCRIPTIONS="true",
+        ENABLE_LINKEDIN_POST_SEARCH=False,
+        ENABLE_JOBSPY_LINKEDIN=False,
         ADZUNA_APP_ID="app",
         ADZUNA_APP_KEY="key",
     )
@@ -24,7 +26,39 @@ def test_build_status_text_does_not_expose_bot_token() -> None:
     assert "Remotive=on" in text
     assert "Arbeitnow=off" in text
     assert "Adzuna=on" in text
-    assert "LinkedIn" not in text
+    assert "LinkedInPosts=off" in text
+    assert "JobSpyLinkedIn=off" in text
+
+
+def test_build_status_text_reports_linkedin_post_search_missing_key() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="secret-token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_LINKEDIN_POST_SEARCH=True,
+        SERPAPI_API_KEY="",
+        ENABLE_JOBSPY_LINKEDIN=False,
+    )
+
+    text = build_status_text(settings)
+
+    assert "LinkedInPosts=missing-key" in text
+    assert "JobSpyLinkedIn=off" in text
+
+
+def test_build_status_text_reports_linkedin_post_search_on_without_exposing_key() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="secret-token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_LINKEDIN_POST_SEARCH=True,
+        SERPAPI_API_KEY="serp-secret",
+        ENABLE_JOBSPY_LINKEDIN=True,
+    )
+
+    text = build_status_text(settings)
+
+    assert "LinkedInPosts=on" in text
+    assert "JobSpyLinkedIn=on" in text
+    assert "serp-secret" not in text
 
 
 def test_format_whoami_text_returns_user_id() -> None:
