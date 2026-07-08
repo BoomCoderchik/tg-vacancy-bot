@@ -11,6 +11,7 @@
 - `tg-vacancy-bot run-web`
   - Starts the same Telegram long polling and background public-source polling as `run`.
   - Exposes `GET /` and `GET /health` for web-hosting health checks.
+  - Exposes `POST /linkedin/user-posts` when `LINKEDIN_USER_POSTS_WEBHOOK_TOKEN` is set, so an authorized LinkedIn post provider can push records for immediate publishing.
   - Reads the listening port from `PORT`, defaulting to `8080`.
 
 - `tg-vacancy-bot init-env`
@@ -69,6 +70,7 @@
 
 - `tg_vacancy_bot/deployment.py`
   - Hosts the minimal HTTP health endpoint used by web-service deployments.
+  - Hosts the authenticated LinkedIn user-post webhook for authorized push-style intake.
   - Runs the bot process alongside the health endpoint without changing Telegram publishing behavior.
 
 - `tg_vacancy_bot/parser.py`
@@ -79,6 +81,7 @@
   - Classifies and normalizes already-available LinkedIn user-post records.
   - Requires an explicit hiring-intent phrase plus a developer/designer role.
   - Rejects candidate posts, course ads, resumes, generic hiring commentary, and records without LinkedIn URLs.
+  - Extracts records from feed/webhook payloads shaped as a single object, top-level array, or `posts`/`items`/`data`/`results` list.
   - Produces `Vacancy` objects with `result_type="linkedin_user_post"` so the existing dedupe and publishing pipeline can be reused.
 
 - `tg_vacancy_bot/intake.py`
@@ -126,6 +129,7 @@ Optional source credentials:
 - `ADZUNA_APP_ID` and `ADZUNA_APP_KEY`.
 - `JOOBLE_API_KEY`.
 - `ENABLE_LINKEDIN_USER_POSTS=true` and `LINKEDIN_USER_POSTS_FEED_URL` for an authorized JSON feed of LinkedIn user posts.
+- `LINKEDIN_USER_POSTS_WEBHOOK_TOKEN` for authorized push-style LinkedIn user-post intake through `run-web`.
 
 Optional OpenAI localization:
 
@@ -150,4 +154,4 @@ For `@it_jobs_board`-style intake:
 
 ## LinkedIn Boundary
 
-The project does not bypass LinkedIn rules or scrape LinkedIn directly. LinkedIn posts can enter the system when a user forwards text or sends a LinkedIn URL to the bot, or through `LINKEDIN_USER_POSTS_FEED_URL` when that URL points to an official API, webhook, export, or external service that is authorized to provide LinkedIn post data.
+The project does not bypass LinkedIn rules or scrape LinkedIn directly. LinkedIn posts can enter the system when a user forwards text or sends a LinkedIn URL to the bot, through `LINKEDIN_USER_POSTS_FEED_URL` when that URL points to an official API, webhook, export, or external service that is authorized to provide LinkedIn post data, or through the authenticated `/linkedin/user-posts` webhook when such a provider pushes already-available post data to the bot.

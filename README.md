@@ -13,6 +13,7 @@ Telegram bot for collecting IT vacancies from forwarded messages and public job 
 - Stores message fingerprints in SQLite to avoid duplicates.
 - Includes source adapters for Remotive, Arbeitnow, RemoteOK, Hacker News "Who is Hiring", Jobicy, We Work Remotely, Himalayas, Real Work From Anywhere, and JobsCollider.
 - Polls configured public sources in the background while the bot is running.
+- Can receive authorized LinkedIn user-post JSON through `run-web` and publish matching hiring posts immediately.
 
 ## Near-Real-Time Parser Mode
 
@@ -26,7 +27,7 @@ SOURCE_MAX_PUBLISH_PER_POLL=20
 
 The bot does not wait for manual forwarding in this mode. It polls real configured sources, publishes vacancies that are new to the bot, skips repeats through SQLite deduplication, and drops dated source vacancies older than `SOURCE_MAX_AGE_HOURS`. Vacancies from sources without a publication date are not assigned a fake date; they rely on source ordering, the publish limit, and deduplication.
 
-Sixty-second polling is near-real-time for ordinary job APIs. Truly instant publishing requires a source-provided webhook or stream.
+Sixty-second polling is near-real-time for ordinary job APIs. Truly instant publishing requires a source-provided webhook or stream. For LinkedIn user posts, use the inbound `/linkedin/user-posts` webhook with an authorized LinkedIn data provider.
 
 ## Required Telegram Setup
 
@@ -80,6 +81,14 @@ tg-vacancy-bot run-web
 ```
 
 This runs the same Telegram bot and source polling loop with a small HTTP health endpoint for platforms that require an open port. For reliable free always-on parsing, prefer the VM path in `docs/deployment.md`.
+
+When `LINKEDIN_USER_POSTS_WEBHOOK_TOKEN` is set, `run-web` also accepts authorized LinkedIn user-post payloads at:
+
+```text
+POST /linkedin/user-posts
+Authorization: Bearer <LINKEDIN_USER_POSTS_WEBHOOK_TOKEN>
+Content-Type: application/json
+```
 
 To translate vacancy descriptions into Russian and compress long source text before publishing, set:
 
@@ -158,6 +167,22 @@ LINKEDIN_USER_POSTS_FEED_URL=https://authorized.example/linkedin-posts.json
 
 Leave `ENABLE_LINKEDIN_USER_POSTS=false` or keep `LINKEDIN_USER_POSTS_FEED_URL` empty to disable this source.
 
+For faster push-style intake, keep `tg-vacancy-bot run-web` online and set:
+
+```dotenv
+LINKEDIN_USER_POSTS_WEBHOOK_TOKEN=use-a-long-random-secret
+```
+
+Then configure the authorized LinkedIn provider to POST each available user post to `/linkedin/user-posts`. The webhook accepts the same JSON shape as the feed and returns counts:
+
+```json
+{
+  "received": 1,
+  "accepted": 1,
+  "published": 1
+}
+```
+
 Accepted feed shape:
 
 ```json
@@ -174,6 +199,17 @@ Accepted feed shape:
 ```
 
 The adapter also accepts a top-level JSON array, or list fields named `items`, `data`, or `results`.
+
+The webhook also accepts a single post object:
+
+```json
+{
+  "url": "https://www.linkedin.com/posts/example",
+  "text": "Ищем Junior Front-End Developer в команду DAP. Angular, TypeScript.",
+  "published_at": "2026-07-07T07:30:00Z",
+  "author": "Jane Hiring"
+}
+```
 
 LinkedIn post filtering requires:
 

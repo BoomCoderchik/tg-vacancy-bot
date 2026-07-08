@@ -132,6 +132,18 @@ def build_linkedin_user_post_vacancy_from_text(
     )
 
 
+def extract_linkedin_user_post_records(payload: object) -> list[dict[str, object]]:
+    if isinstance(payload, list):
+        return [item for item in payload if isinstance(item, dict)]
+    if isinstance(payload, dict):
+        for key in ("posts", "items", "data", "results"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                return [item for item in value if isinstance(item, dict)]
+        return [payload]
+    return []
+
+
 def _looks_like_structured_vacancy_text(text: str) -> bool:
     return bool(
         re.search(

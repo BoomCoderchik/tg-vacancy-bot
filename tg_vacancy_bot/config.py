@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     enable_jobscollider: bool = Field(default=True, alias="ENABLE_JOBSCOLLIDER")
     enable_linkedin_user_posts: bool = Field(default=False, alias="ENABLE_LINKEDIN_USER_POSTS")
     linkedin_user_posts_feed_url: str = Field(default="", alias="LINKEDIN_USER_POSTS_FEED_URL")
+    linkedin_user_posts_webhook_token: str = Field(default="", alias="LINKEDIN_USER_POSTS_WEBHOOK_TOKEN")
 
     adzuna_app_id: str = Field(default="", alias="ADZUNA_APP_ID")
     adzuna_app_key: str = Field(default="", alias="ADZUNA_APP_KEY")

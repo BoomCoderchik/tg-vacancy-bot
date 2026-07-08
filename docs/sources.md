@@ -71,11 +71,19 @@
   - Filtering requires explicit hiring intent and an allowed developer/designer role.
   - Direct LinkedIn scraping and browser automation are intentionally not implemented.
 
+- LinkedIn user posts inbound webhook
+  - Enabled only when `LINKEDIN_USER_POSTS_WEBHOOK_TOKEN` is set and the app runs with `tg-vacancy-bot run-web`.
+  - Accepts `POST /linkedin/user-posts` with `Authorization: Bearer <token>` or `X-Webhook-Token: <token>`.
+  - The payload shape matches the authorized JSON feed and may also be a single post object.
+  - Publishes accepted records immediately through the real Telegram publisher and the same SQLite deduplication store.
+  - The upstream system must be an official API, webhook, export, or external service that is allowed to provide LinkedIn post data.
+
 ## Intake Sources
 
 - Direct or forwarded Telegram messages to the bot.
 - Public Telegram channel origins when Telegram exposes forward metadata.
 - LinkedIn URLs when supplied by the user via a message or forwarded text, or when provided by the authorized LinkedIn user-post JSON feed.
+- LinkedIn user-post JSON pushed to `/linkedin/user-posts` by an authorized upstream provider.
 
 ## Planned Source Pattern
 

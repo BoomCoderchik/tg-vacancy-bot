@@ -23,6 +23,16 @@ def test_settings_reads_source_max_age_hours() -> None:
     assert settings.source_max_age_hours == 12
 
 
+def test_settings_reads_linkedin_user_posts_webhook_token() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        LINKEDIN_USER_POSTS_WEBHOOK_TOKEN="secret",
+    )
+
+    assert settings.linkedin_user_posts_webhook_token == "secret"
+
+
 def test_settings_reads_description_localization_options() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
