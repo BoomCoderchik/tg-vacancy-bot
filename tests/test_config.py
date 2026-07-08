@@ -45,6 +45,40 @@ def test_settings_reads_jobspy_linkedin_options() -> None:
     assert settings.jobspy_linkedin_proxies == ("http://proxy-a", "http://proxy-b")
 
 
+def test_settings_reads_linkedin_post_search_options() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_LINKEDIN_POST_SEARCH="true",
+        SERPAPI_API_KEY="serp-key",
+        LINKEDIN_POST_SEARCH_QUERY='site:linkedin.com/posts "Ищем" frontend',
+        LINKEDIN_POST_SEARCH_LOCATION="Kazakhstan",
+        LINKEDIN_POST_SEARCH_RESULTS_WANTED="8",
+    )
+
+    assert settings.enable_linkedin_post_search is True
+    assert settings.serpapi_api_key == "serp-key"
+    assert settings.linkedin_post_search_query == 'site:linkedin.com/posts "Ищем" frontend'
+    assert settings.linkedin_post_search_location == "Kazakhstan"
+    assert settings.linkedin_post_search_results_wanted == 8
+
+
+def test_settings_reads_linkedin_post_scraper_options() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_LINKEDIN_POST_SCRAPER="true",
+        LINKEDIN_POST_SCRAPER_QUERY='site:linkedin.com/posts "ищем" frontend',
+        LINKEDIN_POST_SCRAPER_LOCATION="Kazakhstan",
+        LINKEDIN_POST_SCRAPER_RESULTS_WANTED="8",
+    )
+
+    assert settings.enable_linkedin_post_scraper is True
+    assert settings.linkedin_post_scraper_query == 'site:linkedin.com/posts "ищем" frontend'
+    assert settings.linkedin_post_scraper_location == "Kazakhstan"
+    assert settings.linkedin_post_scraper_results_wanted == 8
+
+
 def test_settings_reads_description_localization_options() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from datetime import UTC, datetime, timedelta
 
 from tg_vacancy_bot.config import Settings
@@ -199,3 +200,28 @@ def test_poll_sources_once_keeps_deduplication_before_publish(monkeypatch) -> No
 
     assert published == 0
     assert bot.sent_messages == []
+
+
+def test_poll_sources_once_warns_when_linkedin_posts_enabled_without_serpapi_key(caplog) -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_REMOTIVE=False,
+        ENABLE_ARBEITNOW=False,
+        ENABLE_REMOTEOK=False,
+        ENABLE_HN_WHO_IS_HIRING=False,
+        ENABLE_JOBICY=False,
+        ENABLE_WE_WORK_REMOTELY=False,
+        ENABLE_HIMALAYAS=False,
+        ENABLE_REAL_WORK_FROM_ANYWHERE=False,
+        ENABLE_JOBSCOLLIDER=False,
+        ENABLE_LINKEDIN_POST_SEARCH=True,
+        ENABLE_LINKEDIN_POST_SCRAPER=False,
+        SERPAPI_API_KEY="",
+    )
+
+    with caplog.at_level(logging.WARNING):
+        published = asyncio.run(poll_sources_once(FakeBot(), settings, FakeStore()))
+
+    assert published == 0
+    assert "LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY is missing." in caplog.text
