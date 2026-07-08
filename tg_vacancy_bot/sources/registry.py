@@ -9,8 +9,6 @@ from .adapters.himalayas import HimalayasAdapter
 from .adapters.jobicy import JobicyAdapter
 from .adapters.jobscollider import JobsColliderAdapter
 from .adapters.jooble import JoobleAdapter
-from .adapters.linkedin_api_posts import LinkedInApiPostsAdapter
-from .adapters.linkedin_user_posts import LinkedInUserPostsAdapter
 from .adapters.real_work_from_anywhere import RealWorkFromAnywhereAdapter
 from .adapters.remoteok import RemoteOkAdapter
 from .adapters.remotive import RemotiveAdapter
@@ -38,10 +36,6 @@ def build_adapters(settings: Settings) -> list[SourceAdapter]:
         adapters.append(RealWorkFromAnywhereAdapter())
     if settings.enable_jobscollider:
         adapters.append(JobsColliderAdapter())
-    if settings.enable_linkedin_user_posts and settings.linkedin_user_posts_feed_url:
-        adapters.append(LinkedInUserPostsAdapter(settings))
-    if settings.linkedin_api_access_token and settings.linkedin_api_author_urns:
-        adapters.append(LinkedInApiPostsAdapter(settings))
     if settings.adzuna_app_id and settings.adzuna_app_key:
         adapters.append(AdzunaAdapter(settings))
     if settings.jooble_api_key:

@@ -66,12 +66,12 @@ def test_parse_publishable_message_returns_vacancy() -> None:
     assert "Python" in vacancy.stack
 
 
-def test_parse_publishable_message_returns_linkedin_user_post() -> None:
+def test_parse_publishable_message_treats_linkedin_url_as_regular_vacancy() -> None:
     vacancy = parse_publishable_message(
         "We're hiring a React developer to join our team. "
         "https://www.linkedin.com/feed/update/urn:li:activity:123/"
     )
 
-    assert vacancy.result_type == "linkedin_user_post"
-    assert vacancy.role == "React developer"
+    assert vacancy.result_type == "vacancy"
+    assert vacancy.source == "LinkedIn"
     assert vacancy.url == "https://www.linkedin.com/feed/update/urn:li:activity:123/"

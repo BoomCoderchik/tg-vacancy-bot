@@ -62,37 +62,15 @@
   - Query configured by `JOOBLE_KEYWORDS` and `JOOBLE_LOCATION`.
   - Publication date: parsed from `updated` when present.
 
-- LinkedIn user posts authorized JSON feed
-  - Enabled only when `ENABLE_LINKEDIN_USER_POSTS=true` and `LINKEDIN_USER_POSTS_FEED_URL` is set.
-  - The feed must be produced by an official API, webhook, export, or external service that is allowed to provide LinkedIn post data.
-  - The adapter accepts a top-level JSON array, or an object with `posts`, `items`, `data`, or `results`.
-  - Records should provide `url` or `link`, `text` or `content`, optional `published_at`, and optional `author`.
-  - Publication date: parsed from `published_at`, `publishedAt`, `created_at`, `createdAt`, or `date` when present.
-  - Filtering requires explicit hiring intent and an allowed developer/designer role.
-  - Direct LinkedIn scraping and browser automation are intentionally not implemented.
-
-- LinkedIn user posts inbound webhook
-  - Enabled only when `LINKEDIN_USER_POSTS_WEBHOOK_TOKEN` is set and the app runs with `tg-vacancy-bot run-web`.
-  - Accepts `POST /linkedin/user-posts` with `Authorization: Bearer <token>` or `X-Webhook-Token: <token>`.
-  - The payload shape matches the authorized JSON feed and may also be a single post object.
-  - Publishes accepted records immediately through the real Telegram publisher and the same SQLite deduplication store.
-  - The upstream system must be an official API, webhook, export, or external service that is allowed to provide LinkedIn post data.
-
-- LinkedIn Posts API
-  - Enabled only when `LINKEDIN_API_ACCESS_TOKEN` and `LINKEDIN_API_AUTHOR_URNS` are set.
-  - Uses the official `https://api.linkedin.com/rest/posts` endpoint with `q=author`.
-  - `LINKEDIN_API_AUTHOR_URNS` is a comma- or semicolon-separated list of `urn:li:person:...` or `urn:li:organization:...` author URNs.
-  - `LINKEDIN_API_VERSION` defaults to `202606`.
-  - Requires LinkedIn-approved API access and the permissions LinkedIn requires for the configured authors.
-  - Direct LinkedIn page scraping and browser automation remain intentionally out of scope.
-
 ## Intake Sources
 
 - Direct or forwarded Telegram messages to the bot.
 - Public Telegram channel origins when Telegram exposes forward metadata.
-- LinkedIn URLs when supplied by the user via a message or forwarded text, or when provided by the authorized LinkedIn user-post JSON feed.
-- LinkedIn user-post JSON pushed to `/linkedin/user-posts` by an authorized upstream provider.
-- LinkedIn posts returned by the official LinkedIn Posts API for configured author URNs.
+- LinkedIn URLs only when supplied manually by an operator via sent or forwarded vacancy text.
+
+## LinkedIn Boundary
+
+There is no automatic LinkedIn source adapter, feed intake, webhook, browser automation, account-based crawler, or LinkedIn API polling in the current version. Direct LinkedIn scraping and browser automation remain intentionally out of scope.
 
 ## Planned Source Pattern
 

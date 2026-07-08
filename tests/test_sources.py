@@ -5,7 +5,6 @@ from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.sources import build_adapters, filter_it_vacancies
 from tg_vacancy_bot.sources.adapters.jobicy import JobicyAdapter
-from tg_vacancy_bot.sources.adapters.linkedin_api_posts import LinkedInApiPostsAdapter
 from tg_vacancy_bot.sources.rss import RssFeedAdapter, RssFeedConfig
 
 
@@ -48,50 +47,6 @@ def test_build_adapters_adds_keyed_sources_with_credentials() -> None:
     names = [adapter.name for adapter in build_adapters(settings)]
 
     assert names == ["Adzuna", "Jooble"]
-
-
-def test_build_adapters_adds_linkedin_user_posts_when_feed_is_configured() -> None:
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        ENABLE_REMOTIVE=False,
-        ENABLE_ARBEITNOW=False,
-        ENABLE_REMOTEOK=False,
-        ENABLE_HN_WHO_IS_HIRING=False,
-        ENABLE_JOBICY=False,
-        ENABLE_WE_WORK_REMOTELY=False,
-        ENABLE_HIMALAYAS=False,
-        ENABLE_REAL_WORK_FROM_ANYWHERE=False,
-        ENABLE_JOBSCOLLIDER=False,
-        ENABLE_LINKEDIN_USER_POSTS=True,
-        LINKEDIN_USER_POSTS_FEED_URL="https://authorized.example/linkedin-posts.json",
-    )
-
-    names = [adapter.name for adapter in build_adapters(settings)]
-
-    assert names == ["LinkedIn user posts"]
-
-
-def test_build_adapters_adds_linkedin_posts_api_when_credentials_are_configured() -> None:
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        ENABLE_REMOTIVE=False,
-        ENABLE_ARBEITNOW=False,
-        ENABLE_REMOTEOK=False,
-        ENABLE_HN_WHO_IS_HIRING=False,
-        ENABLE_JOBICY=False,
-        ENABLE_WE_WORK_REMOTELY=False,
-        ENABLE_HIMALAYAS=False,
-        ENABLE_REAL_WORK_FROM_ANYWHERE=False,
-        ENABLE_JOBSCOLLIDER=False,
-        LINKEDIN_API_ACCESS_TOKEN="linkedin-token",
-        LINKEDIN_API_AUTHOR_URNS="urn:li:person:abc",
-    )
-
-    names = [adapter.name for adapter in build_adapters(settings)]
-
-    assert names == ["LinkedIn Posts API"]
 
 
 def test_build_adapters_adds_no_key_sources_by_default() -> None:
@@ -150,80 +105,6 @@ def test_jobicy_adapter_maps_public_api_response(monkeypatch) -> None:
             raw_text="Build Python APIs with FastAPI.",
         )
     ]
-
-
-def test_linkedin_posts_api_adapter_maps_official_response(monkeypatch) -> None:
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        LINKEDIN_API_ACCESS_TOKEN="linkedin-token",
-        LINKEDIN_API_AUTHOR_URNS="urn:li:person:abc",
-        SOURCE_MAX_AGE_HOURS="0",
-    )
-
-    class FakeResponse:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return None
-
-        def raise_for_status(self) -> None:
-            return None
-
-        async def json(self):
-            return {
-                "elements": [
-                    {
-                        "id": "urn:li:share:123",
-                        "author": "urn:li:person:abc",
-                        "commentary": "We're hiring an Angular developer to join our team.",
-                        "publishedAt": 1783209600000,
-                    },
-                    {
-                        "id": "urn:li:share:456",
-                        "author": "urn:li:person:abc",
-                        "commentary": "Looking for job as a frontend developer.",
-                        "publishedAt": 1783209600000,
-                    },
-                ]
-            }
-
-    class FakeSession:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return None
-
-        def get(self, url, *, params):
-            assert url == "https://api.linkedin.com/rest/posts"
-            assert params == {
-                "q": "author",
-                "author": "urn:li:person:abc",
-                "count": "20",
-                "sortBy": "LAST_MODIFIED",
-            }
-            return FakeResponse()
-
-    def fake_source_session(*, headers):
-        assert headers["Authorization"] == "Bearer linkedin-token"
-        assert headers["LinkedIn-Version"] == "202606"
-        assert headers["X-RestLi-Method"] == "FINDER"
-        return FakeSession()
-
-    monkeypatch.setattr(
-        "tg_vacancy_bot.sources.adapters.linkedin_api_posts.source_session",
-        fake_source_session,
-    )
-
-    vacancies = asyncio.run(LinkedInApiPostsAdapter(settings).fetch())
-
-    assert len(vacancies) == 1
-    assert vacancies[0].result_type == "linkedin_user_post"
-    assert vacancies[0].role == "Angular developer"
-    assert vacancies[0].url == "https://www.linkedin.com/feed/update/urn:li:share:123/"
-    assert vacancies[0].published_at == datetime(2026, 7, 5, tzinfo=UTC)
 
 
 def test_rss_feed_adapter_maps_public_feed_item(monkeypatch) -> None:

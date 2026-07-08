@@ -23,30 +23,6 @@ def test_settings_reads_source_max_age_hours() -> None:
     assert settings.source_max_age_hours == 12
 
 
-def test_settings_reads_linkedin_user_posts_webhook_token() -> None:
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        LINKEDIN_USER_POSTS_WEBHOOK_TOKEN="secret",
-    )
-
-    assert settings.linkedin_user_posts_webhook_token == "secret"
-
-
-def test_settings_reads_linkedin_api_options() -> None:
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        LINKEDIN_API_ACCESS_TOKEN="linkedin-token",
-        LINKEDIN_API_AUTHOR_URNS="urn:li:person:abc; urn:li:organization:123",
-        LINKEDIN_API_VERSION="202606",
-    )
-
-    assert settings.linkedin_api_access_token == "linkedin-token"
-    assert settings.linkedin_api_author_urns == ("urn:li:person:abc", "urn:li:organization:123")
-    assert settings.linkedin_api_version == "202606"
-
-
 def test_settings_reads_description_localization_options() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
