@@ -158,6 +158,35 @@ def test_preview_sources_supports_source_filter_and_limit(capsys, monkeypatch) -
     assert "Backend Developer" not in output
 
 
+def test_preview_sources_shows_configuration_warning_when_adapter_is_missing(
+    capsys,
+    monkeypatch,
+) -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_REMOTIVE=False,
+        ENABLE_ARBEITNOW=False,
+        ENABLE_REMOTEOK=False,
+        ENABLE_HN_WHO_IS_HIRING=False,
+        ENABLE_JOBICY=False,
+        ENABLE_WE_WORK_REMOTELY=False,
+        ENABLE_HIMALAYAS=False,
+        ENABLE_REAL_WORK_FROM_ANYWHERE=False,
+        ENABLE_JOBSCOLLIDER=False,
+        ENABLE_LINKEDIN_POST_SEARCH=True,
+        SERPAPI_API_KEY="",
+    )
+    monkeypatch.setattr("tg_vacancy_bot.app.get_settings", lambda: settings)
+
+    main(["preview-sources", "--source", "LinkedIn Hiring Posts"])
+
+    output = capsys.readouterr().out
+    assert "Source preview" in output
+    assert "WARNING: LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY is missing." in output
+    assert "No matching registered adapters." in output
+
+
 def test_poll_once_respects_global_publish_limit(monkeypatch, tmp_path) -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",

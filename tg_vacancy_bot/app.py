@@ -166,6 +166,7 @@ def format_source_check(settings) -> str:
 
 async def preview_sources(settings, source_name: str | None = None, limit: int = 5) -> str:
     lines = ["Source preview"]
+    lines.extend(f"WARNING: {warning}" for warning in source_configuration_warnings(settings))
     adapters = build_adapters(settings)
     if source_name:
         adapters = [adapter for adapter in adapters if adapter.name == source_name]
