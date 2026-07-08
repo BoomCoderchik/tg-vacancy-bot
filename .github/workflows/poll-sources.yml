@@ -1,8 +1,14 @@
-name: Poll vacancy sources
+name: Poll vacancy sources manually
 
 on:
-  schedule:
-    - cron: "*/15 * * * *"
+  # Disabled after moving production polling to an always-on VPS service.
+  # The VPS runs `tg-vacancy-bot run`, which performs background source polling
+  # according to SOURCE_POLL_INTERVAL_SECONDS.
+  #
+  # Keep this workflow manual-only so GitHub Actions does not publish duplicate
+  # vacancies every 15 minutes.
+  # schedule:
+  #   - cron: "*/15 * * * *"
   workflow_dispatch:
 
 concurrency:

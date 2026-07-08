@@ -93,7 +93,7 @@ OPENAI_BASE_URL=
 
 This uses the real OpenAI API, or an OpenAI-compatible endpoint such as OpenRouter, for normalized cards from forwarded messages, `publish-message`, and public source polling. For OpenRouter, use `OPENAI_BASE_URL=https://openrouter.ai/api/v1` and set `OPENAI_MODEL` to an OpenRouter model slug such as `qwen/qwen3.6-plus:free`. When OpenRouter is configured and `OPENAI_FALLBACK_MODELS` is empty, the bot automatically retries empty or failed localization responses with `qwen/qwen3.6-plus:free` and `openrouter/free`. You can override that chain with a comma-separated `OPENAI_FALLBACK_MODELS` value. If localization is enabled without `OPENAI_API_KEY`, publishing stops with a clear configuration error instead of using fake or placeholder text.
 
-The scheduled GitHub Actions source poll requires localization to be available before it posts to Telegram. If `OPENAI_API_KEY` is missing or the formatter regresses to the old card style, the workflow fails before publishing.
+GitHub Actions source polling is disabled by default after moving production polling to an always-on VPS. The checked-in workflow is manual-only and should not be used as the primary parser schedule while `tg-vacancy-bot run` is active on the server.
 
 To preview how a forwarded vacancy will be normalized before posting:
 
