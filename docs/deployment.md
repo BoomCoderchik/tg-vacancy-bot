@@ -141,6 +141,44 @@ can delay near-real-time polling and can lose SQLite state if no persistent disk
 is available. Render Free has similar sleep behavior and is not recommended as
 the primary always-on parser path.
 
-GitHub Actions schedules are also not a replacement for this use case: they are
-not a long-running server and the schedule granularity is too coarse for
-near-real-time polling.
+For polling that must continue when no server is running, use the GitHub Actions
+schedule below. Prefer the VM path when you need a true always-on bot process,
+forwarded-message handling, or tighter polling than 15 minutes.
+
+## Serverless Scheduled Polling: GitHub Actions
+
+If you want parsing to continue after your local server or laptop is turned off,
+use the included GitHub Actions scheduler:
+
+```text
+.github/workflows/poll-sources.yml
+```
+
+It runs `tg-vacancy-bot poll-once` every 15 minutes and publishes only real,
+deduplicated vacancies to `TARGET_CHAT_ID`. This is the simplest no-server path
+for 15-minute polling. It is not a true always-on bot process, so forwarded
+Telegram messages are not handled while no server is running, and GitHub may
+delay scheduled jobs during platform load.
+
+Required GitHub repository secrets:
+
+- `TELEGRAM_BOT_TOKEN`
+- `TARGET_CHAT_ID`
+
+Set these only if the matching feature is enabled:
+
+- `OPENAI_API_KEY` when `LOCALIZE_DESCRIPTIONS=true`
+- `SERPAPI_API_KEY` when `ENABLE_LINKEDIN_POST_SEARCH=true`
+- `ADZUNA_APP_ID` and `ADZUNA_APP_KEY` for Adzuna
+- `JOOBLE_API_KEY` for Jooble
+
+Optional secrets can override defaults, including `SOURCE_MAX_PUBLISH_PER_POLL`,
+`SOURCE_MAX_AGE_HOURS`, `LOCALIZE_DESCRIPTIONS`, `OPENAI_MODEL`,
+`OPENAI_BASE_URL`, and source toggles such as `ENABLE_REMOTIVE`,
+`ENABLE_JOBICY`, `ENABLE_LINKEDIN_POST_SCRAPER`, and
+`ENABLE_JOBSPY_LINKEDIN`.
+
+The workflow stores the SQLite deduplication database in `data/` and restores it
+through the GitHub Actions cache. Keep only one production scheduler active for
+the same Telegram channel unless all schedulers share the same database; a VM
+service and GitHub Actions cache do not share state and can duplicate posts.

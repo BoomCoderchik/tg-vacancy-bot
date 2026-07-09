@@ -115,6 +115,31 @@ To poll public sources once and publish new vacancies:
 tg-vacancy-bot poll-once
 ```
 
+## Scheduled Parsing Without A Running Server
+
+This repository includes `.github/workflows/poll-sources.yml`, which runs
+`tg-vacancy-bot poll-once` on GitHub Actions every 15 minutes. This lets new
+source vacancies be parsed and published to Telegram even when your local
+server or laptop is off.
+
+Configure the required repository secrets in GitHub before enabling production
+use:
+
+- `TELEGRAM_BOT_TOKEN`
+- `TARGET_CHAT_ID`
+- `OPENAI_API_KEY`, only when `LOCALIZE_DESCRIPTIONS=true`
+
+Optional source API keys and toggles such as `ADZUNA_APP_ID`,
+`ADZUNA_APP_KEY`, `JOOBLE_API_KEY`, `SERPAPI_API_KEY`, and `ENABLE_*` can also
+be configured as GitHub secrets. The workflow keeps `DATABASE_PATH` under
+`data/` and restores it with the GitHub Actions cache so source deduplication is
+preserved between scheduled runs.
+
+Do not run the 15-minute GitHub Actions scheduler and a production always-on
+server against the same Telegram channel at the same time unless they share the
+same deduplication database. Otherwise, both schedulers can publish the same new
+vacancy before either one sees the other's SQLite state.
+
 To check which sources are configured without publishing anything:
 
 ```powershell

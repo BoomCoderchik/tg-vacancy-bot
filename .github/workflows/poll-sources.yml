@@ -1,15 +1,12 @@
-name: Poll vacancy sources manually
+name: Poll vacancy sources every 15 minutes
 
 on:
-  # Disabled after moving production polling to an always-on VPS service.
-  # The VPS runs `tg-vacancy-bot run`, which performs background source polling
-  # according to SOURCE_POLL_INTERVAL_SECONDS.
-  #
-  # Keep this workflow manual-only so GitHub Actions does not publish duplicate
-  # vacancies every 15 minutes.
-  # schedule:
-  #   - cron: "*/15 * * * *"
+  schedule:
+    - cron: "*/15 * * * *"
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: poll-vacancy-sources
@@ -26,23 +23,45 @@ jobs:
       FORWARDED_MODE: normalize
       DATABASE_PATH: data/vacancies.sqlite3
       SOURCE_POLL_INTERVAL_SECONDS: "0"
-      SOURCE_MAX_PUBLISH_PER_POLL: ${{ secrets.SOURCE_MAX_PUBLISH_PER_POLL }}
-      LOCALIZE_DESCRIPTIONS: "true"
+      SOURCE_MAX_PUBLISH_PER_POLL: ${{ secrets.SOURCE_MAX_PUBLISH_PER_POLL || '20' }}
+      SOURCE_MAX_AGE_HOURS: ${{ secrets.SOURCE_MAX_AGE_HOURS || '48' }}
+      LOCALIZE_DESCRIPTIONS: ${{ secrets.LOCALIZE_DESCRIPTIONS || 'false' }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+      OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || 'gpt-4.1-mini' }}
       OPENAI_FALLBACK_MODELS: ${{ secrets.OPENAI_FALLBACK_MODELS }}
       OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
-      ENABLE_REMOTIVE: ${{ secrets.ENABLE_REMOTIVE }}
-      ENABLE_ARBEITNOW: ${{ secrets.ENABLE_ARBEITNOW }}
-      ENABLE_REMOTEOK: ${{ secrets.ENABLE_REMOTEOK }}
-      ENABLE_HN_WHO_IS_HIRING: ${{ secrets.ENABLE_HN_WHO_IS_HIRING }}
+      ENABLE_REMOTIVE: ${{ secrets.ENABLE_REMOTIVE || 'true' }}
+      ENABLE_ARBEITNOW: ${{ secrets.ENABLE_ARBEITNOW || 'true' }}
+      ENABLE_REMOTEOK: ${{ secrets.ENABLE_REMOTEOK || 'true' }}
+      ENABLE_HN_WHO_IS_HIRING: ${{ secrets.ENABLE_HN_WHO_IS_HIRING || 'true' }}
+      ENABLE_JOBICY: ${{ secrets.ENABLE_JOBICY || 'true' }}
+      ENABLE_WE_WORK_REMOTELY: ${{ secrets.ENABLE_WE_WORK_REMOTELY || 'true' }}
+      ENABLE_HIMALAYAS: ${{ secrets.ENABLE_HIMALAYAS || 'true' }}
+      ENABLE_REAL_WORK_FROM_ANYWHERE: ${{ secrets.ENABLE_REAL_WORK_FROM_ANYWHERE || 'true' }}
+      ENABLE_JOBSCOLLIDER: ${{ secrets.ENABLE_JOBSCOLLIDER || 'true' }}
+      ENABLE_LINKEDIN_POST_SEARCH: ${{ secrets.ENABLE_LINKEDIN_POST_SEARCH || 'false' }}
+      SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
+      LINKEDIN_POST_SEARCH_QUERY: ${{ secrets.LINKEDIN_POST_SEARCH_QUERY }}
+      LINKEDIN_POST_SEARCH_LOCATION: ${{ secrets.LINKEDIN_POST_SEARCH_LOCATION || 'Kazakhstan' }}
+      LINKEDIN_POST_SEARCH_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SEARCH_RESULTS_WANTED || '10' }}
+      ENABLE_LINKEDIN_POST_SCRAPER: ${{ secrets.ENABLE_LINKEDIN_POST_SCRAPER || 'false' }}
+      LINKEDIN_POST_SCRAPER_QUERY: ${{ secrets.LINKEDIN_POST_SCRAPER_QUERY }}
+      LINKEDIN_POST_SCRAPER_LOCATION: ${{ secrets.LINKEDIN_POST_SCRAPER_LOCATION || 'Kazakhstan' }}
+      LINKEDIN_POST_SCRAPER_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SCRAPER_RESULTS_WANTED || '10' }}
+      ENABLE_JOBSPY_LINKEDIN: ${{ secrets.ENABLE_JOBSPY_LINKEDIN || 'false' }}
+      JOBSPY_LINKEDIN_QUERY: ${{ secrets.JOBSPY_LINKEDIN_QUERY }}
+      JOBSPY_LINKEDIN_LOCATION: ${{ secrets.JOBSPY_LINKEDIN_LOCATION || 'Worldwide' }}
+      JOBSPY_LINKEDIN_RESULTS_WANTED: ${{ secrets.JOBSPY_LINKEDIN_RESULTS_WANTED || '20' }}
+      JOBSPY_LINKEDIN_HOURS_OLD: ${{ secrets.JOBSPY_LINKEDIN_HOURS_OLD || '48' }}
+      JOBSPY_LINKEDIN_FETCH_DESCRIPTION: ${{ secrets.JOBSPY_LINKEDIN_FETCH_DESCRIPTION || 'false' }}
+      JOBSPY_LINKEDIN_PROXIES: ${{ secrets.JOBSPY_LINKEDIN_PROXIES }}
       ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
       ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
-      ADZUNA_COUNTRY: ${{ secrets.ADZUNA_COUNTRY }}
-      ADZUNA_QUERY: ${{ secrets.ADZUNA_QUERY }}
+      ADZUNA_COUNTRY: ${{ secrets.ADZUNA_COUNTRY || 'us' }}
+      ADZUNA_QUERY: ${{ secrets.ADZUNA_QUERY || 'software developer' }}
       ADZUNA_LOCATION: ${{ secrets.ADZUNA_LOCATION }}
       JOOBLE_API_KEY: ${{ secrets.JOOBLE_API_KEY }}
-      JOOBLE_KEYWORDS: ${{ secrets.JOOBLE_KEYWORDS }}
+      JOOBLE_KEYWORDS: ${{ secrets.JOOBLE_KEYWORDS || 'software developer' }}
       JOOBLE_LOCATION: ${{ secrets.JOOBLE_LOCATION }}
 
     steps:
@@ -55,7 +74,7 @@ jobs:
       - name: Restore deduplication database
         uses: actions/cache@v4
         with:
-          path: data/vacancies.sqlite3
+          path: data/
           key: vacancy-db-${{ github.run_id }}
           restore-keys: |
             vacancy-db-
