@@ -41,15 +41,15 @@ jobs:
       ENABLE_JOBSCOLLIDER: ${{ secrets.ENABLE_JOBSCOLLIDER || 'true' }}
       ENABLE_LINKEDIN_POST_SEARCH: ${{ secrets.ENABLE_LINKEDIN_POST_SEARCH || 'false' }}
       SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
-      LINKEDIN_POST_SEARCH_QUERY: ${{ secrets.LINKEDIN_POST_SEARCH_QUERY }}
+      LINKEDIN_POST_SEARCH_QUERY: ${{ secrets.LINKEDIN_POST_SEARCH_QUERY || 'site:linkedin.com/posts hiring developer OR site:linkedin.com/feed/update hiring frontend' }}
       LINKEDIN_POST_SEARCH_LOCATION: ${{ secrets.LINKEDIN_POST_SEARCH_LOCATION || 'Kazakhstan' }}
       LINKEDIN_POST_SEARCH_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SEARCH_RESULTS_WANTED || '10' }}
       ENABLE_LINKEDIN_POST_SCRAPER: ${{ secrets.ENABLE_LINKEDIN_POST_SCRAPER || 'false' }}
-      LINKEDIN_POST_SCRAPER_QUERY: ${{ secrets.LINKEDIN_POST_SCRAPER_QUERY }}
+      LINKEDIN_POST_SCRAPER_QUERY: ${{ secrets.LINKEDIN_POST_SCRAPER_QUERY || 'site:linkedin.com/posts hiring developer || site:linkedin.com/feed/update hiring frontend' }}
       LINKEDIN_POST_SCRAPER_LOCATION: ${{ secrets.LINKEDIN_POST_SCRAPER_LOCATION || 'Kazakhstan' }}
       LINKEDIN_POST_SCRAPER_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SCRAPER_RESULTS_WANTED || '10' }}
       ENABLE_JOBSPY_LINKEDIN: ${{ secrets.ENABLE_JOBSPY_LINKEDIN || 'false' }}
-      JOBSPY_LINKEDIN_QUERY: ${{ secrets.JOBSPY_LINKEDIN_QUERY }}
+      JOBSPY_LINKEDIN_QUERY: ${{ secrets.JOBSPY_LINKEDIN_QUERY || 'backend OR frontend OR fullstack OR designer OR "AI engineer" OR "ML engineer" OR "LLM engineer"' }}
       JOBSPY_LINKEDIN_LOCATION: ${{ secrets.JOBSPY_LINKEDIN_LOCATION || 'Worldwide' }}
       JOBSPY_LINKEDIN_RESULTS_WANTED: ${{ secrets.JOBSPY_LINKEDIN_RESULTS_WANTED || '20' }}
       JOBSPY_LINKEDIN_HOURS_OLD: ${{ secrets.JOBSPY_LINKEDIN_HOURS_OLD || '48' }}
