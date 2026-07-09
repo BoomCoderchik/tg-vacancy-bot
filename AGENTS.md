@@ -7,7 +7,12 @@ Before changing code, read:
 - `README.md`
 - `docs/architecture.md`
 - `docs/sources.md`
+- `docs/task-workflow.md`
 - `docs/git-workflow.md`
+
+Follow `docs/task-workflow.md` for the project task lifecycle: understand the
+request, inspect context, plan when needed, implement narrowly, verify, review,
+and report the result.
 
 Follow `docs/git-workflow.md` for every feature or code/documentation change.
 Each completed feature or change must be committed after verification, and the
