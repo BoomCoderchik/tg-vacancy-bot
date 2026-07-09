@@ -3,7 +3,10 @@ name: Scheduled vacancy source polling
 on:
   schedule:
     # Avoid the busiest GitHub Actions scheduler minutes (:00, :15, :30, :45).
-    - cron: "7,22,37,52 * * * *"
+    - cron: "7 * * * *"
+    - cron: "22 * * * *"
+    - cron: "37 * * * *"
+    - cron: "52 * * * *"
   workflow_dispatch:
 
 permissions:
