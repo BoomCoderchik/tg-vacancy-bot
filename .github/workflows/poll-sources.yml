@@ -2,7 +2,8 @@ name: Poll vacancy sources every 15 minutes
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    # Avoid the busiest GitHub Actions scheduler minutes (:00, :15, :30, :45).
+    - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
 
 permissions:

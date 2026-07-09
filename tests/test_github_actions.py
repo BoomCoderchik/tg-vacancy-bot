@@ -7,7 +7,7 @@ WORKFLOW = Path(".github/workflows/poll-sources.yml")
 def test_poll_sources_workflow_runs_every_15_minutes() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
 
-    assert 'cron: "*/15 * * * *"' in text
+    assert 'cron: "7,22,37,52 * * * *"' in text
     assert "tg-vacancy-bot poll-once" in text
     assert "SOURCE_POLL_INTERVAL_SECONDS: \"0\"" in text
     assert "concurrency:" in text
