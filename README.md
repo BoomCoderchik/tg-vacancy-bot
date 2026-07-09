@@ -117,7 +117,7 @@ tg-vacancy-bot poll-once
 
 ## Scheduled Parsing Without A Running Server
 
-This repository includes `.github/workflows/poll-sources.yml`, which runs
+This repository includes `.github/workflows/scheduled-source-polling.yml`, which runs
 `tg-vacancy-bot poll-once` on GitHub Actions every 15 minutes. This lets new
 source vacancies be parsed and published to Telegram even when your local
 server or laptop is off.

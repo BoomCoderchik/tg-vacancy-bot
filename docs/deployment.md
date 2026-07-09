@@ -151,7 +151,7 @@ If you want parsing to continue after your local server or laptop is turned off,
 use the included GitHub Actions scheduler:
 
 ```text
-.github/workflows/poll-sources.yml
+.github/workflows/scheduled-source-polling.yml
 ```
 
 It runs `tg-vacancy-bot poll-once` every 15 minutes and publishes only real,

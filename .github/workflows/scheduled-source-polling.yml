@@ -1,4 +1,4 @@
-name: Poll vacancy sources every 15 minutes
+name: Scheduled vacancy source polling
 
 on:
   schedule:
