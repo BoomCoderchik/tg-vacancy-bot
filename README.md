@@ -55,6 +55,8 @@ LINKEDIN_POST_SCRAPER_RESULTS_WANTED=10
 
 This source scrapes public search-result HTML and keeps only real `linkedin.com/posts/...` and `linkedin.com/feed/update/...` links. It does not require an API key and does not create placeholder vacancies. Use `||` to separate fallback search queries. Because it depends on public search-result markup, it can be less stable than SerpApi and may return no rows when the search engine changes HTML or rate-limits requests.
 
+The scraper keeps only results with a reliable publication date (from the search result or the LinkedIn activity ID) and the normal `SOURCE_MAX_AGE_HOURS` freshness filter removes older posts before publishing.
+
 ## JobSpy LinkedIn Jobs Discovery
 
 LinkedIn Jobs discovery is available as an explicit opt-in source through [JobSpy](https://github.com/speedyapply/JobSpy). It is intended to send new LinkedIn Jobs links in the configured development/design/AI search scope through the same source polling flow as the other adapters: intake filter, freshness filter, SQLite deduplication, publication limit, and Telegram publishing.

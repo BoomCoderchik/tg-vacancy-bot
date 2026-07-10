@@ -36,6 +36,7 @@ def test_poll_sources_workflow_defaults_optional_runtime_values() -> None:
     assert "LOCALIZE_DESCRIPTIONS: ${{ secrets.LOCALIZE_DESCRIPTIONS || 'false' }}" in text
     assert "ENABLE_JOBICY: ${{ secrets.ENABLE_JOBICY || 'true' }}" in text
     assert "ENABLE_JOBSPY_LINKEDIN: ${{ secrets.ENABLE_JOBSPY_LINKEDIN || 'false' }}" in text
+    assert "ENABLE_LINKEDIN_POST_SCRAPER: ${{ secrets.ENABLE_LINKEDIN_POST_SCRAPER || 'true' }}" in text
     assert "LINKEDIN_POST_SEARCH_QUERY: ${{ secrets.LINKEDIN_POST_SEARCH_QUERY ||" in text
     assert "LINKEDIN_POST_SCRAPER_QUERY: ${{ secrets.LINKEDIN_POST_SCRAPER_QUERY ||" in text
     assert "JOBSPY_LINKEDIN_QUERY: ${{ secrets.JOBSPY_LINKEDIN_QUERY ||" in text

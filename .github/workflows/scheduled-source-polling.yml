@@ -48,7 +48,7 @@ jobs:
       LINKEDIN_POST_SEARCH_QUERY: ${{ secrets.LINKEDIN_POST_SEARCH_QUERY || 'site:linkedin.com/posts hiring developer OR site:linkedin.com/feed/update hiring frontend' }}
       LINKEDIN_POST_SEARCH_LOCATION: ${{ secrets.LINKEDIN_POST_SEARCH_LOCATION || 'Kazakhstan' }}
       LINKEDIN_POST_SEARCH_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SEARCH_RESULTS_WANTED || '10' }}
-      ENABLE_LINKEDIN_POST_SCRAPER: ${{ secrets.ENABLE_LINKEDIN_POST_SCRAPER || 'false' }}
+      ENABLE_LINKEDIN_POST_SCRAPER: ${{ secrets.ENABLE_LINKEDIN_POST_SCRAPER || 'true' }}
       LINKEDIN_POST_SCRAPER_QUERY: ${{ secrets.LINKEDIN_POST_SCRAPER_QUERY || 'site:linkedin.com/posts hiring developer || site:linkedin.com/feed/update hiring frontend' }}
       LINKEDIN_POST_SCRAPER_LOCATION: ${{ secrets.LINKEDIN_POST_SCRAPER_LOCATION || 'Kazakhstan' }}
       LINKEDIN_POST_SCRAPER_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SCRAPER_RESULTS_WANTED || '10' }}
