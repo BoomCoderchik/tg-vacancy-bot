@@ -70,7 +70,12 @@ class OpenAIDescriptionLocalizer:
                 errors.append(format_openai_error(exc))
                 continue
 
-            text = normalize_localized_description(response.choices[0].message.content or "")
+            content = extract_response_content(response)
+            if content is None:
+                errors.append(f"{model} returned an invalid response without message content.")
+                continue
+
+            text = normalize_localized_description(content)
             rejection_reason = localized_description_rejection_reason(description, text)
             if rejection_reason is None:
                 return text
@@ -106,6 +111,17 @@ def normalize_localized_description(text: str) -> str:
     if len(normalized) <= MAX_LOCALIZED_DESCRIPTION_CHARS:
         return normalized
     return normalized[: MAX_LOCALIZED_DESCRIPTION_CHARS - 1].rstrip() + "..."
+
+
+def extract_response_content(response: object) -> str | None:
+    """Return assistant content when an API response has the expected shape."""
+    choices = getattr(response, "choices", None)
+    if not choices:
+        return None
+    first_choice = choices[0]
+    message = getattr(first_choice, "message", None)
+    content = getattr(message, "content", None)
+    return content if isinstance(content, str) else None
 
 
 def localized_description_rejection_reason(original: str, localized: str) -> str | None:
