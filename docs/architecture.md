@@ -80,7 +80,7 @@
   - Marks manually supplied LinkedIn URLs as source `LinkedIn`.
 
 - `tg_vacancy_bot/intake.py`
-  - Rejects forwarded text that does not look like an allowed development/design/AI vacancy before formatting/publishing.
+  - Rejects forwarded text that does not match the unified vacancy filtering policy before formatting/publishing.
 
 - `tg_vacancy_bot/telegram_origin.py`
   - Extracts public `https://t.me/...` links from forwarded Telegram channel metadata.
@@ -93,7 +93,7 @@
 - `tg_vacancy_bot/source_polling.py`
   - Shared background source polling and publishing loop.
   - Applies the per-poll source publishing limit.
-  - Publishes only source vacancies that pass the development/design/AI filter.
+  - Publishes only source vacancies that pass the unified vacancy filtering policy.
   - Skips publishing a vacancy when required description localization fails, so English originals do not leak into localized channel posts.
   - Filters dated source vacancies by `SOURCE_MAX_AGE_HOURS` before publishing while preserving undated vacancies for dedupe-based handling.
 
@@ -107,6 +107,32 @@
   - Uses the real OpenAI API or an OpenAI-compatible endpoint to translate vacancy descriptions to Russian and compress long source text before normalized cards are published.
   - Rejects empty localization responses and non-Russian/original-language responses, then tries the next configured fallback model before publishing.
   - Raises a configuration error when localization is enabled without `OPENAI_API_KEY`.
+
+## Vacancy Filtering Policy
+
+The full, maintained category matrix and implementation plan live in
+[`docs/vacancy-filtering-policy-plan.md`](vacancy-filtering-policy-plan.md).
+Update that document first when the channel's vacancy policy changes, then
+reflect the stabilized behavior here.
+
+The publication policy is development-first. Backend, frontend, fullstack,
+mobile, GameDev, ML/LLM/AI, blockchain/Web3, UI/UX, technical PM, engineering
+leadership, and explicitly coding-focused enterprise or technical-adjacent
+roles may be published. Embedded/IoT is limited to software work, QA is
+limited to automation/SDET, and security is limited to AppSec/DevSecOps.
+
+DevOps/SRE/Cloud, database administration, network/sysadmin/support, manual QA,
+Data Analyst/BI, ordinary product/project roles, general design, and
+non-coding consulting or implementation roles are excluded.
+
+The same policy applies to source adapters, forwarded messages, `copy` mode,
+background polling, and preview commands. Role evidence must come from the
+actual vacancy role or explicit technical responsibilities; a technology name
+or a word such as `developer` appearing only in company or product
+description is not sufficient. There are no filters by geography, work format,
+salary, language, citizenship, work authorization, or employment type; valid
+internships, trainee, freelance, contract, part-time, and unpaid roles remain
+eligible.
 
 ## External Services
 
@@ -141,7 +167,7 @@ Do not replace missing external services with fake data. If a token, chat ID, AP
 For `@it_jobs_board`-style intake:
 
 - If you forward a message to the bot in `normalize` mode, it parses the text and publishes a clean card.
-- Obvious non-vacancy messages and vacancies outside the allowed development/design/AI scope are skipped.
+- Obvious non-vacancy messages and vacancies outside the unified vacancy filtering policy are skipped.
 - If the forwarded source is a public Telegram channel, the card link can point back to the original `t.me/channel/message_id`.
 - If `FORWARDED_MODE=copy`, the bot applies the same allowed-vacancy intake check and then copies the original incoming message to the target chat.
 - If `OPERATOR_USER_IDS` is set, unauthorized users are rejected before copy/normalize publishing.
