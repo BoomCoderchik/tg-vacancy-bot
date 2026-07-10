@@ -21,7 +21,7 @@ def test_poll_sources_workflow_runs_every_15_minutes() -> None:
 def test_poll_sources_workflow_preserves_dedupe_state() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
 
-    assert "actions/cache@v4" in text
+    assert "actions/cache@v5" in text
     assert "path: data/" in text
     assert "DATABASE_PATH: data/vacancies.sqlite3" in text
     assert "key: vacancy-db-${{ github.run_id }}" in text
