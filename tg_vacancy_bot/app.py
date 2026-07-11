@@ -181,7 +181,11 @@ async def preview_sources(settings, source_name: str | None = None, limit: int =
         except Exception as exc:
             lines.append(f"{adapter.name}: fetch failed: {exc}")
             continue
-        filtered = filter_it_vacancies(vacancies)
+        filtered = filter_fresh_vacancies(
+            filter_it_vacancies(vacancies),
+            max_age_hours=settings.source_max_age_hours,
+            current_time=datetime.now(UTC),
+        )
         lines.append(f"{adapter.name}: fetched={len(vacancies)} filtered={len(filtered)}")
         for vacancy in filtered[:per_source_limit]:
             lines.append(f"- {vacancy.title}")

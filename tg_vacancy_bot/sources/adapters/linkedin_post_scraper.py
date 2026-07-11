@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+from datetime import UTC, datetime
 from urllib.parse import parse_qs, unquote, urlparse
 
 from bs4 import BeautifulSoup, Tag
@@ -7,7 +9,12 @@ from bs4 import BeautifulSoup, Tag
 from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.sources.base import SourceAdapter, html_to_text, source_session
-from tg_vacancy_bot.sources.adapters.linkedin_post_search import _clean_title, _is_linkedin_post_url, _stack_from_text
+from tg_vacancy_bot.sources.adapters.linkedin_post_search import (
+    _clean_title,
+    _is_linkedin_post_url,
+    _parse_search_date,
+    _stack_from_text,
+)
 
 
 DUCKDUCKGO_HTML_SEARCH_URL = "https://html.duckduckgo.com/html/"
@@ -18,6 +25,7 @@ BROWSER_HEADERS = {
     ),
     "Accept-Language": "ru,en;q=0.8",
 }
+ACTIVITY_ID_PATTERN = re.compile(r"activity-(\d{15,20})(?:[-/?#]|$)", re.IGNORECASE)
 
 
 class LinkedInPostScraperAdapter(SourceAdapter):
@@ -66,6 +74,11 @@ def _html_to_vacancies(html: str, location: str, limit: int, seen_urls: set[str]
         snippet = _snippet_for_anchor(anchor)
         if not snippet:
             continue
+        published_at = _published_at_for_result(anchor, link)
+        if published_at is None:
+            # Do not publish an undated result: search engines can return very
+            # old indexed LinkedIn posts without exposing their publication date.
+            continue
 
         seen.add(link)
         vacancies.append(
@@ -76,6 +89,7 @@ def _html_to_vacancies(html: str, location: str, limit: int, seen_urls: set[str]
                 url=link,
                 location=location or None,
                 stack=_stack_from_text(f"{title} {snippet}"),
+                published_at=published_at,
                 raw_text=f"{title} {snippet}",
             )
         )
@@ -119,3 +133,28 @@ def _snippet_for_anchor(anchor: Tag) -> str:
         if text:
             return text
     return ""
+
+
+def _published_at_for_result(anchor: Tag, link: str) -> datetime | None:
+    container = anchor.find_parent(class_="result")
+    if container is not None:
+        for candidate in container.select("time, [class*=date], [class*=time]"):
+            value = str(candidate.get("datetime") or html_to_text(str(candidate)))
+            parsed = _parse_search_date(value)
+            if parsed is not None:
+                return parsed
+
+    return _published_at_from_activity_id(link)
+
+
+def _published_at_from_activity_id(link: str) -> datetime | None:
+    match = ACTIVITY_ID_PATTERN.search(link)
+    if not match:
+        return None
+    try:
+        # LinkedIn activity IDs use the same 22-bit worker/sequence layout as
+        # Snowflake IDs; their high bits are milliseconds since Unix epoch.
+        timestamp_ms = int(match.group(1)) >> 22
+        return datetime.fromtimestamp(timestamp_ms / 1000, tz=UTC)
+    except (ValueError, OSError, OverflowError):
+        return None

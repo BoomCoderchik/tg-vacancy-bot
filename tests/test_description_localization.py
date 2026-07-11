@@ -46,6 +46,21 @@ class FailingOpenAIClient:
         self.chat = FailingChat()
 
 
+class EmptyChoicesResponses:
+    async def create(self, **kwargs):
+        return type("Response", (), {"choices": None})()
+
+
+class EmptyChoicesChat:
+    def __init__(self) -> None:
+        self.completions = EmptyChoicesResponses()
+
+
+class EmptyChoicesOpenAIClient:
+    def __init__(self) -> None:
+        self.chat = EmptyChoicesChat()
+
+
 class EmptyThenGoodResponses:
     def __init__(self) -> None:
         self.models: list[str] = []
@@ -159,6 +174,17 @@ def test_openai_localizer_wraps_api_errors() -> None:
     )
 
     with pytest.raises(RuntimeError, match="OpenAI description localization failed"):
+        asyncio.run(localizer.localize("Remote backend role."))
+
+
+def test_openai_localizer_wraps_response_without_choices() -> None:
+    localizer = OpenAIDescriptionLocalizer(
+        api_key="test-key",
+        model="test-model",
+        client=EmptyChoicesOpenAIClient(),
+    )
+
+    with pytest.raises(RuntimeError, match="invalid response without message content"):
         asyncio.run(localizer.localize("Remote backend role."))
 
 

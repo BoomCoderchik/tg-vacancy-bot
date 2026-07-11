@@ -48,7 +48,7 @@ jobs:
       LINKEDIN_POST_SEARCH_QUERY: ${{ secrets.LINKEDIN_POST_SEARCH_QUERY || 'site:linkedin.com/posts hiring developer OR site:linkedin.com/feed/update hiring frontend' }}
       LINKEDIN_POST_SEARCH_LOCATION: ${{ secrets.LINKEDIN_POST_SEARCH_LOCATION || 'Kazakhstan' }}
       LINKEDIN_POST_SEARCH_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SEARCH_RESULTS_WANTED || '10' }}
-      ENABLE_LINKEDIN_POST_SCRAPER: ${{ secrets.ENABLE_LINKEDIN_POST_SCRAPER || 'false' }}
+      ENABLE_LINKEDIN_POST_SCRAPER: ${{ secrets.ENABLE_LINKEDIN_POST_SCRAPER || 'true' }}
       LINKEDIN_POST_SCRAPER_QUERY: ${{ secrets.LINKEDIN_POST_SCRAPER_QUERY || 'site:linkedin.com/posts hiring developer || site:linkedin.com/feed/update hiring frontend' }}
       LINKEDIN_POST_SCRAPER_LOCATION: ${{ secrets.LINKEDIN_POST_SCRAPER_LOCATION || 'Kazakhstan' }}
       LINKEDIN_POST_SCRAPER_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SCRAPER_RESULTS_WANTED || '10' }}
@@ -69,14 +69,14 @@ jobs:
       JOOBLE_LOCATION: ${{ secrets.JOOBLE_LOCATION }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
       - name: Restore deduplication database
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: data/
           key: vacancy-db-${{ github.run_id }}

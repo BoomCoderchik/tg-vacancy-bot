@@ -4,7 +4,10 @@ from datetime import UTC, datetime
 from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.sources import build_adapters, filter_it_vacancies
-from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import LinkedInPostScraperAdapter
+from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import (
+    LinkedInPostScraperAdapter,
+    _html_to_vacancies,
+)
 from tg_vacancy_bot.sources.adapters.linkedin_post_search import LinkedInPostSearchAdapter
 from tg_vacancy_bot.sources.adapters.jobspy_linkedin import JobSpyLinkedInAdapter
 from tg_vacancy_bot.sources.adapters.jobicy import JobicyAdapter
@@ -402,7 +405,7 @@ def test_linkedin_post_scraper_maps_public_search_html(monkeypatch) -> None:
     html = """
     <html>
       <body>
-        <a class="result__a" href="/l/?uddg=https%3A%2F%2Fwww.linkedin.com%2Fposts%2Fexample_hiring-junior-frontend-activity-123">
+        <a class="result__a" href="/l/?uddg=https%3A%2F%2Fwww.linkedin.com%2Fposts%2Fexample_hiring-junior-frontend-activity-7480965762036461568">
           Ищем Junior Front-End Developer в команду DAP | LinkedIn
         </a>
         <a class="result__snippet">
@@ -454,15 +457,27 @@ def test_linkedin_post_scraper_maps_public_search_html(monkeypatch) -> None:
             title="Ищем Junior Front-End Developer в команду DAP",
             description="г. Алматы. Ищем Junior Front-End Developer. Angular от 1 года, TypeScript, HTML/CSS.",
             source="LinkedIn Hiring Post Scraper",
-            url="https://www.linkedin.com/posts/example_hiring-junior-frontend-activity-123",
+            url="https://www.linkedin.com/posts/example_hiring-junior-frontend-activity-7480965762036461568",
             location="Kazakhstan",
             stack=("LinkedIn post", "frontend", "Angular", "TypeScript"),
+            published_at=datetime(2026, 7, 9, 12, 47, 7, 292000, tzinfo=UTC),
             raw_text=(
                 "Ищем Junior Front-End Developer в команду DAP "
                 "г. Алматы. Ищем Junior Front-End Developer. Angular от 1 года, TypeScript, HTML/CSS."
             ),
         )
     ]
+
+
+def test_linkedin_post_scraper_skips_results_without_a_reliable_date() -> None:
+    html = """
+    <a class="result__a" href="https://www.linkedin.com/posts/example_hiring-activity-no-date">
+      Hiring developer - LinkedIn
+    </a>
+    <a class="result__snippet">We are hiring a backend developer.</a>
+    """
+
+    assert _html_to_vacancies(html, location="Kazakhstan", limit=5) == []
 
 
 def test_linkedin_post_scraper_reports_search_challenge(monkeypatch) -> None:

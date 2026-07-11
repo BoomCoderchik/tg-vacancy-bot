@@ -80,6 +80,7 @@
 - LinkedIn Hiring Post Scraper
   - Enabled with `ENABLE_LINKEDIN_POST_SCRAPER=true`.
   - Scrapes public search-result HTML to find publicly indexed LinkedIn post URLs, not LinkedIn Jobs pages.
+  - Requires a publication date: it reads a date exposed by the search result or derives it from the LinkedIn `activity-...` ID. Results without a reliable date are skipped, so old indexed posts are not published.
   - Query configured by `LINKEDIN_POST_SCRAPER_QUERY`, `LINKEDIN_POST_SCRAPER_LOCATION`, and `LINKEDIN_POST_SCRAPER_RESULTS_WANTED`; separate fallback search queries with `||`.
   - Maps result title, snippet, and link into a short `Vacancy` card with source `LinkedIn Hiring Post Scraper`.
   - Drops results that are not `linkedin.com/posts/...` or `linkedin.com/feed/update/...`.
