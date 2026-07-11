@@ -10,6 +10,12 @@ from .access_control import parse_operator_user_ids
 OPENAI_RELIABLE_TRANSLATION_FALLBACK_MODEL = "gpt-4.1-mini"
 OPENROUTER_RELIABLE_TRANSLATION_FALLBACK_MODEL = "openai/gpt-4.1-mini"
 OPENROUTER_FREE_FALLBACK_MODELS = ("qwen/qwen3.6-plus:free", "openrouter/free")
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+# Groq currently gives this model a substantially larger free request allowance
+# than the larger models. The replacement is kept in the fallback chain because
+# Groq can change model availability without changing our client.
+GROQ_FREE_TRANSLATION_MODEL = "llama-3.1-8b-instant"
+GROQ_FREE_TRANSLATION_FALLBACK_MODELS = ("openai/gpt-oss-20b",)
 DEFAULT_LINKEDIN_POST_SCRAPER_QUERY = (
     'site:linkedin.com/posts hiring developer || '
     'site:linkedin.com/posts "ищем" разработчик || '
@@ -86,6 +92,10 @@ class Settings(BaseSettings):
     openai_model: str = Field(default="gpt-4.1-mini", alias="OPENAI_MODEL")
     openai_fallback_models_raw: str = Field(default="", alias="OPENAI_FALLBACK_MODELS")
     openai_base_url: str = Field(default="", alias="OPENAI_BASE_URL")
+    localization_provider: Literal["openai", "groq"] = Field(default="openai", alias="LOCALIZATION_PROVIDER")
+    groq_api_key: str = Field(default="", alias="GROQ_API_KEY")
+    groq_model: str = Field(default=GROQ_FREE_TRANSLATION_MODEL, alias="GROQ_MODEL")
+    groq_fallback_models_raw: str = Field(default="", alias="GROQ_FALLBACK_MODELS")
 
     @property
     def operator_user_ids(self) -> tuple[int, ...]:
@@ -104,6 +114,39 @@ class Settings(BaseSettings):
                 )
             )
         return unique_models((*configured, OPENAI_RELIABLE_TRANSLATION_FALLBACK_MODEL))
+
+    @property
+    def localization_api_key(self) -> str:
+        if self.localization_provider == "groq":
+            return self.groq_api_key
+        return self.openai_api_key
+
+    @property
+    def localization_model(self) -> str:
+        if self.localization_provider == "groq":
+            return self.groq_model
+        return self.openai_model
+
+    @property
+    def localization_fallback_models(self) -> tuple[str, ...]:
+        if self.localization_provider == "groq":
+            configured = tuple(
+                model.strip() for model in self.groq_fallback_models_raw.split(",") if model.strip()
+            )
+            return unique_models(configured or GROQ_FREE_TRANSLATION_FALLBACK_MODELS)
+        return self.openai_fallback_models
+
+    @property
+    def localization_base_url(self) -> str:
+        if self.localization_provider == "groq":
+            return GROQ_BASE_URL
+        return self.openai_base_url
+
+    @property
+    def localization_api_key_name(self) -> str:
+        if self.localization_provider == "groq":
+            return "GROQ_API_KEY"
+        return "OPENAI_API_KEY"
 
     @property
     def jobspy_linkedin_proxies(self) -> tuple[str, ...]:

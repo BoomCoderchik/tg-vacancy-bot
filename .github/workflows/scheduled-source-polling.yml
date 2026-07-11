@@ -30,10 +30,14 @@ jobs:
       SOURCE_MAX_PUBLISH_PER_POLL: ${{ secrets.SOURCE_MAX_PUBLISH_PER_POLL || '20' }}
       SOURCE_MAX_AGE_HOURS: ${{ secrets.SOURCE_MAX_AGE_HOURS || '48' }}
       LOCALIZE_DESCRIPTIONS: ${{ secrets.LOCALIZE_DESCRIPTIONS || 'false' }}
+      LOCALIZATION_PROVIDER: ${{ secrets.LOCALIZATION_PROVIDER || 'openai' }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || 'gpt-4.1-mini' }}
       OPENAI_FALLBACK_MODELS: ${{ secrets.OPENAI_FALLBACK_MODELS }}
       OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      GROQ_MODEL: ${{ secrets.GROQ_MODEL || 'llama-3.1-8b-instant' }}
+      GROQ_FALLBACK_MODELS: ${{ secrets.GROQ_FALLBACK_MODELS || 'openai/gpt-oss-20b' }}
       ENABLE_REMOTIVE: ${{ secrets.ENABLE_REMOTIVE || 'true' }}
       ENABLE_ARBEITNOW: ${{ secrets.ENABLE_ARBEITNOW || 'true' }}
       ENABLE_REMOTEOK: ${{ secrets.ENABLE_REMOTEOK || 'true' }}
@@ -107,12 +111,18 @@ jobs:
           assert "<b>Стек</b>" in card
           PY
 
-      # If translation is required, stop before Telegram publishing when OpenAI is unavailable.
+      # If translation is required, stop before Telegram publishing when its selected provider is unavailable.
       - name: Verify localization configuration
         run: |
-          if [ "${LOCALIZE_DESCRIPTIONS}" = "true" ] && [ -z "${OPENAI_API_KEY}" ]; then
-            echo "LOCALIZE_DESCRIPTIONS=true but OPENAI_API_KEY is not configured."
-            exit 1
+          if [ "${LOCALIZE_DESCRIPTIONS}" = "true" ]; then
+            if [ "${LOCALIZATION_PROVIDER}" = "groq" ] && [ -z "${GROQ_API_KEY}" ]; then
+              echo "LOCALIZATION_PROVIDER=groq but GROQ_API_KEY is not configured."
+              exit 1
+            fi
+            if [ "${LOCALIZATION_PROVIDER}" = "openai" ] && [ -z "${OPENAI_API_KEY}" ]; then
+              echo "LOCALIZATION_PROVIDER=openai but OPENAI_API_KEY is not configured."
+              exit 1
+            fi
           fi
 
       - name: Poll and publish new vacancies

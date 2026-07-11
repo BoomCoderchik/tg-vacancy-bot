@@ -253,3 +253,17 @@ def test_localize_vacancy_description_requires_openai_key_when_enabled() -> None
 
     with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
         asyncio.run(localize_vacancy_description(vacancy, settings))
+
+
+def test_localize_vacancy_description_requires_groq_key_when_enabled() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        LOCALIZE_DESCRIPTIONS="true",
+        LOCALIZATION_PROVIDER="groq",
+        GROQ_API_KEY="",
+    )
+    vacancy = Vacancy(title="Python Engineer", description="Remote role.", source="Telegram")
+
+    with pytest.raises(RuntimeError, match="GROQ_API_KEY"):
+        asyncio.run(localize_vacancy_description(vacancy, settings))
