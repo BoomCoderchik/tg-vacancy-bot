@@ -93,14 +93,14 @@ async def localize_vacancy_description(
 ) -> Vacancy:
     if not settings.localize_descriptions or not vacancy.description.strip():
         return vacancy
-    if not settings.openai_api_key:
-        raise RuntimeError("OPENAI_API_KEY is required when LOCALIZE_DESCRIPTIONS=true.")
+    if not settings.localization_api_key:
+        raise RuntimeError(f"{settings.localization_api_key_name} is required when LOCALIZE_DESCRIPTIONS=true.")
 
     localizer = localizer or OpenAIDescriptionLocalizer(
-        api_key=settings.openai_api_key,
-        model=settings.openai_model,
-        fallback_models=settings.openai_fallback_models,
-        base_url=settings.openai_base_url,
+        api_key=settings.localization_api_key,
+        model=settings.localization_model,
+        fallback_models=settings.localization_fallback_models,
+        base_url=settings.localization_base_url,
     )
     description = await localizer.localize(vacancy.description)
     return replace(vacancy, description=description)

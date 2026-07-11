@@ -45,7 +45,7 @@
   - Requires `TELEGRAM_BOT_TOKEN` and `TARGET_CHAT_ID` for real publishing.
   - Supports optional `OPERATOR_USER_IDS` for publish access control.
   - Controls source polling with `SOURCE_POLL_INTERVAL_SECONDS`, `SOURCE_MAX_PUBLISH_PER_POLL`, and `SOURCE_MAX_AGE_HOURS`.
-  - Supports optional OpenAI/OpenAI-compatible description localization with `LOCALIZE_DESCRIPTIONS`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_FALLBACK_MODELS`, and `OPENAI_BASE_URL`.
+  - Supports optional OpenAI/OpenAI-compatible description localization with `LOCALIZE_DESCRIPTIONS`, `LOCALIZATION_PROVIDER`, `OPENAI_*`, and the built-in Groq mode (`GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_FALLBACK_MODELS`).
   - Supports opt-in LinkedIn hiring-post search with `ENABLE_LINKEDIN_POST_SEARCH`, `SERPAPI_API_KEY`, `LINKEDIN_POST_SEARCH_QUERY`, `LINKEDIN_POST_SEARCH_LOCATION`, and `LINKEDIN_POST_SEARCH_RESULTS_WANTED`.
   - Supports opt-in free LinkedIn hiring-post scraping with `ENABLE_LINKEDIN_POST_SCRAPER`, `LINKEDIN_POST_SCRAPER_QUERY`, `LINKEDIN_POST_SCRAPER_LOCATION`, and `LINKEDIN_POST_SCRAPER_RESULTS_WANTED`.
   - Supports opt-in JobSpy LinkedIn discovery with `ENABLE_JOBSPY_LINKEDIN`, `JOBSPY_LINKEDIN_QUERY`, `JOBSPY_LINKEDIN_LOCATION`, `JOBSPY_LINKEDIN_RESULTS_WANTED`, `JOBSPY_LINKEDIN_HOURS_OLD`, `JOBSPY_LINKEDIN_FETCH_DESCRIPTION`, and `JOBSPY_LINKEDIN_PROXIES`.
@@ -106,7 +106,7 @@
 - `tg_vacancy_bot/description_localization.py`
   - Uses the real OpenAI API or an OpenAI-compatible endpoint to translate vacancy descriptions to Russian and compress long source text before normalized cards are published.
   - Rejects empty localization responses and non-Russian/original-language responses, then tries the next configured fallback model before publishing.
-  - Raises a configuration error when localization is enabled without `OPENAI_API_KEY`.
+  - Raises a configuration error when localization is enabled without the key required by the selected provider.
 
 ## Vacancy Filtering Policy
 
@@ -155,10 +155,12 @@ Optional source credentials:
 Optional OpenAI localization:
 
 - `LOCALIZE_DESCRIPTIONS=true`.
-- `OPENAI_API_KEY` for the real OpenAI or OpenAI-compatible API.
+- `LOCALIZATION_PROVIDER=openai` (default) with `OPENAI_API_KEY` for the real OpenAI or OpenAI-compatible API.
 - `OPENAI_MODEL`, defaulting to `gpt-4.1-mini`.
 - `OPENAI_FALLBACK_MODELS`, optional comma-separated fallback model list.
 - `OPENAI_BASE_URL`, optional. For OpenRouter, use `https://openrouter.ai/api/v1`.
+- `LOCALIZATION_PROVIDER=groq` with `GROQ_API_KEY` uses Groq's OpenAI-compatible API at `https://api.groq.com/openai/v1`.
+- Groq defaults to `llama-3.1-8b-instant` with `openai/gpt-oss-20b` as a fallback. `GROQ_MODEL` and `GROQ_FALLBACK_MODELS` allow model replacement without a code change.
 
 Do not replace missing external services with fake data. If a token, chat ID, API key, or permission is missing, report the missing service and stop that integration path until it is configured.
 

@@ -129,7 +129,7 @@ use:
 
 - `TELEGRAM_BOT_TOKEN`
 - `TARGET_CHAT_ID`
-- `OPENAI_API_KEY`, only when `LOCALIZE_DESCRIPTIONS=true`
+- One localization key when `LOCALIZE_DESCRIPTIONS=true`: `OPENAI_API_KEY` for the default mode, or `GROQ_API_KEY` when `LOCALIZATION_PROVIDER=groq`.
 
 Optional source API keys and toggles such as `ADZUNA_APP_ID`,
 `ADZUNA_APP_KEY`, `JOOBLE_API_KEY`, `SERPAPI_API_KEY`, and `ENABLE_*` can also
@@ -171,13 +171,29 @@ To translate vacancy descriptions into Russian and compress long source text bef
 
 ```dotenv
 LOCALIZE_DESCRIPTIONS=true
+LOCALIZATION_PROVIDER=openai
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4.1-mini
 OPENAI_FALLBACK_MODELS=
 OPENAI_BASE_URL=
 ```
 
-This uses the real OpenAI API, or an OpenAI-compatible endpoint such as OpenRouter, for normalized cards from forwarded messages, `publish-message`, and public source polling. If localization is enabled without `OPENAI_API_KEY`, publishing stops with a clear configuration error instead of using fake or placeholder text.
+This uses the real OpenAI API, or an OpenAI-compatible endpoint such as OpenRouter, for normalized cards from forwarded messages, `publish-message`, and public source polling. If localization is enabled without the selected provider key, publishing stops with a clear configuration error instead of using fake or placeholder text.
+
+### Free Groq localization mode
+
+For the scheduled parser's current load profile, Groq is the supported free option:
+
+```dotenv
+LOCALIZE_DESCRIPTIONS=true
+LOCALIZATION_PROVIDER=groq
+GROQ_API_KEY=gsk_...
+# Defaults shown explicitly; change these only after testing a replacement model.
+GROQ_MODEL=llama-3.1-8b-instant
+GROQ_FALLBACK_MODELS=openai/gpt-oss-20b
+```
+
+Groq is OpenAI-client-compatible, so the bot uses its API directly rather than the unstable OpenRouter free-model pool. At the time this was documented, the free limit for `llama-3.1-8b-instant` is 30 requests/minute and 14,400 requests/day: above the bot's 20-vacancy, 15-minute poll ceiling. Groq has announced that this particular model will be removed on 2026-08-16; the configured `openai/gpt-oss-20b` fallback keeps the bot running, but has a lower free quota. Before that date, test and set a replacement through `GROQ_MODEL` and `GROQ_FALLBACK_MODELS` without changing code. Add `LOCALIZATION_PROVIDER=groq`, `GROQ_API_KEY`, and optionally the two model variables as GitHub Actions secrets; do not store the key in the repository.
 
 ## Preview And Manual Publish
 
