@@ -61,6 +61,21 @@ def test_build_status_text_reports_linkedin_post_search_on_without_exposing_key(
     assert "serp-secret" not in text
 
 
+def test_build_status_text_reports_linkedin_post_search_on_with_serper_key() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="secret-token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_LINKEDIN_POST_SEARCH=True,
+        SERPER_API_KEY="serper-secret",
+        ENABLE_JOBSPY_LINKEDIN=False,
+    )
+
+    text = build_status_text(settings)
+
+    assert "LinkedInPosts=on" in text
+    assert "serper-secret" not in text
+
+
 def test_format_whoami_text_returns_user_id() -> None:
     assert format_whoami_text(123456) == "Your Telegram user ID: 123456"
 

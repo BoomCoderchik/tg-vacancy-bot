@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     enable_linkedin_post_search: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SEARCH")
     enable_linkedin_post_scraper: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SCRAPER")
     serpapi_api_key: str = Field(default="", alias="SERPAPI_API_KEY")
+    serper_api_key: str = Field(default="", alias="SERPER_API_KEY")
     linkedin_post_search_query: str = Field(
         default=(
             '(site:linkedin.com/posts OR site:linkedin.com/feed/update) '

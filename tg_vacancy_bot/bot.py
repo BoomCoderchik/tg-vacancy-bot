@@ -52,7 +52,7 @@ def build_status_text(settings: Settings) -> str:
 def _linkedin_post_search_state(settings: Settings) -> str:
     if not settings.enable_linkedin_post_search:
         return "off"
-    if not settings.serpapi_api_key:
+    if not (settings.serpapi_api_key or settings.serper_api_key):
         return "missing-key"
     return "on"
 

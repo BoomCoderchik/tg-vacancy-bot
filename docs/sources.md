@@ -71,8 +71,8 @@
   - Publication date: parsed from JobSpy `date_posted` when present.
 
 - LinkedIn Hiring Posts
-  - Enabled only when `ENABLE_LINKEDIN_POST_SEARCH=true` and `SERPAPI_API_KEY` are set.
-  - Uses SerpApi Google Search (`https://serpapi.com/search.json`) to find publicly indexed LinkedIn post URLs, not LinkedIn Jobs pages.
+  - Enabled only when `ENABLE_LINKEDIN_POST_SEARCH=true` and `SERPAPI_API_KEY` or `SERPER_API_KEY` are set.
+  - Uses SerpApi Google Search (`https://serpapi.com/search.json`) or Serper Google Search (`https://google.serper.dev/search`) to find publicly indexed LinkedIn post URLs, not LinkedIn Jobs pages.
   - Query configured by `LINKEDIN_POST_SEARCH_QUERY`, `LINKEDIN_POST_SEARCH_LOCATION`, and `LINKEDIN_POST_SEARCH_RESULTS_WANTED`.
   - Maps search `title`, `snippet`, `link`, and optional `date` into a short `Vacancy` card with source `LinkedIn Hiring Posts`.
   - Drops results that are not `linkedin.com/posts/...` or `linkedin.com/feed/update/...`.
@@ -92,12 +92,12 @@
 - Public Telegram channel origins when Telegram exposes forward metadata.
 - LinkedIn URLs supplied manually by an operator via sent or forwarded vacancy text.
 - LinkedIn links discovered by the opt-in JobSpy LinkedIn source.
-- LinkedIn post links discovered by the opt-in SerpApi-backed hiring-post search source.
+- LinkedIn post links discovered by the opt-in SerpApi-backed or Serper-backed hiring-post search source.
 - LinkedIn post links discovered by the opt-in free hiring-post scraper source.
 
 ## LinkedIn Boundary
 
-The automatic LinkedIn sources are `LinkedInPostSearchAdapter` for SerpApi-backed public hiring posts, `LinkedInPostScraperAdapter` for free public search-result scraping, and `JobSpyLinkedInAdapter` for LinkedIn Jobs. They must remain explicitly opt-in. Account-based crawling and fake LinkedIn fallback rows remain out of scope.
+The automatic LinkedIn sources are `LinkedInPostSearchAdapter` for SerpApi-backed public hiring posts, `LinkedInPostSerperAdapter` for Serper-backed public hiring posts, `LinkedInPostScraperAdapter` for free public search-result scraping, and `JobSpyLinkedInAdapter` for LinkedIn Jobs. They must remain explicitly opt-in. Account-based crawling and fake LinkedIn fallback rows remain out of scope.
 
 ## Planned Source Pattern
 

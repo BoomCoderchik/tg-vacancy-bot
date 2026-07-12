@@ -49,6 +49,7 @@ jobs:
       ENABLE_JOBSCOLLIDER: ${{ secrets.ENABLE_JOBSCOLLIDER || 'true' }}
       ENABLE_LINKEDIN_POST_SEARCH: ${{ secrets.ENABLE_LINKEDIN_POST_SEARCH || 'true' }}
       SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
+      SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
       LINKEDIN_POST_SEARCH_QUERY: ${{ secrets.LINKEDIN_POST_SEARCH_QUERY || '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("ищем" OR "ищет" OR "в команду" OR "we are hiring" OR hiring OR "join our team" OR "open position" OR "looking for") (frontend OR "front-end" OR backend OR fullstack OR "full-stack" OR mobile OR android OR ios OR react OR vue OR angular OR python OR java OR golang OR node.js OR typescript OR javascript OR designer OR "ui/ux" OR "AI engineer" OR "ML engineer" OR "LLM engineer" OR разработчик OR инженер OR программист)' }}
       LINKEDIN_POST_SEARCH_LOCATION: ${{ secrets.LINKEDIN_POST_SEARCH_LOCATION || 'Kazakhstan' }}
       LINKEDIN_POST_SEARCH_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SEARCH_RESULTS_WANTED || '30' }}

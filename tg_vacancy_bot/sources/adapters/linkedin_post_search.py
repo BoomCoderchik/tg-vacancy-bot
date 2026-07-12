@@ -11,6 +11,7 @@ from tg_vacancy_bot.sources.dates import parse_source_datetime
 
 
 SERPAPI_SEARCH_URL = "https://serpapi.com/search.json"
+SERPER_SEARCH_URL = "https://google.serper.dev/search"
 POST_URL_MARKERS = ("linkedin.com/posts/", "linkedin.com/feed/update/")
 
 
@@ -43,7 +44,44 @@ class LinkedInPostSearchAdapter(SourceAdapter):
         return vacancies
 
 
-def _result_to_vacancy(result: Mapping[str, Any], location: str) -> Vacancy | None:
+class LinkedInPostSerperAdapter(SourceAdapter):
+    name = "LinkedIn Hiring Posts (Serper)"
+
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+
+    async def fetch(self) -> list[Vacancy]:
+        payload = {
+            "q": self.settings.linkedin_post_search_query,
+            "num": self.settings.linkedin_post_search_results_wanted,
+            "hl": "ru",
+            "location": self.settings.linkedin_post_search_location,
+        }
+        headers = {"X-API-KEY": self.settings.serper_api_key, "Content-Type": "application/json"}
+        async with source_session(headers=headers) as session:
+            async with session.post(SERPER_SEARCH_URL, json=payload) as response:
+                response.raise_for_status()
+                response_payload = await response.json()
+
+        vacancies = []
+        for result in response_payload.get("organic", []):
+            if isinstance(result, Mapping):
+                vacancy = _result_to_vacancy(
+                    result,
+                    self.settings.linkedin_post_search_location,
+                    source=LinkedInPostSerperAdapter.name,
+                )
+                if vacancy is not None:
+                    vacancies.append(vacancy)
+        return vacancies
+
+
+def _result_to_vacancy(
+    result: Mapping[str, Any],
+    location: str,
+    *,
+    source: str = LinkedInPostSearchAdapter.name,
+) -> Vacancy | None:
     title = _clean_title(_text(result, "title"))
     link = _text(result, "link")
     snippet = _text(result, "snippet")
@@ -53,7 +91,7 @@ def _result_to_vacancy(result: Mapping[str, Any], location: str) -> Vacancy | No
     return Vacancy(
         title=title,
         description=snippet,
-        source=LinkedInPostSearchAdapter.name,
+        source=source,
         url=link,
         location=location or None,
         stack=_stack_from_text(f"{title} {snippet}"),

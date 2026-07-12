@@ -8,7 +8,7 @@ from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import (
     LinkedInPostScraperAdapter,
     _html_to_vacancies,
 )
-from tg_vacancy_bot.sources.adapters.linkedin_post_search import LinkedInPostSearchAdapter
+from tg_vacancy_bot.sources.adapters.linkedin_post_search import LinkedInPostSearchAdapter, LinkedInPostSerperAdapter
 from tg_vacancy_bot.sources.adapters.jobspy_linkedin import JobSpyLinkedInAdapter
 from tg_vacancy_bot.sources.adapters.jobicy import JobicyAdapter
 from tg_vacancy_bot.sources.rss import RssFeedAdapter, RssFeedConfig
@@ -105,7 +105,31 @@ def test_build_adapters_adds_linkedin_post_search_with_serpapi_key() -> None:
     assert names == ["LinkedIn Hiring Posts"]
 
 
-def test_build_adapters_skips_linkedin_post_search_without_serpapi_key() -> None:
+def test_build_adapters_adds_linkedin_post_search_with_serper_key() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_REMOTIVE=False,
+        ENABLE_ARBEITNOW=False,
+        ENABLE_REMOTEOK=False,
+        ENABLE_HN_WHO_IS_HIRING=False,
+        ENABLE_JOBICY=False,
+        ENABLE_WE_WORK_REMOTELY=False,
+        ENABLE_HIMALAYAS=False,
+        ENABLE_REAL_WORK_FROM_ANYWHERE=False,
+        ENABLE_JOBSCOLLIDER=False,
+        ENABLE_JOBSPY_LINKEDIN=False,
+        ENABLE_LINKEDIN_POST_SEARCH=True,
+        ENABLE_LINKEDIN_POST_SCRAPER=False,
+        SERPER_API_KEY="serper-key",
+    )
+
+    names = [adapter.name for adapter in build_adapters(settings)]
+
+    assert names == ["LinkedIn Hiring Posts (Serper)"]
+
+
+def test_build_adapters_skips_linkedin_post_search_without_search_provider_key() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
@@ -403,6 +427,88 @@ def test_linkedin_post_search_adapter_maps_public_post_results(monkeypatch) -> N
     ]
 
 
+def test_linkedin_post_serper_adapter_maps_public_post_results(monkeypatch) -> None:
+    calls = []
+
+    class FakeSession:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        def post(self, url: str, json: dict):
+            calls.append((url, json))
+            return _FakeResponse(
+                json_data={
+                    "organic": [
+                        {
+                            "title": "Ищем Junior Front-End Developer в команду DAP | LinkedIn",
+                            "link": "https://www.linkedin.com/posts/example_hiring-junior-frontend-activity-123",
+                            "snippet": (
+                                "г. Алматы. Ищем Junior Front-End Developer. "
+                                "Angular от 1 года, TypeScript, HTML/CSS. Резюме: hr@example.kz"
+                            ),
+                            "date": "Jul 8, 2026",
+                        },
+                        {
+                            "title": "Senior Backend Engineer",
+                            "link": "https://www.linkedin.com/jobs/view/123",
+                            "snippet": "Regular LinkedIn job page, not a post.",
+                        },
+                    ]
+                }
+            )
+
+    monkeypatch.setattr(
+        "tg_vacancy_bot.sources.adapters.linkedin_post_search.source_session",
+        lambda headers=None: FakeSession(),
+    )
+
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_LINKEDIN_POST_SEARCH=True,
+        SERPER_API_KEY="serper-key",
+        LINKEDIN_POST_SEARCH_QUERY='site:linkedin.com/posts "Ищем" frontend',
+        LINKEDIN_POST_SEARCH_LOCATION="Kazakhstan",
+        LINKEDIN_POST_SEARCH_RESULTS_WANTED="5",
+    )
+
+    vacancies = asyncio.run(LinkedInPostSerperAdapter(settings).fetch())
+
+    assert calls == [
+        (
+            "https://google.serper.dev/search",
+            {
+                "q": 'site:linkedin.com/posts "Ищем" frontend',
+                "num": 5,
+                "hl": "ru",
+                "location": "Kazakhstan",
+            },
+        )
+    ]
+    assert vacancies == [
+        Vacancy(
+            title="Ищем Junior Front-End Developer в команду DAP",
+            description=(
+                "г. Алматы. Ищем Junior Front-End Developer. "
+                "Angular от 1 года, TypeScript, HTML/CSS. Резюме: hr@example.kz"
+            ),
+            source="LinkedIn Hiring Posts (Serper)",
+            url="https://www.linkedin.com/posts/example_hiring-junior-frontend-activity-123",
+            location="Kazakhstan",
+            stack=("LinkedIn post", "frontend", "Angular", "TypeScript"),
+            published_at=datetime(2026, 7, 8, tzinfo=UTC),
+            raw_text=(
+                "Ищем Junior Front-End Developer в команду DAP "
+                "г. Алматы. Ищем Junior Front-End Developer. Angular от 1 года, TypeScript, HTML/CSS. "
+                "Резюме: hr@example.kz"
+            ),
+        )
+    ]
+
+
 def test_linkedin_post_scraper_maps_public_search_html(monkeypatch) -> None:
     calls = []
     html = """
@@ -596,4 +702,7 @@ class _FakeSession:
         return None
 
     def get(self, url: str) -> _FakeResponse:
+        return self._response
+
+    def post(self, url: str, json: dict) -> _FakeResponse:
         return self._response
