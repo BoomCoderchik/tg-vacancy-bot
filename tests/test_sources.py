@@ -27,6 +27,7 @@ def test_build_adapters_skips_keyed_sources_without_credentials() -> None:
         ENABLE_HIMALAYAS=False,
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
+        ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
     )
 
@@ -46,6 +47,7 @@ def test_build_adapters_adds_keyed_sources_with_credentials() -> None:
         ENABLE_HIMALAYAS=False,
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
+        ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
         ADZUNA_APP_ID="app",
         ADZUNA_APP_KEY="key",
@@ -155,6 +157,7 @@ def test_build_adapters_adds_no_key_sources_by_default() -> None:
         ENABLE_ARBEITNOW=False,
         ENABLE_REMOTEOK=False,
         ENABLE_HN_WHO_IS_HIRING=False,
+        ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
     )
 
