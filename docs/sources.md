@@ -63,7 +63,7 @@
   - Publication date: parsed from `updated` when present.
 
 - JobSpy LinkedIn
-  - Enabled with `ENABLE_JOBSPY_LINKEDIN=true`; disabled by default.
+  - Enabled with `ENABLE_JOBSPY_LINKEDIN=true`; disabled by default and should remain disabled when ordinary LinkedIn Jobs cards are out of scope.
   - Uses `python-jobspy` with `site_name="linkedin"`.
   - Query configured by `JOBSPY_LINKEDIN_QUERY`, `JOBSPY_LINKEDIN_LOCATION`, `JOBSPY_LINKEDIN_RESULTS_WANTED`, and `JOBSPY_LINKEDIN_HOURS_OLD`.
   - `JOBSPY_LINKEDIN_FETCH_DESCRIPTION=false` publishes lightweight link cards from search results; `true` lets JobSpy request individual LinkedIn job pages for descriptions.
@@ -82,6 +82,7 @@
   - Scrapes public search-result HTML to find publicly indexed LinkedIn post URLs, not LinkedIn Jobs pages.
   - Requires a publication date: it reads a date exposed by the search result or derives it from the LinkedIn `activity-...` ID. Results without a reliable date are skipped, so old indexed posts are not published.
   - Query configured by `LINKEDIN_POST_SCRAPER_QUERY`, `LINKEDIN_POST_SCRAPER_LOCATION`, and `LINKEDIN_POST_SCRAPER_RESULTS_WANTED`; separate fallback search queries with `||`.
+  - The default search depth is 100 candidates. This is a collection limit, not a publication limit; source polling and SQLite deduplication publish the candidates in later safe batches.
   - Maps result title, snippet, and link into a short `Vacancy` card with source `LinkedIn Hiring Post Scraper`.
   - Drops results that are not `linkedin.com/posts/...` or `linkedin.com/feed/update/...`.
   - Requires no API key, but can return no rows if search-result markup changes or the search provider rate-limits requests.

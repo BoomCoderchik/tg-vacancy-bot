@@ -45,10 +45,11 @@
   - Requires `TELEGRAM_BOT_TOKEN` and `TARGET_CHAT_ID` for real publishing.
   - Supports optional `OPERATOR_USER_IDS` for publish access control.
   - Controls source polling with `SOURCE_POLL_INTERVAL_SECONDS`, `SOURCE_MAX_PUBLISH_PER_POLL`, and `SOURCE_MAX_AGE_HOURS`.
+  - Controls localization load with `LOCALIZATION_MAX_PER_POLL`; already-Russian descriptions bypass the model.
   - Supports optional OpenAI/OpenAI-compatible description localization with `LOCALIZE_DESCRIPTIONS`, `LOCALIZATION_PROVIDER`, `OPENAI_*`, and the built-in Groq mode (`GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_FALLBACK_MODELS`).
   - Supports opt-in LinkedIn hiring-post search with `ENABLE_LINKEDIN_POST_SEARCH`, `SERPAPI_API_KEY`, `LINKEDIN_POST_SEARCH_QUERY`, `LINKEDIN_POST_SEARCH_LOCATION`, and `LINKEDIN_POST_SEARCH_RESULTS_WANTED`.
   - Supports opt-in free LinkedIn hiring-post scraping with `ENABLE_LINKEDIN_POST_SCRAPER`, `LINKEDIN_POST_SCRAPER_QUERY`, `LINKEDIN_POST_SCRAPER_LOCATION`, and `LINKEDIN_POST_SCRAPER_RESULTS_WANTED`.
-  - Supports opt-in JobSpy LinkedIn discovery with `ENABLE_JOBSPY_LINKEDIN`, `JOBSPY_LINKEDIN_QUERY`, `JOBSPY_LINKEDIN_LOCATION`, `JOBSPY_LINKEDIN_RESULTS_WANTED`, `JOBSPY_LINKEDIN_HOURS_OLD`, `JOBSPY_LINKEDIN_FETCH_DESCRIPTION`, and `JOBSPY_LINKEDIN_PROXIES`.
+  - Supports opt-in JobSpy LinkedIn discovery with `ENABLE_JOBSPY_LINKEDIN`, `JOBSPY_LINKEDIN_QUERY`, `JOBSPY_LINKEDIN_LOCATION`, `JOBSPY_LINKEDIN_RESULTS_WANTED`, `JOBSPY_LINKEDIN_HOURS_OLD`, `JOBSPY_LINKEDIN_FETCH_DESCRIPTION`, and `JOBSPY_LINKEDIN_PROXIES`; keep it disabled when only ordinary LinkedIn posts are wanted.
 
 - `tg_vacancy_bot/access_control.py`
   - Parses operator allowlists and checks whether a sender may publish through the bot.
@@ -93,6 +94,7 @@
 - `tg_vacancy_bot/source_polling.py`
   - Shared background source polling and publishing loop.
   - Applies the per-poll source publishing limit.
+  - Applies the separate per-poll localization-attempt limit and stops before another localization request when that budget is exhausted.
   - Publishes only source vacancies that pass the unified vacancy filtering policy.
   - Skips publishing a vacancy when required description localization fails, so English originals do not leak into localized channel posts.
   - Filters dated source vacancies by `SOURCE_MAX_AGE_HOURS` before publishing while preserving undated vacancies for dedupe-based handling.

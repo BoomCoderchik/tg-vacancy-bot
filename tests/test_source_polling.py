@@ -106,6 +106,33 @@ def test_poll_sources_once_skips_vacancy_when_localization_fails(monkeypatch) ->
     assert store.published == []
 
 
+def test_poll_sources_once_limits_localization_calls(monkeypatch) -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        SOURCE_MAX_PUBLISH_PER_POLL="50",
+        LOCALIZATION_MAX_PER_POLL="2",
+        LOCALIZE_DESCRIPTIONS="true",
+        OPENAI_API_KEY="test-key",
+    )
+    monkeypatch.setattr("tg_vacancy_bot.source_polling.build_adapters", lambda _: [FakeAdapter()])
+    bot = FakeBot()
+    store = FakeStore()
+    calls = 0
+
+    async def fake_localize(vacancy, settings):
+        nonlocal calls
+        calls += 1
+        return vacancy
+
+    monkeypatch.setattr("tg_vacancy_bot.source_polling.localize_vacancy_description", fake_localize)
+
+    published = asyncio.run(poll_sources_once(bot, settings, store))
+
+    assert published == 2
+    assert calls == 2
+
+
 def test_poll_sources_once_skips_stale_published_vacancies(monkeypatch) -> None:
     now = datetime(2026, 7, 5, 12, tzinfo=UTC)
     settings = Settings(

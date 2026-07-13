@@ -255,6 +255,20 @@ def test_localize_vacancy_description_requires_openai_key_when_enabled() -> None
         asyncio.run(localize_vacancy_description(vacancy, settings))
 
 
+def test_localize_vacancy_description_skips_model_for_russian_text() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        LOCALIZE_DESCRIPTIONS="true",
+        OPENAI_API_KEY="test-key",
+    )
+    vacancy = Vacancy(title="Python Engineer", description="Ищем Python разработчика.", source="LinkedIn")
+
+    localized = asyncio.run(localize_vacancy_description(vacancy, settings))
+
+    assert localized == vacancy
+
+
 def test_localize_vacancy_description_requires_groq_key_when_enabled() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",

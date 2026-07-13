@@ -30,6 +30,7 @@ jobs:
       SOURCE_MAX_PUBLISH_PER_POLL: ${{ secrets.SOURCE_MAX_PUBLISH_PER_POLL || '20' }}
       SOURCE_MAX_AGE_HOURS: ${{ secrets.SOURCE_MAX_AGE_HOURS || '48' }}
       LOCALIZE_DESCRIPTIONS: ${{ secrets.LOCALIZE_DESCRIPTIONS || 'false' }}
+      LOCALIZATION_MAX_PER_POLL: ${{ secrets.LOCALIZATION_MAX_PER_POLL || '12' }}
       LOCALIZATION_PROVIDER: ${{ secrets.LOCALIZATION_PROVIDER || 'openai' }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || 'gpt-4.1-mini' }}
@@ -55,7 +56,7 @@ jobs:
       ENABLE_LINKEDIN_POST_SCRAPER: ${{ secrets.ENABLE_LINKEDIN_POST_SCRAPER || 'true' }}
       LINKEDIN_POST_SCRAPER_QUERY: ${{ secrets.LINKEDIN_POST_SCRAPER_QUERY || 'site:linkedin.com/posts hiring developer || site:linkedin.com/feed/update hiring frontend' }}
       LINKEDIN_POST_SCRAPER_LOCATION: ${{ secrets.LINKEDIN_POST_SCRAPER_LOCATION || 'Kazakhstan' }}
-      LINKEDIN_POST_SCRAPER_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SCRAPER_RESULTS_WANTED || '10' }}
+      LINKEDIN_POST_SCRAPER_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SCRAPER_RESULTS_WANTED || '100' }}
       ENABLE_JOBSPY_LINKEDIN: ${{ secrets.ENABLE_JOBSPY_LINKEDIN || 'false' }}
       JOBSPY_LINKEDIN_QUERY: ${{ secrets.JOBSPY_LINKEDIN_QUERY || 'backend OR frontend OR fullstack OR designer OR "AI engineer" OR "ML engineer" OR "LLM engineer"' }}
       JOBSPY_LINKEDIN_LOCATION: ${{ secrets.JOBSPY_LINKEDIN_LOCATION || 'Worldwide' }}
