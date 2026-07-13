@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
@@ -13,6 +14,41 @@ from tg_vacancy_bot.sources.dates import parse_source_datetime
 SERPAPI_SEARCH_URL = "https://serpapi.com/search.json"
 SERPER_SEARCH_URL = "https://google.serper.dev/search"
 POST_URL_MARKERS = ("linkedin.com/posts/", "linkedin.com/feed/update/")
+HASHTAG_PATTERN = re.compile(r"(?<!\w)#[\w.+-]+", re.UNICODE)
+ROLE_TERM_PATTERN = re.compile(
+    r"\b(?P<role>"
+    r"(?:(?:junior|middle|mid-level|mid|senior|lead|staff|principal|trainee|intern)\s+)?"
+    r"(?:front[-\s]?end|frontend|back[-\s]?end|backend|full[-\s]?stack|full\s+stack|software|cloud|"
+    r"python|java|golang|go|node(?:\.js)?|react|vue|angular|typescript|javascript|mobile|ios|android|"
+    r"ml|ai|llm|machine\s+learning|data)\s+"
+    r"(?:developer|engineer|architect|programmer)"
+    r"(?:\s*\([^)]+\))?"
+    r")\b",
+    re.IGNORECASE,
+)
+ROLE_NOUN_FIRST_PATTERN = re.compile(
+    r"\b(?P<role>"
+    r"(?:(?:junior|middle|mid-level|mid|senior|lead|staff|principal|trainee|intern)\s+)?"
+    r"(?:developer|engineer|architect|programmer)\s+"
+    r"(?:front[-\s]?end|frontend|back[-\s]?end|backend|full[-\s]?stack|full\s+stack|software|cloud|"
+    r"python|java|golang|go|node(?:\.js)?|react|vue|angular|typescript|javascript|mobile|ios|android|"
+    r"ml|ai|llm|machine\s+learning|data)"
+    r"(?:\s*\([^)]+\))?"
+    r")\b",
+    re.IGNORECASE,
+)
+RU_ROLE_PATTERN = re.compile(
+    r"(?P<role>"
+    r"(?:(?:junior|middle|senior|lead|джуниор|мидл|сеньор|ведущий|стаж[её]р)\s+)?"
+    r"(?:(?:front[-\s]?end|frontend|back[-\s]?end|backend|full[-\s]?stack|python|java|go|react|"
+    r"vue|angular|typescript|javascript|ml|ai|llm)\s*[- ]*)?"
+    r"(?:разработчик|инженер|программист)"
+    r"(?:\s+(?:front[-\s]?end|frontend|back[-\s]?end|backend|full[-\s]?stack|python|java|go|react|"
+    r"vue|angular|typescript|javascript|ml|ai|llm))?"
+    r"(?:\s*\([^)]+\))?"
+    r")",
+    re.IGNORECASE,
+)
 
 
 class LinkedInPostSearchAdapter(SourceAdapter):
@@ -22,25 +58,35 @@ class LinkedInPostSearchAdapter(SourceAdapter):
         self.settings = settings
 
     async def fetch(self) -> list[Vacancy]:
-        params = {
-            "engine": "google",
-            "api_key": self.settings.serpapi_api_key,
-            "q": self.settings.linkedin_post_search_query,
-            "num": self.settings.linkedin_post_search_results_wanted,
-            "location": self.settings.linkedin_post_search_location,
-            "hl": "ru",
-        }
+        limit = max(self.settings.linkedin_post_search_results_wanted, 0)
+        vacancies: list[Vacancy] = []
+        seen_urls: set[str] = set()
         async with source_session() as session:
-            async with session.get(SERPAPI_SEARCH_URL, params=params) as response:
-                response.raise_for_status()
-                payload = await response.json()
+            for query in _search_queries(self.settings.linkedin_post_search_query):
+                if len(vacancies) >= limit:
+                    break
+                params = {
+                    "engine": "google",
+                    "api_key": self.settings.serpapi_api_key,
+                    "q": query,
+                    "num": limit,
+                    "location": self.settings.linkedin_post_search_location,
+                    "hl": "ru",
+                }
+                async with session.get(SERPAPI_SEARCH_URL, params=params) as response:
+                    response.raise_for_status()
+                    payload = await response.json()
 
-        vacancies = []
-        for result in payload.get("organic_results", []):
-            if isinstance(result, Mapping):
-                vacancy = _result_to_vacancy(result, self.settings.linkedin_post_search_location)
-                if vacancy is not None:
+                for result in payload.get("organic_results", []):
+                    if not isinstance(result, Mapping):
+                        continue
+                    vacancy = _result_to_vacancy(result, self.settings.linkedin_post_search_location)
+                    if vacancy is None or not vacancy.url or vacancy.url in seen_urls:
+                        continue
+                    seen_urls.add(vacancy.url)
                     vacancies.append(vacancy)
+                    if len(vacancies) >= limit:
+                        break
         return vacancies
 
 
@@ -51,28 +97,38 @@ class LinkedInPostSerperAdapter(SourceAdapter):
         self.settings = settings
 
     async def fetch(self) -> list[Vacancy]:
-        payload = {
-            "q": self.settings.linkedin_post_search_query,
-            "num": self.settings.linkedin_post_search_results_wanted,
-            "hl": "ru",
-            "location": self.settings.linkedin_post_search_location,
-        }
+        limit = max(self.settings.linkedin_post_search_results_wanted, 0)
         headers = {"X-API-KEY": self.settings.serper_api_key, "Content-Type": "application/json"}
+        vacancies: list[Vacancy] = []
+        seen_urls: set[str] = set()
         async with source_session(headers=headers) as session:
-            async with session.post(SERPER_SEARCH_URL, json=payload) as response:
-                response.raise_for_status()
-                response_payload = await response.json()
+            for query in _search_queries(self.settings.linkedin_post_search_query):
+                if len(vacancies) >= limit:
+                    break
+                payload = {
+                    "q": query,
+                    "num": limit,
+                    "hl": "ru",
+                    "location": self.settings.linkedin_post_search_location,
+                }
+                async with session.post(SERPER_SEARCH_URL, json=payload) as response:
+                    response.raise_for_status()
+                    response_payload = await response.json()
 
-        vacancies = []
-        for result in response_payload.get("organic", []):
-            if isinstance(result, Mapping):
-                vacancy = _result_to_vacancy(
-                    result,
-                    self.settings.linkedin_post_search_location,
-                    source=LinkedInPostSerperAdapter.name,
-                )
-                if vacancy is not None:
+                for result in response_payload.get("organic", []):
+                    if not isinstance(result, Mapping):
+                        continue
+                    vacancy = _result_to_vacancy(
+                        result,
+                        self.settings.linkedin_post_search_location,
+                        source=LinkedInPostSerperAdapter.name,
+                    )
+                    if vacancy is None or not vacancy.url or vacancy.url in seen_urls:
+                        continue
+                    seen_urls.add(vacancy.url)
                     vacancies.append(vacancy)
+                    if len(vacancies) >= limit:
+                        break
         return vacancies
 
 
@@ -82,11 +138,12 @@ def _result_to_vacancy(
     *,
     source: str = LinkedInPostSearchAdapter.name,
 ) -> Vacancy | None:
-    title = _clean_title(_text(result, "title"))
+    search_title = _clean_title(_text(result, "title"))
     link = _text(result, "link")
     snippet = _text(result, "snippet")
-    if not title or not link or not snippet or not _is_linkedin_post_url(link):
+    if not search_title or not link or not snippet or not _is_linkedin_post_url(link):
         return None
+    title = _post_title(search_title, snippet)
 
     return Vacancy(
         title=title,
@@ -94,7 +151,7 @@ def _result_to_vacancy(
         source=source,
         url=link,
         location=location or None,
-        stack=_stack_from_text(f"{title} {snippet}"),
+        stack=_stack_from_text(f"{title} {snippet} {search_title}"),
         published_at=_parse_search_date(_text(result, "date")),
         raw_text=f"{title} {snippet}",
     )
@@ -105,8 +162,42 @@ def _is_linkedin_post_url(link: str) -> bool:
     return any(marker in lower for marker in POST_URL_MARKERS)
 
 
+def _post_title(search_title: str, snippet: str) -> str:
+    role = _extract_role_title(f"{search_title}. {snippet}")
+    if role:
+        return role
+    without_hashtags = _strip_hashtags(search_title)
+    return without_hashtags or search_title
+
+
+def _extract_role_title(text: str) -> str:
+    normalized = " ".join((text or "").replace("\xa0", " ").split())
+    for pattern in (ROLE_TERM_PATTERN, ROLE_NOUN_FIRST_PATTERN, RU_ROLE_PATTERN):
+        match = pattern.search(normalized)
+        if match:
+            return _normalize_role(match.group("role"))
+    return ""
+
+
+def _normalize_role(role: str) -> str:
+    role = role.strip(" .,:;!?)(")
+    role = re.sub(r"\s+", " ", role)
+    role = re.sub(r"\s+-\s+", "-", role)
+    return role[:1].upper() + role[1:] if role else ""
+
+
+def _strip_hashtags(title: str) -> str:
+    cleaned = HASHTAG_PATTERN.sub("", title)
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned.strip(" -|.,")
+
+
+def _search_queries(raw_query: str) -> tuple[str, ...]:
+    return tuple(query.strip() for query in raw_query.split("||") if query.strip())
+
+
 def _clean_title(title: str) -> str:
-    for suffix in (" | LinkedIn", " в LinkedIn", " on LinkedIn"):
+    for suffix in (" | LinkedIn", " в LinkedIn", " on LinkedIn", " - LinkedIn"):
         if title.endswith(suffix):
             return title[: -len(suffix)].strip()
     return title

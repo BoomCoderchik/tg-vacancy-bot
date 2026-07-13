@@ -179,9 +179,9 @@ For `@it_jobs_board`-style intake:
 
 The project permits three automatic LinkedIn paths:
 
-- `LinkedInPostSearchAdapter`, enabled only with `ENABLE_LINKEDIN_POST_SEARCH=true` and `SERPAPI_API_KEY`, searches SerpApi Google results for LinkedIn post URLs such as `linkedin.com/posts/...` and maps title/snippet/link into `Vacancy`.
-- `LinkedInPostSerperAdapter`, enabled only with `ENABLE_LINKEDIN_POST_SEARCH=true` and `SERPER_API_KEY`, searches Serper Google results for the same LinkedIn post URL scope and maps title/snippet/link into `Vacancy`.
-- `LinkedInPostScraperAdapter`, enabled only with `ENABLE_LINKEDIN_POST_SCRAPER=true`, scrapes public search-result HTML for LinkedIn post URLs such as `linkedin.com/posts/...` and maps title/snippet/link into `Vacancy`.
+- `LinkedInPostSearchAdapter`, enabled only with `ENABLE_LINKEDIN_POST_SEARCH=true` and `SERPAPI_API_KEY`, searches SerpApi Google results for LinkedIn post URLs such as `linkedin.com/posts/...`, supports `||` fallback queries, and maps title/snippet/link into `Vacancy` with role-normalized titles when search titles are hashtag-heavy.
+- `LinkedInPostSerperAdapter`, enabled only with `ENABLE_LINKEDIN_POST_SEARCH=true` and `SERPER_API_KEY`, searches Serper Google results for the same LinkedIn post URL scope, supports `||` fallback queries, and maps title/snippet/link into `Vacancy` with role-normalized titles when search titles are hashtag-heavy.
+- `LinkedInPostScraperAdapter`, enabled only with `ENABLE_LINKEDIN_POST_SCRAPER=true`, scrapes public search-result HTML for LinkedIn post URLs such as `linkedin.com/posts/...` and maps title/snippet/link into `Vacancy` with role-normalized titles when search titles are hashtag-heavy.
 - `JobSpyLinkedInAdapter`, enabled only with `ENABLE_JOBSPY_LINKEDIN=true`, calls JobSpy for LinkedIn Jobs rows and maps them into `Vacancy`.
 
 All LinkedIn adapters are opt-in and do not use a LinkedIn account. If a provider blocks, rate-limits, lacks credentials, or returns no rows, the source path fails or returns no publishable vacancies; it must not create fake vacancies or placeholder records.

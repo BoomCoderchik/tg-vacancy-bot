@@ -17,9 +17,12 @@ GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 GROQ_FREE_TRANSLATION_MODEL = "llama-3.1-8b-instant"
 GROQ_FREE_TRANSLATION_FALLBACK_MODELS = ("openai/gpt-oss-20b",)
 DEFAULT_LINKEDIN_POST_SCRAPER_QUERY = (
-    'site:linkedin.com/posts hiring developer || '
-    'site:linkedin.com/posts "ищем" разработчик || '
-    'site:linkedin.com/feed/update hiring frontend'
+    '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR "we\'re hiring" OR hiring) '
+    '(frontend OR backend OR fullstack OR "software developer" OR "software engineer" OR react OR python) || '
+    '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("looking for" OR "join our team" OR "open role") '
+    '(developer OR engineer OR frontend OR backend OR fullstack OR react OR python) || '
+    '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("ищем" OR "ищет" OR "нанимаем" OR "в команду") '
+    '(разработчик OR инженер OR frontend OR backend OR fullstack OR react OR python)'
 )
 
 
@@ -53,9 +56,11 @@ class Settings(BaseSettings):
     linkedin_post_search_query: str = Field(
         default=(
             '(site:linkedin.com/posts OR site:linkedin.com/feed/update) '
-            '("ищем" OR "ищет" OR "в команду" OR "we are hiring" OR "we\'re hiring" OR hiring) '
-            '(frontend OR "front-end" OR backend OR fullstack OR "full-stack" OR designer OR '
-            '"AI engineer" OR "ML engineer" OR "LLM engineer" OR разработчик OR инженер)'
+            '("we are hiring" OR "we\'re hiring" OR hiring OR "looking for" OR "join our team" OR "open role" OR '
+            '"ищем" OR "ищет" OR "нанимаем" OR "в команду") '
+            '(frontend OR "front-end" OR backend OR fullstack OR "full-stack" OR "software developer" OR '
+            '"software engineer" OR developer OR engineer OR react OR python OR designer OR "AI engineer" OR '
+            '"ML engineer" OR "LLM engineer" OR разработчик OR инженер)'
         ),
         alias="LINKEDIN_POST_SEARCH_QUERY",
     )

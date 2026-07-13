@@ -37,12 +37,12 @@ ENABLE_LINKEDIN_POST_SEARCH=true
 SERPAPI_API_KEY=
 # Or use Serper instead of SerpApi:
 SERPER_API_KEY=
-LINKEDIN_POST_SEARCH_QUERY=(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("ищем" OR "ищет" OR "в команду" OR "we are hiring" OR "we're hiring" OR hiring) (frontend OR "front-end" OR backend OR fullstack OR "full-stack" OR designer OR "AI engineer" OR "ML engineer" OR "LLM engineer" OR разработчик OR инженер)
+LINKEDIN_POST_SEARCH_QUERY=(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR "we're hiring" OR hiring OR "looking for" OR "join our team" OR "open role" OR "ищем" OR "ищет" OR "нанимаем" OR "в команду") (frontend OR "front-end" OR backend OR fullstack OR "full-stack" OR "software developer" OR "software engineer" OR developer OR engineer OR react OR python OR designer OR "AI engineer" OR "ML engineer" OR "LLM engineer" OR разработчик OR инженер)
 LINKEDIN_POST_SEARCH_LOCATION=Kazakhstan
 LINKEDIN_POST_SEARCH_RESULTS_WANTED=10
 ```
 
-This source uses SerpApi or Serper Google Search results for publicly indexed LinkedIn post URLs. It publishes only real search results with a short snippet-based summary and the LinkedIn post link. If neither `SERPAPI_API_KEY` nor `SERPER_API_KEY` is set, the source is not registered.
+This source uses SerpApi or Serper Google Search results for publicly indexed LinkedIn post URLs. It publishes only real search results with a short snippet-based summary and the LinkedIn post link. Use `||` to separate fallback search queries when you want the keyed provider to try several hiring-post searches. If neither `SERPAPI_API_KEY` nor `SERPER_API_KEY` is set, the source is not registered.
 
 ## Free LinkedIn Hiring Post Scraper
 
@@ -50,7 +50,7 @@ To avoid paid search APIs, enable the free scraper source:
 
 ```dotenv
 ENABLE_LINKEDIN_POST_SCRAPER=true
-LINKEDIN_POST_SCRAPER_QUERY=site:linkedin.com/posts hiring developer || site:linkedin.com/posts "ищем" разработчик || site:linkedin.com/feed/update hiring frontend
+LINKEDIN_POST_SCRAPER_QUERY=(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR "we're hiring" OR hiring) (frontend OR backend OR fullstack OR "software developer" OR "software engineer" OR react OR python) || (site:linkedin.com/posts OR site:linkedin.com/feed/update) ("looking for" OR "join our team" OR "open role") (developer OR engineer OR frontend OR backend OR fullstack OR react OR python) || (site:linkedin.com/posts OR site:linkedin.com/feed/update) ("ищем" OR "ищет" OR "нанимаем" OR "в команду") (разработчик OR инженер OR frontend OR backend OR fullstack OR react OR python)
 LINKEDIN_POST_SCRAPER_LOCATION=Kazakhstan
 LINKEDIN_POST_SCRAPER_RESULTS_WANTED=10
 ```
