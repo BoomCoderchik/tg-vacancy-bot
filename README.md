@@ -30,17 +30,19 @@ Sixty-second polling is near-real-time for ordinary job APIs. Truly instant publ
 
 ## LinkedIn Hiring Post Discovery
 
-To find ordinary LinkedIn posts like "Ищем Junior Front-End Developer..." rather than LinkedIn Jobs cards, enable the [SerpApi](https://serpapi.com/search-api)-backed post search source:
+To find ordinary LinkedIn posts like "Ищем Junior Front-End Developer..." rather than LinkedIn Jobs cards, enable the Google Search-backed post search source through [SerpApi](https://serpapi.com/search-api) or [Serper](https://serper.dev/):
 
 ```dotenv
 ENABLE_LINKEDIN_POST_SEARCH=true
 SERPAPI_API_KEY=
-LINKEDIN_POST_SEARCH_QUERY=(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("ищем" OR "ищет" OR "в команду" OR "we are hiring" OR "we're hiring" OR hiring) (frontend OR "front-end" OR backend OR fullstack OR "full-stack" OR designer OR "AI engineer" OR "ML engineer" OR "LLM engineer" OR разработчик OR инженер)
+# Or use Serper instead of SerpApi:
+SERPER_API_KEY=
+LINKEDIN_POST_SEARCH_QUERY=(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR "we're hiring" OR hiring OR "looking for" OR "join our team" OR "open role" OR "ищем" OR "ищет" OR "нанимаем" OR "в команду") (frontend OR "front-end" OR backend OR fullstack OR "full-stack" OR "software developer" OR "software engineer" OR developer OR engineer OR react OR python OR designer OR "AI engineer" OR "ML engineer" OR "LLM engineer" OR разработчик OR инженер)
 LINKEDIN_POST_SEARCH_LOCATION=Kazakhstan
 LINKEDIN_POST_SEARCH_RESULTS_WANTED=10
 ```
 
-This source uses SerpApi Google Search results for publicly indexed LinkedIn post URLs. It publishes only real search results with a short snippet-based summary and the LinkedIn post link. If `SERPAPI_API_KEY` is missing, the source is not registered.
+This source uses SerpApi or Serper Google Search results for publicly indexed LinkedIn post URLs. It publishes only real search results with a short snippet-based summary and the LinkedIn post link. Use `||` to separate fallback search queries when you want the keyed provider to try several hiring-post searches. If neither `SERPAPI_API_KEY` nor `SERPER_API_KEY` is set, the source is not registered.
 
 ## Free LinkedIn Hiring Post Scraper
 
@@ -48,7 +50,7 @@ To avoid paid search APIs, enable the free scraper source:
 
 ```dotenv
 ENABLE_LINKEDIN_POST_SCRAPER=true
-LINKEDIN_POST_SCRAPER_QUERY=site:linkedin.com/posts hiring developer || site:linkedin.com/posts "ищем" разработчик || site:linkedin.com/feed/update hiring frontend
+LINKEDIN_POST_SCRAPER_QUERY=(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR "we're hiring" OR hiring) (frontend OR backend OR fullstack OR "software developer" OR "software engineer" OR react OR python) || (site:linkedin.com/posts OR site:linkedin.com/feed/update) ("looking for" OR "join our team" OR "open role") (developer OR engineer OR frontend OR backend OR fullstack OR react OR python) || (site:linkedin.com/posts OR site:linkedin.com/feed/update) ("ищем" OR "ищет" OR "нанимаем" OR "в команду") (разработчик OR инженер OR frontend OR backend OR fullstack OR react OR python)
 LINKEDIN_POST_SCRAPER_LOCATION=Kazakhstan
 LINKEDIN_POST_SCRAPER_RESULTS_WANTED=10
 ```
@@ -132,7 +134,7 @@ use:
 - One localization key when `LOCALIZE_DESCRIPTIONS=true`: `OPENAI_API_KEY` for the default mode, or `GROQ_API_KEY` when `LOCALIZATION_PROVIDER=groq`.
 
 Optional source API keys and toggles such as `ADZUNA_APP_ID`,
-`ADZUNA_APP_KEY`, `JOOBLE_API_KEY`, `SERPAPI_API_KEY`, and `ENABLE_*` can also
+`ADZUNA_APP_KEY`, `JOOBLE_API_KEY`, `SERPAPI_API_KEY`, `SERPER_API_KEY`, and `ENABLE_*` can also
 be configured as GitHub secrets. The workflow keeps `DATABASE_PATH` under
 `data/` and restores it with the GitHub Actions cache so source deduplication is
 preserved between scheduled runs.
@@ -229,6 +231,6 @@ Messages that do not look like allowed development/design/AI vacancies are skipp
 
 ## LinkedIn Boundary
 
-This project now permits three documented, opt-in LinkedIn paths: SerpApi-backed public hiring-post search, free public search-result scraping for hiring posts, and JobSpy-backed LinkedIn Jobs discovery. It does not log in with a LinkedIn account, invent vacancies, or publish fake fallback records when LinkedIn or a search provider blocks or returns no results.
+This project now permits three documented, opt-in LinkedIn paths: keyed Google Search-backed public hiring-post search through SerpApi or Serper, free public search-result scraping for hiring posts, and JobSpy-backed LinkedIn Jobs discovery. It does not log in with a LinkedIn account, invent vacancies, or publish fake fallback records when LinkedIn or a search provider blocks or returns no results.
 
 LinkedIn links can also enter when an operator manually sends or forwards vacancy text containing a LinkedIn URL to the Telegram bot. In that case the normal forwarded-message parser can keep the URL and mark the vacancy source as `LinkedIn`.
