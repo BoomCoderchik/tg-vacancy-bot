@@ -11,7 +11,7 @@ from .adapters.jobscollider import JobsColliderAdapter
 from .adapters.jobspy_linkedin import JobSpyLinkedInAdapter
 from .adapters.jooble import JoobleAdapter
 from .adapters.linkedin_post_scraper import LinkedInPostScraperAdapter
-from .adapters.linkedin_post_search import LinkedInPostSearchAdapter
+from .adapters.linkedin_post_search import LinkedInPostSearchAdapter, LinkedInPostSerperAdapter
 from .adapters.real_work_from_anywhere import RealWorkFromAnywhereAdapter
 from .adapters.remoteok import RemoteOkAdapter
 from .adapters.remotive import RemotiveAdapter
@@ -41,6 +41,8 @@ def build_adapters(settings: Settings) -> list[SourceAdapter]:
         adapters.append(JobsColliderAdapter())
     if settings.enable_linkedin_post_search and settings.serpapi_api_key:
         adapters.append(LinkedInPostSearchAdapter(settings))
+    if settings.enable_linkedin_post_search and settings.serper_api_key:
+        adapters.append(LinkedInPostSerperAdapter(settings))
     if settings.enable_linkedin_post_scraper:
         adapters.append(LinkedInPostScraperAdapter(settings))
     if settings.enable_jobspy_linkedin:
@@ -54,6 +56,8 @@ def build_adapters(settings: Settings) -> list[SourceAdapter]:
 
 def source_configuration_warnings(settings: Settings) -> list[str]:
     warnings: list[str] = []
-    if settings.enable_linkedin_post_search and not settings.serpapi_api_key:
-        warnings.append("LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY is missing.")
+    if settings.enable_linkedin_post_search and not (settings.serpapi_api_key or settings.serper_api_key):
+        warnings.append(
+            "LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY or SERPER_API_KEY is missing."
+        )
     return warnings

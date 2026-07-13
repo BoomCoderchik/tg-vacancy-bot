@@ -47,7 +47,7 @@
   - Controls source polling with `SOURCE_POLL_INTERVAL_SECONDS`, `SOURCE_MAX_PUBLISH_PER_POLL`, and `SOURCE_MAX_AGE_HOURS`.
   - Controls localization load with `LOCALIZATION_MAX_PER_POLL`; already-Russian descriptions bypass the model.
   - Supports optional OpenAI/OpenAI-compatible description localization with `LOCALIZE_DESCRIPTIONS`, `LOCALIZATION_PROVIDER`, `OPENAI_*`, and the built-in Groq mode (`GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_FALLBACK_MODELS`).
-  - Supports opt-in LinkedIn hiring-post search with `ENABLE_LINKEDIN_POST_SEARCH`, `SERPAPI_API_KEY`, `LINKEDIN_POST_SEARCH_QUERY`, `LINKEDIN_POST_SEARCH_LOCATION`, and `LINKEDIN_POST_SEARCH_RESULTS_WANTED`.
+  - Supports opt-in LinkedIn hiring-post search with `ENABLE_LINKEDIN_POST_SEARCH`, `SERPAPI_API_KEY` or `SERPER_API_KEY`, `LINKEDIN_POST_SEARCH_QUERY`, `LINKEDIN_POST_SEARCH_LOCATION`, and `LINKEDIN_POST_SEARCH_RESULTS_WANTED`.
   - Supports opt-in free LinkedIn hiring-post scraping with `ENABLE_LINKEDIN_POST_SCRAPER`, `LINKEDIN_POST_SCRAPER_QUERY`, `LINKEDIN_POST_SCRAPER_LOCATION`, and `LINKEDIN_POST_SCRAPER_RESULTS_WANTED`.
   - Supports opt-in JobSpy LinkedIn discovery with `ENABLE_JOBSPY_LINKEDIN`, `JOBSPY_LINKEDIN_QUERY`, `JOBSPY_LINKEDIN_LOCATION`, `JOBSPY_LINKEDIN_RESULTS_WANTED`, `JOBSPY_LINKEDIN_HOURS_OLD`, `JOBSPY_LINKEDIN_FETCH_DESCRIPTION`, and `JOBSPY_LINKEDIN_PROXIES`; keep it disabled when only ordinary LinkedIn posts are wanted.
 
@@ -148,7 +148,7 @@ The bot depends on real Telegram access:
 Optional source credentials:
 
 - No-key sources are controlled by `ENABLE_REMOTIVE`, `ENABLE_ARBEITNOW`, `ENABLE_REMOTEOK`, `ENABLE_HN_WHO_IS_HIRING`, `ENABLE_JOBICY`, `ENABLE_WE_WORK_REMOTELY`, `ENABLE_HIMALAYAS`, `ENABLE_REAL_WORK_FROM_ANYWHERE`, and `ENABLE_JOBSCOLLIDER`.
-- LinkedIn hiring-post search is controlled by `ENABLE_LINKEDIN_POST_SEARCH=false` by default and requires `SERPAPI_API_KEY`.
+- LinkedIn hiring-post search is controlled by `ENABLE_LINKEDIN_POST_SEARCH=false` by default and requires `SERPAPI_API_KEY` or `SERPER_API_KEY`.
 - Free LinkedIn hiring-post scraping is controlled by `ENABLE_LINKEDIN_POST_SCRAPER=false` by default and does not require an API key.
 - JobSpy LinkedIn is controlled by `ENABLE_JOBSPY_LINKEDIN=false` by default plus `JOBSPY_LINKEDIN_*` search options. It requires the `python-jobspy` dependency but no project API key.
 - `ADZUNA_APP_ID` and `ADZUNA_APP_KEY`.
@@ -181,8 +181,9 @@ For `@it_jobs_board`-style intake:
 
 The project permits three automatic LinkedIn paths:
 
-- `LinkedInPostSearchAdapter`, enabled only with `ENABLE_LINKEDIN_POST_SEARCH=true` and `SERPAPI_API_KEY`, searches public Google results for LinkedIn post URLs such as `linkedin.com/posts/...` and maps title/snippet/link into `Vacancy`.
-- `LinkedInPostScraperAdapter`, enabled only with `ENABLE_LINKEDIN_POST_SCRAPER=true`, scrapes public search-result HTML for LinkedIn post URLs such as `linkedin.com/posts/...` and maps title/snippet/link into `Vacancy`.
+- `LinkedInPostSearchAdapter`, enabled only with `ENABLE_LINKEDIN_POST_SEARCH=true` and `SERPAPI_API_KEY`, searches SerpApi Google results for LinkedIn post URLs such as `linkedin.com/posts/...`, supports `||` fallback queries, and maps title/snippet/link into `Vacancy` with role-normalized titles when search titles are hashtag-heavy.
+- `LinkedInPostSerperAdapter`, enabled only with `ENABLE_LINKEDIN_POST_SEARCH=true` and `SERPER_API_KEY`, searches Serper Google results for the same LinkedIn post URL scope, supports `||` fallback queries, and maps title/snippet/link into `Vacancy` with role-normalized titles when search titles are hashtag-heavy.
+- `LinkedInPostScraperAdapter`, enabled only with `ENABLE_LINKEDIN_POST_SCRAPER=true`, scrapes public search-result HTML for LinkedIn post URLs such as `linkedin.com/posts/...` and maps title/snippet/link into `Vacancy` with role-normalized titles when search titles are hashtag-heavy.
 - `JobSpyLinkedInAdapter`, enabled only with `ENABLE_JOBSPY_LINKEDIN=true`, calls JobSpy for LinkedIn Jobs rows and maps them into `Vacancy`.
 
 All LinkedIn adapters are opt-in and do not use a LinkedIn account. If a provider blocks, rate-limits, lacks credentials, or returns no rows, the source path fails or returns no publishable vacancies; it must not create fake vacancies or placeholder records.

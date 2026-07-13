@@ -251,4 +251,4 @@ def test_poll_sources_once_warns_when_linkedin_posts_enabled_without_serpapi_key
         published = asyncio.run(poll_sources_once(FakeBot(), settings, FakeStore()))
 
     assert published == 0
-    assert "LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY is missing." in caplog.text
+    assert "LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY or SERPER_API_KEY is missing." in caplog.text

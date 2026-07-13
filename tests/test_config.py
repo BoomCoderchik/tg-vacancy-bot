@@ -51,6 +51,7 @@ def test_settings_reads_linkedin_post_search_options() -> None:
         TARGET_CHAT_ID="@target",
         ENABLE_LINKEDIN_POST_SEARCH="true",
         SERPAPI_API_KEY="serp-key",
+        SERPER_API_KEY="serper-key",
         LINKEDIN_POST_SEARCH_QUERY='site:linkedin.com/posts "Ищем" frontend',
         LINKEDIN_POST_SEARCH_LOCATION="Kazakhstan",
         LINKEDIN_POST_SEARCH_RESULTS_WANTED="8",
@@ -58,6 +59,7 @@ def test_settings_reads_linkedin_post_search_options() -> None:
 
     assert settings.enable_linkedin_post_search is True
     assert settings.serpapi_api_key == "serp-key"
+    assert settings.serper_api_key == "serper-key"
     assert settings.linkedin_post_search_query == 'site:linkedin.com/posts "Ищем" frontend'
     assert settings.linkedin_post_search_location == "Kazakhstan"
     assert settings.linkedin_post_search_results_wanted == 8

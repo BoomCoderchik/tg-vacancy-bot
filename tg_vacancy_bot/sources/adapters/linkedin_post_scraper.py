@@ -13,6 +13,8 @@ from tg_vacancy_bot.sources.adapters.linkedin_post_search import (
     _clean_title,
     _is_linkedin_post_url,
     _parse_search_date,
+    _post_title,
+    _search_queries,
     _stack_from_text,
 )
 
@@ -66,14 +68,15 @@ def _html_to_vacancies(html: str, location: str, limit: int, seen_urls: set[str]
     for anchor in soup.select("a.result__a, a.result-link, a[href]"):
         if not isinstance(anchor, Tag):
             continue
-        title = _clean_title(html_to_text(str(anchor)))
+        search_title = _clean_title(html_to_text(str(anchor)))
         link = _normalize_result_url(str(anchor.get("href") or ""))
-        if not title or not link or not _is_linkedin_post_url(link) or link in seen:
+        if not search_title or not link or not _is_linkedin_post_url(link) or link in seen:
             continue
 
         snippet = _snippet_for_anchor(anchor)
         if not snippet:
             continue
+        title = _post_title(search_title, snippet)
         published_at = _published_at_for_result(anchor, link)
         if published_at is None:
             # Do not publish an undated result: search engines can return very
@@ -88,7 +91,7 @@ def _html_to_vacancies(html: str, location: str, limit: int, seen_urls: set[str]
                 source=LinkedInPostScraperAdapter.name,
                 url=link,
                 location=location or None,
-                stack=_stack_from_text(f"{title} {snippet}"),
+                stack=_stack_from_text(f"{title} {snippet} {search_title}"),
                 published_at=published_at,
                 raw_text=f"{title} {snippet}",
             )
@@ -96,11 +99,6 @@ def _html_to_vacancies(html: str, location: str, limit: int, seen_urls: set[str]
         if len(vacancies) >= limit:
             break
     return vacancies
-
-
-def _search_queries(raw_query: str) -> tuple[str, ...]:
-    return tuple(query.strip() for query in raw_query.split("||") if query.strip())
-
 
 def _looks_like_search_challenge(html: str) -> bool:
     lower = (html or "").lower()

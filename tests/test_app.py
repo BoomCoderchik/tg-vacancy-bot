@@ -20,7 +20,7 @@ def test_main_reports_missing_runtime_config(capsys, monkeypatch, tmp_path) -> N
     get_settings.cache_clear()
 
 
-def test_check_sources_reports_missing_linkedin_post_search_key(capsys, monkeypatch) -> None:
+def test_check_sources_reports_missing_linkedin_post_search_provider_key(capsys, monkeypatch) -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
@@ -33,6 +33,7 @@ def test_check_sources_reports_missing_linkedin_post_search_key(capsys, monkeypa
         ENABLE_HIMALAYAS=False,
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
+        ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SEARCH=True,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
         SERPAPI_API_KEY="",
@@ -44,7 +45,7 @@ def test_check_sources_reports_missing_linkedin_post_search_key(capsys, monkeypa
     output = capsys.readouterr().out
     assert "Source configuration" in output
     assert "Warnings:\n" in output
-    assert "WARNING: LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY is missing." in output
+    assert "WARNING: LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY or SERPER_API_KEY is missing." in output
     assert "Registered adapters: none" in output
 
 
@@ -64,6 +65,7 @@ def test_check_sources_reports_registered_linkedin_post_search_without_exposing_
         ENABLE_HIMALAYAS=False,
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
+        ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SEARCH=True,
         SERPAPI_API_KEY="serp-secret",
     )
@@ -90,6 +92,7 @@ def test_preview_sources_prints_filtered_candidates_without_publishing(capsys, m
         ENABLE_HIMALAYAS=False,
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
+        ENABLE_JOBSPY_LINKEDIN=False,
     )
 
     class FakeAdapter:
@@ -175,6 +178,7 @@ def test_preview_sources_shows_configuration_warning_when_adapter_is_missing(
         ENABLE_HIMALAYAS=False,
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
+        ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SEARCH=True,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
         SERPAPI_API_KEY="",
@@ -185,7 +189,7 @@ def test_preview_sources_shows_configuration_warning_when_adapter_is_missing(
 
     output = capsys.readouterr().out
     assert "Source preview" in output
-    assert "WARNING: LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY is missing." in output
+    assert "WARNING: LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY or SERPER_API_KEY is missing." in output
     assert "No matching registered adapters." in output
 
 
@@ -274,7 +278,7 @@ def test_poll_once_skips_vacancy_when_localization_fails(monkeypatch, tmp_path) 
     assert [vacancy.title for vacancy in attempted] == ["UI/UX Designer", "Python Engineer"]
 
 
-def test_poll_once_warns_when_linkedin_posts_enabled_without_serpapi_key(
+def test_poll_once_warns_when_linkedin_posts_enabled_without_search_provider_key(
     caplog,
     monkeypatch,
     tmp_path,
@@ -292,6 +296,7 @@ def test_poll_once_warns_when_linkedin_posts_enabled_without_serpapi_key(
         ENABLE_HIMALAYAS=False,
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
+        ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SEARCH=True,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
         SERPAPI_API_KEY="",
@@ -315,4 +320,4 @@ def test_poll_once_warns_when_linkedin_posts_enabled_without_serpapi_key(
     with caplog.at_level(logging.WARNING):
         asyncio.run(poll_once())
 
-    assert "LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY is missing." in caplog.text
+    assert "LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY or SERPER_API_KEY is missing." in caplog.text
