@@ -23,7 +23,9 @@ def utcnow() -> datetime:
 
 async def poll_sources_once(bot: Bot, settings: Settings, store: VacancyStore) -> int:
     published = 0
+    localized = 0
     max_publish = settings.source_max_publish_per_poll
+    max_localizations = settings.localization_max_per_poll
     for warning in source_configuration_warnings(settings):
         logger.warning(warning)
     for adapter in build_adapters(settings):
@@ -44,7 +46,12 @@ async def poll_sources_once(bot: Bot, settings: Settings, store: VacancyStore) -
                 return published
             if store.seen(vacancy):
                 continue
+            if settings.localize_descriptions and max_localizations > 0 and localized >= max_localizations:
+                logger.info("Localization per-poll limit reached: %s", max_localizations)
+                return published
             try:
+                if settings.localize_descriptions:
+                    localized += 1
                 public_vacancy = await localize_vacancy_description(vacancy, settings)
             except Exception as exc:
                 # Keep scheduled source posts Russian-only when localization is enabled.

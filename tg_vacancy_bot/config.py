@@ -71,7 +71,10 @@ class Settings(BaseSettings):
         alias="LINKEDIN_POST_SCRAPER_QUERY",
     )
     linkedin_post_scraper_location: str = Field(default="Kazakhstan", alias="LINKEDIN_POST_SCRAPER_LOCATION")
-    linkedin_post_scraper_results_wanted: int = Field(default=10, alias="LINKEDIN_POST_SCRAPER_RESULTS_WANTED")
+    # Search depth is intentionally larger than the per-cycle publication
+    # budget: deduplication lets later polls publish the remaining fresh posts.
+    linkedin_post_scraper_results_wanted: int = Field(default=100, alias="LINKEDIN_POST_SCRAPER_RESULTS_WANTED")
+    localization_max_per_poll: int = Field(default=12, alias="LOCALIZATION_MAX_PER_POLL")
     jobspy_linkedin_query: str = Field(
         default='backend OR frontend OR fullstack OR designer OR "AI engineer" OR "ML engineer" OR "LLM engineer"',
         alias="JOBSPY_LINKEDIN_QUERY",

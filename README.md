@@ -2,6 +2,8 @@
 
 Telegram bot for collecting IT vacancies from forwarded messages and public job sources, then publishing them to a target Telegram channel in a compact card format.
 
+The planned profile and controlled application automation feature is documented in [`docs/application-automation-plan.md`](docs/application-automation-plan.md). The document contains the current implementation status, safety boundaries, staged architecture, and acceptance checks.
+
 ## What Works Now
 
 - Accepts messages forwarded or sent to the bot.
@@ -52,12 +54,13 @@ To avoid paid search APIs, enable the free scraper source:
 ENABLE_LINKEDIN_POST_SCRAPER=true
 LINKEDIN_POST_SCRAPER_QUERY=(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR "we're hiring" OR hiring) (frontend OR backend OR fullstack OR "software developer" OR "software engineer" OR react OR python) || (site:linkedin.com/posts OR site:linkedin.com/feed/update) ("looking for" OR "join our team" OR "open role") (developer OR engineer OR frontend OR backend OR fullstack OR react OR python) || (site:linkedin.com/posts OR site:linkedin.com/feed/update) ("ищем" OR "ищет" OR "нанимаем" OR "в команду") (разработчик OR инженер OR frontend OR backend OR fullstack OR react OR python)
 LINKEDIN_POST_SCRAPER_LOCATION=Kazakhstan
-LINKEDIN_POST_SCRAPER_RESULTS_WANTED=10
+LINKEDIN_POST_SCRAPER_RESULTS_WANTED=100
 ```
 
 This source scrapes public search-result HTML and keeps only real `linkedin.com/posts/...` and `linkedin.com/feed/update/...` links. It does not require an API key and does not create placeholder vacancies. Use `||` to separate fallback search queries. Because it depends on public search-result markup, it can be less stable than SerpApi and may return no rows when the search engine changes HTML or rate-limits requests.
 
 The scraper keeps only results with a reliable publication date (from the search result or the LinkedIn activity ID) and the normal `SOURCE_MAX_AGE_HOURS` freshness filter removes older posts before publishing.
+The search depth is intentionally larger than the per-cycle publication budget: SQLite deduplication lets later polls publish the remaining fresh posts. `LOCALIZATION_MAX_PER_POLL=12` caps localization attempts per poll when localization is enabled; lower it further if the provider is rate-limited.
 
 ## JobSpy LinkedIn Jobs Discovery
 
@@ -66,7 +69,7 @@ LinkedIn Jobs discovery is available as an explicit opt-in source through [JobSp
 Enable it only when you accept LinkedIn's operational risk around automated access:
 
 ```dotenv
-ENABLE_JOBSPY_LINKEDIN=true
+ENABLE_JOBSPY_LINKEDIN=false
 JOBSPY_LINKEDIN_QUERY=backend OR frontend OR fullstack OR designer OR "AI engineer" OR "ML engineer" OR "LLM engineer"
 JOBSPY_LINKEDIN_LOCATION=Worldwide
 JOBSPY_LINKEDIN_RESULTS_WANTED=20
@@ -157,7 +160,7 @@ tg-vacancy-bot preview-sources --source "LinkedIn Hiring Posts" --limit 5
 ```
 
 When `SOURCE_POLL_INTERVAL_SECONDS` is greater than `0`, `tg-vacancy-bot run` also polls configured public sources in the background while it listens for forwarded messages.
-`SOURCE_MAX_PUBLISH_PER_POLL` limits how many source vacancies can be published in one polling cycle, which prevents first-run flooding.
+`SOURCE_MAX_PUBLISH_PER_POLL` limits how many source vacancies can be published in one polling cycle, which prevents first-run flooding. When localization is enabled, `LOCALIZATION_MAX_PER_POLL` separately limits model calls; unlocalized posts remain available for a later poll through deduplication.
 
 For web-hosting deployment, use:
 

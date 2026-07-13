@@ -95,6 +95,11 @@ async def localize_vacancy_description(
         return vacancy
     if not settings.localization_api_key:
         raise RuntimeError(f"{settings.localization_api_key_name} is required when LOCALIZE_DESCRIPTIONS=true.")
+    # Search snippets are often already Russian. Avoid spending a model call
+    # on text that does not need translation, especially when post discovery
+    # is intentionally configured to collect a large candidate pool.
+    if not source_requires_russian_translation(vacancy.description):
+        return vacancy
 
     localizer = localizer or OpenAIDescriptionLocalizer(
         api_key=settings.localization_api_key,
