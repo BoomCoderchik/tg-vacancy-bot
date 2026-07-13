@@ -2,6 +2,8 @@
 
 Telegram bot for collecting IT vacancies from forwarded messages and public job sources, then publishing them to a target Telegram channel in a compact card format.
 
+The planned profile and controlled application automation feature is documented in [`docs/application-automation-plan.md`](docs/application-automation-plan.md). The document contains the current implementation status, safety boundaries, staged architecture, and acceptance checks.
+
 ## What Works Now
 
 - Accepts messages forwarded or sent to the bot.
