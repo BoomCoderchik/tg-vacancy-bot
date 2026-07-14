@@ -5,8 +5,10 @@ import json
 import re
 import sqlite3
 from pathlib import Path
+from urllib.parse import urlparse
+from uuid import uuid4
 
-from .models import OperatorProfile, Vacancy
+from .models import Application, ApplicationStatus, OperatorProfile, Vacancy
 
 
 class VacancyStore:
@@ -42,6 +44,7 @@ class VacancyStore:
                 """
             )
             self._apply_profile_migration(conn)
+            self._apply_application_migration(conn)
 
     @staticmethod
     def _apply_profile_migration(conn: sqlite3.Connection) -> None:
@@ -69,6 +72,33 @@ class VacancyStore:
                 resume_text TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute("INSERT INTO schema_migrations (version) VALUES (?)", (version,))
+
+    @staticmethod
+    def _apply_application_migration(conn: sqlite3.Connection) -> None:
+        version = 2
+        if conn.execute("SELECT 1 FROM schema_migrations WHERE version = ?", (version,)).fetchone():
+            return
+        conn.execute(
+            """
+            CREATE TABLE applications (
+                application_id TEXT PRIMARY KEY,
+                operator_user_id INTEGER NOT NULL,
+                vacancy_fingerprint TEXT NOT NULL,
+                vacancy_url TEXT,
+                site TEXT,
+                status TEXT NOT NULL,
+                form_fields_json TEXT NOT NULL DEFAULT '[]',
+                filled_values_json TEXT NOT NULL DEFAULT '{}',
+                missing_fields_json TEXT NOT NULL DEFAULT '[]',
+                error_description TEXT,
+                submission_result TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(operator_user_id, vacancy_fingerprint)
             )
             """
         )
@@ -109,6 +139,34 @@ class VacancyStore:
                 "SELECT url FROM published_vacancies WHERE fingerprint = ?", (vacancy_id,)
             ).fetchone()
         return row["url"] if row else None
+
+    def create_application(self, operator_user_id: int, vacancy_id: str) -> tuple[Application, bool] | None:
+        if not re.fullmatch(r"[0-9a-f]{32}", vacancy_id):
+            return None
+        with self._connect() as conn:
+            vacancy = conn.execute(
+                "SELECT url FROM published_vacancies WHERE fingerprint = ?", (vacancy_id,)
+            ).fetchone()
+            if vacancy is None:
+                return None
+            existing = conn.execute(
+                "SELECT * FROM applications WHERE operator_user_id = ? AND vacancy_fingerprint = ?",
+                (operator_user_id, vacancy_id),
+            ).fetchone()
+            if existing:
+                return self._application_from_row(existing), False
+            url = vacancy["url"]
+            status: ApplicationStatus = "created" if url else "failed"
+            error = None if url else "Vacancy does not contain an external application URL."
+            site = urlparse(url).netloc.lower() if url else None
+            application_id = uuid4().hex[:16]
+            conn.execute(
+                """INSERT INTO applications (application_id, operator_user_id, vacancy_fingerprint, vacancy_url, site, status, error_description)
+                VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (application_id, operator_user_id, vacancy_id, url, site, status, error),
+            )
+            row = conn.execute("SELECT * FROM applications WHERE application_id = ?", (application_id,)).fetchone()
+        return self._application_from_row(row), True
 
     def get_operator_profile(self, operator_user_id: int) -> OperatorProfile | None:
         with self._connect() as conn:
@@ -189,4 +247,12 @@ class VacancyStore:
             resume_original_name=row["resume_original_name"],
             resume_stored_name=row["resume_stored_name"],
             resume_text=row["resume_text"],
+        )
+
+    @staticmethod
+    def _application_from_row(row: sqlite3.Row) -> Application:
+        return Application(
+            application_id=row["application_id"], operator_user_id=row["operator_user_id"],
+            vacancy_fingerprint=row["vacancy_fingerprint"], vacancy_url=row["vacancy_url"],
+            site=row["site"], status=row["status"], error_description=row["error_description"],
         )

@@ -4,6 +4,10 @@ from typing import Literal
 
 
 ResultType = Literal["vacancy"]
+ApplicationStatus = Literal[
+    "created", "loading", "parsed", "profile_missing", "unsupported_site", "filled",
+    "manual_required", "awaiting_confirmation", "submitted", "failed", "cancelled",
+]
 
 
 @dataclass(frozen=True)
@@ -46,3 +50,14 @@ class OperatorProfile:
     resume_original_name: str | None = None
     resume_stored_name: str | None = None
     resume_text: str | None = None
+
+
+@dataclass(frozen=True)
+class Application:
+    application_id: str
+    operator_user_id: int
+    vacancy_fingerprint: str
+    vacancy_url: str | None
+    site: str | None
+    status: ApplicationStatus
+    error_description: str | None = None
