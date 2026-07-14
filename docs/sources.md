@@ -83,7 +83,7 @@
 
 - LinkedIn Hiring Posts (Headless)
   - Enabled with `ENABLE_LINKEDIN_POST_HEADLESS=true`; disabled by default.
-  - Uses Playwright to search Bing for public LinkedIn post URLs, then opens those URLs in a clean headless browser context.
+  - Uses SerpApi or Serper, when their existing key is configured, to discover public LinkedIn post URLs, then opens those URLs in a clean Playwright browser context. Without a search-provider key it uses Bing discovery as a best-effort fallback, which can return no rows when blocked.
   - Query configured by `LINKEDIN_POST_HEADLESS_QUERY`, `LINKEDIN_POST_HEADLESS_LOCATION`, `LINKEDIN_POST_HEADLESS_RESULTS_WANTED`, and `LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS`.
   - Does not use a LinkedIn account, cookies, proxies, identity masking, or protection bypasses. Pages that require login or show CAPTCHA/2FA are skipped.
   - Requires text in a public post container and derives the publication date from the LinkedIn activity ID; otherwise it does not create a vacancy.
@@ -99,7 +99,7 @@
 
 ## LinkedIn Boundary
 
-The four automatic LinkedIn adapters are `LinkedInPostSearchAdapter` for SerpApi-backed public hiring posts, `LinkedInPostSerperAdapter` for Serper-backed public hiring posts, `LinkedInPostScraperAdapter` for free public search-result scraping, and `LinkedInPostHeadlessAdapter` for public post pages opened without login. They must remain explicitly opt-in. Account-based crawling, proxy use, protection bypasses, and fake LinkedIn fallback rows remain out of scope.
+The four automatic LinkedIn adapters are `LinkedInPostSearchAdapter` for SerpApi-backed public hiring posts, `LinkedInPostSerperAdapter` for Serper-backed public hiring posts, `LinkedInPostScraperAdapter` for free public search-result scraping, and `LinkedInPostHeadlessAdapter` for public post pages opened without login. The headless adapter reuses SerpApi or Serper for reliable URL discovery when configured, with Bing only as a best-effort no-key fallback. They must remain explicitly opt-in. Account-based crawling, proxy use, protection bypasses, and fake LinkedIn fallback rows remain out of scope.
 
 ## Planned Source Pattern
 
