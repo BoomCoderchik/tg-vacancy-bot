@@ -658,6 +658,7 @@ def test_linkedin_post_scraper_maps_public_search_html(monkeypatch) -> None:
         ENABLE_LINKEDIN_POST_SCRAPER=True,
         LINKEDIN_POST_SCRAPER_QUERY='site:linkedin.com/posts "Ищем" frontend',
         LINKEDIN_POST_SCRAPER_LOCATION="Kazakhstan",
+        LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS="duckduckgo",
         LINKEDIN_POST_SCRAPER_RESULTS_WANTED="5",
     )
 
@@ -682,6 +683,81 @@ def test_linkedin_post_scraper_maps_public_search_html(monkeypatch) -> None:
                 "Junior Front-End Developer "
                 "г. Алматы. Ищем Junior Front-End Developer. Angular от 1 года, TypeScript, HTML/CSS."
             ),
+        )
+    ]
+
+
+def test_linkedin_post_scraper_falls_back_when_duckduckgo_is_blocked(monkeypatch) -> None:
+    calls = []
+    bing_html = """
+    <html>
+      <body>
+        <ol id="b_results">
+          <li class="b_algo">
+            <h2>
+              <a href="https://www.linkedin.com/posts/example_hiring-backend-engineer-activity-7480965762036461568">
+                Backend Engineer | LinkedIn
+              </a>
+            </h2>
+            <div class="b_caption">
+              <p>We are hiring a Backend Engineer with Python and REST API experience.</p>
+            </div>
+          </li>
+        </ol>
+      </body>
+    </html>
+    """
+
+    class FakeSession:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        def get(self, url: str, params: dict):
+            calls.append((url, params))
+            if "duckduckgo" in url:
+                return _FakeResponse(text_data='<form id="challenge-form"></form>')
+            return _FakeResponse(text_data=bing_html)
+
+    monkeypatch.setattr(
+        "tg_vacancy_bot.sources.adapters.linkedin_post_scraper.source_session",
+        lambda headers=None: FakeSession(),
+    )
+
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_LINKEDIN_POST_SCRAPER=True,
+        LINKEDIN_POST_SCRAPER_QUERY="site:linkedin.com/posts backend engineer",
+        LINKEDIN_POST_SCRAPER_LOCATION="Kazakhstan",
+        LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS="duckduckgo,bing",
+        LINKEDIN_POST_SCRAPER_RESULTS_WANTED="5",
+    )
+
+    vacancies = asyncio.run(LinkedInPostScraperAdapter(settings).fetch())
+
+    assert calls == [
+        (
+            "https://html.duckduckgo.com/html/",
+            {"q": "site:linkedin.com/posts backend engineer"},
+        ),
+        (
+            "https://www.bing.com/search",
+            {"q": "site:linkedin.com/posts backend engineer", "setlang": "ru"},
+        ),
+    ]
+    assert vacancies == [
+        Vacancy(
+            title="Backend Engineer",
+            description="We are hiring a Backend Engineer with Python and REST API experience.",
+            source="LinkedIn Hiring Post Scraper",
+            url="https://www.linkedin.com/posts/example_hiring-backend-engineer-activity-7480965762036461568",
+            location="Kazakhstan",
+            stack=("LinkedIn post", "backend", "Python", "REST API"),
+            published_at=datetime(2026, 7, 9, 12, 47, 7, 292000, tzinfo=UTC),
+            raw_text="Backend Engineer We are hiring a Backend Engineer with Python and REST API experience.",
         )
     ]
 

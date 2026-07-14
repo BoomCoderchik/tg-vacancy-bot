@@ -80,8 +80,9 @@
 - LinkedIn Hiring Post Scraper
   - Enabled with `ENABLE_LINKEDIN_POST_SCRAPER=true`.
   - Scrapes public search-result HTML to find publicly indexed LinkedIn post URLs, not LinkedIn Jobs pages.
+  - Uses the configured `LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS` list, defaulting to `duckduckgo,bing`, so a DuckDuckGo anti-bot challenge does not stop the whole source while another public HTML provider is available.
   - Requires a publication date: it reads a date exposed by the search result or derives it from the LinkedIn `activity-...` ID. Results without a reliable date are skipped, so old indexed posts are not published.
-  - Query configured by `LINKEDIN_POST_SCRAPER_QUERY`, `LINKEDIN_POST_SCRAPER_LOCATION`, and `LINKEDIN_POST_SCRAPER_RESULTS_WANTED`; separate fallback search queries with `||`.
+  - Query configured by `LINKEDIN_POST_SCRAPER_QUERY`, `LINKEDIN_POST_SCRAPER_LOCATION`, `LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS`, and `LINKEDIN_POST_SCRAPER_RESULTS_WANTED`; separate fallback search queries with `||`.
   - The default search depth is 100 candidates. This is a collection limit, not a publication limit; source polling and SQLite deduplication publish the candidates in later safe batches.
   - Maps result title, snippet, and link into a short `Vacancy` card with source `LinkedIn Hiring Post Scraper`.
   - Hashtag-heavy search titles are normalized into the detected role when the role is present in the title or snippet.

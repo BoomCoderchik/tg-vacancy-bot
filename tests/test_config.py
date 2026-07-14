@@ -72,12 +72,14 @@ def test_settings_reads_linkedin_post_scraper_options() -> None:
         ENABLE_LINKEDIN_POST_SCRAPER="true",
         LINKEDIN_POST_SCRAPER_QUERY='site:linkedin.com/posts "ищем" frontend',
         LINKEDIN_POST_SCRAPER_LOCATION="Kazakhstan",
+        LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS="ddg, bing, unknown, duckduckgo",
         LINKEDIN_POST_SCRAPER_RESULTS_WANTED="8",
     )
 
     assert settings.enable_linkedin_post_scraper is True
     assert settings.linkedin_post_scraper_query == 'site:linkedin.com/posts "ищем" frontend'
     assert settings.linkedin_post_scraper_location == "Kazakhstan"
+    assert settings.linkedin_post_scraper_search_providers == ("duckduckgo", "bing")
     assert settings.linkedin_post_scraper_results_wanted == 8
 
 

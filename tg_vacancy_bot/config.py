@@ -71,6 +71,10 @@ class Settings(BaseSettings):
         alias="LINKEDIN_POST_SCRAPER_QUERY",
     )
     linkedin_post_scraper_location: str = Field(default="Kazakhstan", alias="LINKEDIN_POST_SCRAPER_LOCATION")
+    linkedin_post_scraper_search_providers_raw: str = Field(
+        default="duckduckgo,bing",
+        alias="LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS",
+    )
     # Search depth is intentionally larger than the per-cycle publication
     # budget: deduplication lets later polls publish the remaining fresh posts.
     linkedin_post_scraper_results_wanted: int = Field(default=100, alias="LINKEDIN_POST_SCRAPER_RESULTS_WANTED")
@@ -160,6 +164,21 @@ class Settings(BaseSettings):
     @property
     def jobspy_linkedin_proxies(self) -> tuple[str, ...]:
         return tuple(proxy.strip() for proxy in self.jobspy_linkedin_proxies_raw.split(",") if proxy.strip())
+
+    @property
+    def linkedin_post_scraper_search_providers(self) -> tuple[str, ...]:
+        aliases = {
+            "ddg": "duckduckgo",
+            "duck": "duckduckgo",
+            "duckduckgo": "duckduckgo",
+            "bing": "bing",
+        }
+        providers = []
+        for raw_provider in self.linkedin_post_scraper_search_providers_raw.split(","):
+            provider = aliases.get(raw_provider.strip().lower())
+            if provider and provider not in providers:
+                providers.append(provider)
+        return tuple(providers or ("duckduckgo", "bing"))
 
     def require_runtime(self) -> None:
         missing = []
