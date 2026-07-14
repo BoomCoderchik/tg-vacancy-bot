@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sqlite3
 from pathlib import Path
 
@@ -98,6 +99,16 @@ class VacancyStore:
                 return True
             except sqlite3.IntegrityError:
                 return False
+
+    def published_vacancy_url(self, vacancy_id: str) -> str | None:
+        """Resolve the short callback identifier without accepting arbitrary SQL input."""
+        if not re.fullmatch(r"[0-9a-f]{32}", vacancy_id):
+            return None
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT url FROM published_vacancies WHERE fingerprint = ?", (vacancy_id,)
+            ).fetchone()
+        return row["url"] if row else None
 
     def get_operator_profile(self, operator_user_id: int) -> OperatorProfile | None:
         with self._connect() as conn:

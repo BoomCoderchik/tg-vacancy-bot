@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from aiogram import Bot
 from aiogram.enums import ParseMode
 
+from .application_buttons import application_button
 from .config import Settings
 from .description_localization import localize_vacancy_description
 from .formatting import format_vacancy_card
@@ -67,6 +68,7 @@ async def poll_sources_once(bot: Bot, settings: Settings, store: VacancyStore) -
                 text=format_vacancy_card(public_vacancy),
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True,
+                reply_markup=application_button(vacancy),
             )
             if store.mark_published(vacancy):
                 published += 1

@@ -252,6 +252,11 @@ Messages that do not look like allowed development/design/AI vacancies are skipp
 - `/status`: shows the active forwarding mode, target chat, polling interval, and enabled sources without exposing secrets.
 - `/profile`: private operator profile: view/edit job preferences, upload or replace a resume, or delete the profile.
 
+Every normalized vacancy card now includes an `Откликнуться` button. It keeps
+only a short vacancy ID in Telegram and resolves the original URL from SQLite;
+the button is intentionally unavailable for `FORWARDED_MODE=copy`, because a
+copied third-party message cannot safely receive the normalized card markup.
+
 ## LinkedIn Boundary
 
 This project now permits three documented, opt-in LinkedIn paths: keyed Google Search-backed public hiring-post search through SerpApi or Serper, free public search-result scraping for hiring posts, and JobSpy-backed LinkedIn Jobs discovery. It does not log in with a LinkedIn account, invent vacancies, or publish fake fallback records when LinkedIn or a search provider blocks or returns no results.

@@ -11,9 +11,11 @@ from tg_vacancy_bot.publisher import TelegramPublisher
 class FakeBot:
     def __init__(self) -> None:
         self.sent_messages: list[str] = []
+        self.reply_markups = []
 
     async def send_message(self, **kwargs) -> None:
         self.sent_messages.append(kwargs["text"])
+        self.reply_markups.append(kwargs.get("reply_markup"))
 
 
 class FakeStore:
@@ -85,3 +87,18 @@ def test_publish_new_retries_after_telegram_flood_control(monkeypatch) -> None:
     assert published == 1
     assert sleeps == [3]
     assert publisher.bot.calls == 2
+
+
+def test_publish_new_adds_application_button(monkeypatch) -> None:
+    publisher = build_publisher()
+    vacancy = Vacancy(title="Python Engineer", description="Remote Python role", source="Fake")
+
+    async def fake_localize(vacancy, settings):
+        return vacancy
+
+    monkeypatch.setattr("tg_vacancy_bot.publisher.localize_vacancy_description", fake_localize)
+
+    assert asyncio.run(publisher.publish_new([vacancy])) == 1
+    button = publisher.bot.reply_markups[0].inline_keyboard[0][0]
+    assert button.text == "Откликнуться"
+    assert button.callback_data.startswith("apply:")

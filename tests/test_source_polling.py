@@ -10,9 +10,11 @@ from tg_vacancy_bot.source_polling import poll_sources_once
 class FakeBot:
     def __init__(self) -> None:
         self.sent_messages: list[str] = []
+        self.reply_markups = []
 
     async def send_message(self, **kwargs) -> None:
         self.sent_messages.append(kwargs["text"])
+        self.reply_markups.append(kwargs.get("reply_markup"))
 
 
 class FakeStore:
@@ -195,6 +197,7 @@ def test_poll_sources_once_publishes_fresh_published_vacancies(monkeypatch) -> N
 
     assert published == 1
     assert len(bot.sent_messages) == 1
+    assert bot.reply_markups[0].inline_keyboard[0][0].text == "Откликнуться"
 
 
 def test_poll_sources_once_keeps_undated_vacancies(monkeypatch) -> None:
