@@ -282,7 +282,19 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
         if not is_profile_operator(callback.from_user.id if callback.from_user else None, settings.operator_user_ids):
             await callback.answer("Отклик доступен только оператору.", show_alert=True)
             return
-        await callback.answer("Отклик будет обработан на следующем этапе.", show_alert=True)
+        vacancy_id = (callback.data or "").removeprefix(APPLICATION_CALLBACK_PREFIX)
+        result = store.create_application(callback.from_user.id, vacancy_id)
+        if result is None:
+            await callback.answer("Вакансия больше недоступна в локальной базе.", show_alert=True)
+            return
+        application, created = result
+        if application.status == "failed":
+            await callback.answer("У вакансии нет внешней ссылки для отклика.", show_alert=True)
+            return
+        if created:
+            await callback.answer(f"Заявка {application.application_id} создана.", show_alert=True)
+        else:
+            await callback.answer(f"Заявка {application.application_id} уже создана.", show_alert=True)
 
     @dp.message(Command("start", "help"))
     async def start(message: Message) -> None:
