@@ -29,8 +29,11 @@ RESUME_STORAGE_DIR=data/resumes
 RESUME_MAX_SIZE_BYTES=10485760
 ```
 
-Telegram `/profile` interactions and extracting resume text are scheduled for
-the next task in the implementation plan.
+Use `/profile` in a private chat with the bot to view the profile, fill in
+fields step by step, upload or replace a PDF/DOCX resume, and delete the
+profile. This command requires an explicit `OPERATOR_USER_IDS` allowlist;
+unlisted users cannot read or change this private data. Extracting resume text
+is scheduled for the next task in the implementation plan.
 
 ## Near-Real-Time Parser Mode
 
@@ -247,6 +250,7 @@ Messages that do not look like allowed development/design/AI vacancies are skipp
 - `/start` or `/help`: shows the forwarding instructions.
 - `/whoami`: returns your Telegram user ID for `OPERATOR_USER_IDS`.
 - `/status`: shows the active forwarding mode, target chat, polling interval, and enabled sources without exposing secrets.
+- `/profile`: private operator profile: view/edit job preferences, upload or replace a resume, or delete the profile.
 
 ## LinkedIn Boundary
 
