@@ -84,6 +84,16 @@ def test_store_marks_application_failed_when_vacancy_has_no_url(tmp_path) -> Non
     assert application.error_description
 
 
+def test_store_updates_application_status(tmp_path) -> None:
+    store = VacancyStore(str(tmp_path / "vacancies.sqlite3"))
+    vacancy = Vacancy(title="Python Engineer", description="Remote role", source="Test", url="https://jobs.example.com/42")
+    store.mark_published(vacancy)
+    application, _ = store.create_application(42, store.fingerprint(vacancy))
+
+    assert store.update_application_status(application.application_id, "manual_required", "Login required") is True
+    assert store.update_application_status("missing", "failed") is False
+
+
 def test_store_migrates_and_persists_operator_profile(tmp_path) -> None:
     database_path = tmp_path / "vacancies.sqlite3"
     with sqlite3.connect(database_path) as connection:
