@@ -3,12 +3,16 @@ from datetime import UTC, datetime
 
 from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
-from tg_vacancy_bot.sources import build_adapters, filter_it_vacancies
+from tg_vacancy_bot.sources import build_adapters, filter_it_vacancies, source_configuration_warnings
 from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import (
     LinkedInPostScraperAdapter,
     _html_to_vacancies,
 )
-from tg_vacancy_bot.sources.adapters.linkedin_post_headless import _extract_post_text, _requires_manual_access
+from tg_vacancy_bot.sources.adapters.linkedin_post_headless import (
+    LinkedInPostHeadlessAdapter,
+    _extract_post_text,
+    _requires_manual_access,
+)
 from tg_vacancy_bot.sources.adapters.linkedin_post_search import LinkedInPostSearchAdapter, LinkedInPostSerperAdapter
 from tg_vacancy_bot.sources.adapters.jobicy import JobicyAdapter
 from tg_vacancy_bot.sources.rss import RssFeedAdapter, RssFeedConfig
@@ -80,6 +84,57 @@ def test_build_adapters_adds_linkedin_post_headless_when_enabled() -> None:
     names = [adapter.name for adapter in build_adapters(settings)]
 
     assert names == ["LinkedIn Hiring Posts (Headless)"]
+
+
+def test_linkedin_post_headless_uses_keyed_search_urls_before_bing(monkeypatch) -> None:
+    class FakeSearchAdapter:
+        def __init__(self, settings: Settings) -> None:
+            assert settings.linkedin_post_search_query == 'site:linkedin.com/posts "hiring"'
+            assert settings.linkedin_post_search_location == "Kazakhstan"
+            assert settings.linkedin_post_search_results_wanted == 1
+
+        async def fetch(self) -> list[Vacancy]:
+            return [
+                Vacancy(
+                    title="Backend Engineer",
+                    description="We are hiring.",
+                    source="Test",
+                    url="https://www.linkedin.com/posts/example_hiring-activity-7446240742659821568-DPvt",
+                )
+            ]
+
+    monkeypatch.setattr(
+        "tg_vacancy_bot.sources.adapters.linkedin_post_headless.LinkedInPostSearchAdapter",
+        FakeSearchAdapter,
+    )
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_LINKEDIN_POST_SEARCH=False,
+        ENABLE_LINKEDIN_POST_HEADLESS=True,
+        LINKEDIN_POST_HEADLESS_QUERY='site:linkedin.com/posts "hiring"',
+        LINKEDIN_POST_HEADLESS_RESULTS_WANTED=1,
+        SERPAPI_API_KEY="serp-key",
+    )
+
+    urls = asyncio.run(LinkedInPostHeadlessAdapter(settings)._discover_keyed_post_urls(1))
+
+    assert urls == ("https://www.linkedin.com/posts/example_hiring-activity-7446240742659821568-DPvt",)
+
+
+def test_linkedin_post_headless_warns_when_only_bing_discovery_is_available() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_LINKEDIN_POST_SEARCH=False,
+        ENABLE_LINKEDIN_POST_HEADLESS=True,
+        SERPAPI_API_KEY="",
+        SERPER_API_KEY="",
+    )
+
+    assert source_configuration_warnings(settings) == [
+        "LinkedIn Headless source has no SERPAPI_API_KEY or SERPER_API_KEY; Bing discovery is best effort."
+    ]
 
 
 def test_build_adapters_adds_linkedin_post_search_with_serpapi_key() -> None:
@@ -754,6 +809,7 @@ def test_linkedin_post_headless_helpers_extract_public_text_and_stop_for_manual_
     assert _extract_post_text(public_post) == "We are hiring a Senior Backend Engineer with Python and FastAPI."
     assert _requires_manual_access(public_post) is False
     assert _requires_manual_access('<input type="password"><p>Sign in to LinkedIn</p>') is True
+    assert _requires_manual_access('<input type="password">' + public_post) is False
     assert _requires_manual_access("<p>Complete the CAPTCHA to continue</p>") is True
 
 
