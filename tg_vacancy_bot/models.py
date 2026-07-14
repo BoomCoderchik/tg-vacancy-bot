@@ -28,3 +28,21 @@ class Vacancy:
             return self.url.strip().lower()
         parts = [self.title, self.company or "", self.location or "", self.description[:240]]
         return "|".join(part.strip().lower() for part in parts if part)
+
+
+@dataclass(frozen=True)
+class OperatorProfile:
+    """Private application data owned by one authorized Telegram operator."""
+
+    operator_user_id: int
+    full_name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    desired_salary: str | None = None
+    location: str | None = None
+    work_format: str | None = None
+    employment_type: str | None = None
+    extra_fields: dict[str, str] = field(default_factory=dict)
+    resume_original_name: str | None = None
+    resume_stored_name: str | None = None
+    resume_text: str | None = None

@@ -13,6 +13,18 @@ def test_settings_reads_source_poll_interval() -> None:
     assert settings.source_max_publish_per_poll == 5
 
 
+def test_settings_reads_resume_storage_options() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        RESUME_STORAGE_DIR="private/resumes",
+        RESUME_MAX_SIZE_BYTES="2048",
+    )
+
+    assert settings.resume_storage_dir == "private/resumes"
+    assert settings.resume_max_size_bytes == 2048
+
+
 def test_settings_reads_source_max_age_hours() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
