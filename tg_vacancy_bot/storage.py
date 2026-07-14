@@ -168,6 +168,14 @@ class VacancyStore:
             row = conn.execute("SELECT * FROM applications WHERE application_id = ?", (application_id,)).fetchone()
         return self._application_from_row(row), True
 
+    def update_application_status(self, application_id: str, status: ApplicationStatus, error: str | None = None) -> bool:
+        with self._connect() as conn:
+            result = conn.execute(
+                "UPDATE applications SET status = ?, error_description = ?, updated_at = CURRENT_TIMESTAMP WHERE application_id = ?",
+                (status, error, application_id),
+            )
+        return result.rowcount == 1
+
     def get_operator_profile(self, operator_user_id: int) -> OperatorProfile | None:
         with self._connect() as conn:
             row = conn.execute(

@@ -14,6 +14,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 
 from .access_control import is_authorized_user
 from .application_buttons import APPLICATION_CALLBACK_PREFIX, application_button
+from .browser_worker import BrowserWorker
 from .config import Settings
 from .description_localization import localize_vacancy_description
 from .formatting import format_vacancy_card
@@ -116,6 +117,12 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
     dp = Dispatcher()
     resume_storage = ResumeStorage(settings.resume_storage_dir, settings.resume_max_size_bytes)
     profile_service = ProfileService(store, resume_storage)
+    browser_worker = BrowserWorker(
+        settings.browser_profile_dir,
+        settings.application_allowed_domains,
+        settings.browser_headless,
+        settings.browser_timeout_seconds,
+    )
 
     def profile_operator_from_message(message: Message) -> int | None:
         user_id = message.from_user.id if message.from_user else None
@@ -291,6 +298,12 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
         if application.status == "failed":
             await callback.answer("У вакансии нет внешней ссылки для отклика.", show_alert=True)
             return
+        if created and application.vacancy_url:
+            inspection = await browser_worker.inspect(application.vacancy_url)
+            store.update_application_status(application.application_id, inspection.status, inspection.error)
+            if inspection.status != "parsed":
+                await callback.answer("Заявка остановлена: требуется ручное действие.", show_alert=True)
+                return
         if created:
             await callback.answer(f"Заявка {application.application_id} создана.", show_alert=True)
         else:
