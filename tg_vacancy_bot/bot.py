@@ -299,13 +299,23 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             await callback.answer("У вакансии нет внешней ссылки для отклика.", show_alert=True)
             return
         if created and application.vacancy_url:
-            inspection = await browser_worker.inspect(application.vacancy_url)
+            profile = store.get_operator_profile(callback.from_user.id)
+            resume_path = (
+                resume_storage.path_for(profile.resume_stored_name)
+                if profile and profile.resume_stored_name
+                else None
+            )
+            inspection = await browser_worker.prepare_application(application.vacancy_url, profile, resume_path)
             store.update_application_status(application.application_id, inspection.status, inspection.error)
-            if inspection.status != "parsed":
+            if inspection.status == "profile_missing":
+                missing = ", ".join(inspection.missing_fields)
+                await callback.answer(f"Заявка остановлена: заполните в /profile: {missing}.", show_alert=True)
+                return
+            if inspection.status != "filled":
                 await callback.answer("Заявка остановлена: требуется ручное действие.", show_alert=True)
                 return
         if created:
-            await callback.answer(f"Заявка {application.application_id} создана.", show_alert=True)
+            await callback.answer(f"Заявка {application.application_id} заполнена. Отправка не выполнялась.", show_alert=True)
         else:
             await callback.answer(f"Заявка {application.application_id} уже создана.", show_alert=True)
 

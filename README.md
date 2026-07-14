@@ -257,6 +257,15 @@ only a short vacancy ID in Telegram and resolves the original URL from SQLite;
 the button is intentionally unavailable for `FORWARDED_MODE=copy`, because a
 copied third-party message cannot safely receive the normalized card markup.
 
+## Arbeitnow application form
+
+The first supported form is Arbeitnow's public application page. Put
+`APPLICATION_ALLOWED_DOMAINS=arbeitnow.com` in `.env`, complete `/profile` with a
+first and last name, email, and PDF/DOCX resume, then press `Откликнуться` on an
+Arbeitnow card. The bot fills only the verified fields and uploads the local
+resume; it never clicks the final submit button. If the form changes, needs a
+login, or shows protection, the flow stops for manual action.
+
 ## LinkedIn Boundary
 
 This project now permits three documented, opt-in LinkedIn paths: keyed Google Search-backed public hiring-post search through SerpApi or Serper, free public search-result scraping for hiring posts, and JobSpy-backed LinkedIn Jobs discovery. It does not log in with a LinkedIn account, invent vacancies, or publish fake fallback records when LinkedIn or a search provider blocks or returns no results.
