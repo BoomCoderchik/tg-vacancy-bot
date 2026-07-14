@@ -16,6 +16,22 @@ The planned profile and controlled application automation feature is documented 
 - Includes source adapters for Remotive, Arbeitnow, RemoteOK, Hacker News "Who is Hiring", Jobicy, We Work Remotely, Himalayas, Real Work From Anywhere, JobsCollider, Adzuna, Jooble, opt-in LinkedIn hiring-post search, opt-in free LinkedIn hiring-post scraping, and opt-in JobSpy LinkedIn Jobs discovery.
 - Polls configured public sources in the background while the bot is running.
 
+## Profile storage foundation
+
+The first foundation stage for the private operator profile is available in the
+application storage layer. It persists one profile per Telegram operator, with
+contact and job-preference fields plus extensible fields. Original PDF/DOCX
+resumes are stored only in a local directory (not in Git, logs, or the public
+channel). Configure it with:
+
+```dotenv
+RESUME_STORAGE_DIR=data/resumes
+RESUME_MAX_SIZE_BYTES=10485760
+```
+
+Telegram `/profile` interactions and extracting resume text are scheduled for
+the next task in the implementation plan.
+
 ## Near-Real-Time Parser Mode
 
 For an always-on vacancy parser, run the bot continuously with source polling enabled:

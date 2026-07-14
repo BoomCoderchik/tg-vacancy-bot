@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     operator_user_ids_raw: str = Field(default="", alias="OPERATOR_USER_IDS")
     forwarded_mode: Literal["normalize", "copy"] = Field(default="normalize", alias="FORWARDED_MODE")
     database_path: str = Field(default="data/vacancies.sqlite3", alias="DATABASE_PATH")
+    resume_storage_dir: str = Field(default="data/resumes", alias="RESUME_STORAGE_DIR")
+    resume_max_size_bytes: int = Field(default=10 * 1024 * 1024, alias="RESUME_MAX_SIZE_BYTES", gt=0)
     source_poll_interval_seconds: int = Field(default=900, alias="SOURCE_POLL_INTERVAL_SECONDS")
     source_max_publish_per_poll: int = Field(default=20, alias="SOURCE_MAX_PUBLISH_PER_POLL")
     source_max_age_hours: int = Field(default=48, alias="SOURCE_MAX_AGE_HOURS")
