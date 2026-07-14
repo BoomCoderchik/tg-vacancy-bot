@@ -8,8 +8,8 @@ from .adapters.hacker_news import HackerNewsWhoIsHiringAdapter
 from .adapters.himalayas import HimalayasAdapter
 from .adapters.jobicy import JobicyAdapter
 from .adapters.jobscollider import JobsColliderAdapter
-from .adapters.jobspy_linkedin import JobSpyLinkedInAdapter
 from .adapters.jooble import JoobleAdapter
+from .adapters.linkedin_post_headless import LinkedInPostHeadlessAdapter
 from .adapters.linkedin_post_scraper import LinkedInPostScraperAdapter
 from .adapters.linkedin_post_search import LinkedInPostSearchAdapter, LinkedInPostSerperAdapter
 from .adapters.real_work_from_anywhere import RealWorkFromAnywhereAdapter
@@ -45,8 +45,8 @@ def build_adapters(settings: Settings) -> list[SourceAdapter]:
         adapters.append(LinkedInPostSerperAdapter(settings))
     if settings.enable_linkedin_post_scraper:
         adapters.append(LinkedInPostScraperAdapter(settings))
-    if settings.enable_jobspy_linkedin:
-        adapters.append(JobSpyLinkedInAdapter(settings))
+    if settings.enable_linkedin_post_headless:
+        adapters.append(LinkedInPostHeadlessAdapter(settings))
     if settings.adzuna_app_id and settings.adzuna_app_key:
         adapters.append(AdzunaAdapter(settings))
     if settings.jooble_api_key:

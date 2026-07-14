@@ -62,14 +62,6 @@
   - Query configured by `JOOBLE_KEYWORDS` and `JOOBLE_LOCATION`.
   - Publication date: parsed from `updated` when present.
 
-- JobSpy LinkedIn
-  - Enabled with `ENABLE_JOBSPY_LINKEDIN=true`; disabled by default and should remain disabled when ordinary LinkedIn Jobs cards are out of scope.
-  - Uses `python-jobspy` with `site_name="linkedin"`.
-  - Query configured by `JOBSPY_LINKEDIN_QUERY`, `JOBSPY_LINKEDIN_LOCATION`, `JOBSPY_LINKEDIN_RESULTS_WANTED`, and `JOBSPY_LINKEDIN_HOURS_OLD`.
-  - `JOBSPY_LINKEDIN_FETCH_DESCRIPTION=false` publishes lightweight link cards from search results; `true` lets JobSpy request individual LinkedIn job pages for descriptions.
-  - Optional `JOBSPY_LINKEDIN_PROXIES` is passed through to JobSpy as a comma-separated proxy list.
-  - Publication date: parsed from JobSpy `date_posted` when present.
-
 - LinkedIn Hiring Posts
   - Enabled only when `ENABLE_LINKEDIN_POST_SEARCH=true` and `SERPAPI_API_KEY` or `SERPER_API_KEY` are set.
   - Uses SerpApi Google Search (`https://serpapi.com/search.json`) or Serper Google Search (`https://google.serper.dev/search`) to find publicly indexed LinkedIn post URLs, not LinkedIn Jobs pages.
@@ -89,18 +81,25 @@
   - Drops results that are not `linkedin.com/posts/...` or `linkedin.com/feed/update/...`.
   - Requires no API key, but can return no rows if search-result markup changes or the search provider rate-limits requests.
 
+- LinkedIn Hiring Posts (Headless)
+  - Enabled with `ENABLE_LINKEDIN_POST_HEADLESS=true`; disabled by default.
+  - Uses Playwright to search Bing for public LinkedIn post URLs, then opens those URLs in a clean headless browser context.
+  - Query configured by `LINKEDIN_POST_HEADLESS_QUERY`, `LINKEDIN_POST_HEADLESS_LOCATION`, `LINKEDIN_POST_HEADLESS_RESULTS_WANTED`, and `LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS`.
+  - Does not use a LinkedIn account, cookies, proxies, identity masking, or protection bypasses. Pages that require login or show CAPTCHA/2FA are skipped.
+  - Requires text in a public post container and derives the publication date from the LinkedIn activity ID; otherwise it does not create a vacancy.
+
 ## Intake Sources
 
 - Direct or forwarded Telegram messages to the bot.
 - Public Telegram channel origins when Telegram exposes forward metadata.
 - LinkedIn URLs supplied manually by an operator via sent or forwarded vacancy text.
-- LinkedIn links discovered by the opt-in JobSpy LinkedIn source.
 - LinkedIn post links discovered by the opt-in SerpApi-backed or Serper-backed hiring-post search source.
 - LinkedIn post links discovered by the opt-in free hiring-post scraper source.
+- LinkedIn post links and descriptions discovered by the opt-in headless source.
 
 ## LinkedIn Boundary
 
-The automatic LinkedIn sources are `LinkedInPostSearchAdapter` for SerpApi-backed public hiring posts, `LinkedInPostSerperAdapter` for Serper-backed public hiring posts, `LinkedInPostScraperAdapter` for free public search-result scraping, and `JobSpyLinkedInAdapter` for LinkedIn Jobs. They must remain explicitly opt-in. Account-based crawling and fake LinkedIn fallback rows remain out of scope.
+The four automatic LinkedIn adapters are `LinkedInPostSearchAdapter` for SerpApi-backed public hiring posts, `LinkedInPostSerperAdapter` for Serper-backed public hiring posts, `LinkedInPostScraperAdapter` for free public search-result scraping, and `LinkedInPostHeadlessAdapter` for public post pages opened without login. They must remain explicitly opt-in. Account-based crawling, proxy use, protection bypasses, and fake LinkedIn fallback rows remain out of scope.
 
 ## Planned Source Pattern
 
