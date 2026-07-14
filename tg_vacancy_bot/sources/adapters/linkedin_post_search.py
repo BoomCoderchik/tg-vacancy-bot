@@ -13,6 +13,7 @@ from tg_vacancy_bot.sources.dates import parse_source_datetime
 
 SERPAPI_SEARCH_URL = "https://serpapi.com/search.json"
 SERPER_SEARCH_URL = "https://google.serper.dev/search"
+SERPER_MAX_RESULTS_PER_REQUEST = 10
 POST_URL_MARKERS = ("linkedin.com/posts/", "linkedin.com/feed/update/")
 HASHTAG_PATTERN = re.compile(r"(?<!\w)#[\w.+-]+", re.UNICODE)
 ROLE_TERM_PATTERN = re.compile(
@@ -103,32 +104,41 @@ class LinkedInPostSerperAdapter(SourceAdapter):
         seen_urls: set[str] = set()
         async with source_session(headers=headers) as session:
             for query in _search_queries(self.settings.linkedin_post_search_query):
-                if len(vacancies) >= limit:
-                    break
-                payload = {
-                    "q": query,
-                    "num": limit,
-                    "hl": "ru",
-                    "location": self.settings.linkedin_post_search_location,
-                }
-                async with session.post(SERPER_SEARCH_URL, json=payload) as response:
-                    response.raise_for_status()
-                    response_payload = await response.json()
+                page = 1
+                while len(vacancies) < limit:
+                    request_limit = min(SERPER_MAX_RESULTS_PER_REQUEST, limit - len(vacancies))
+                    payload = {
+                        "q": query,
+                        "num": request_limit,
+                        "hl": "ru",
+                        "location": self.settings.linkedin_post_search_location,
+                    }
+                    if page > 1:
+                        payload["page"] = page
+                    async with session.post(SERPER_SEARCH_URL, json=payload) as response:
+                        response.raise_for_status()
+                        response_payload = await response.json()
 
-                for result in response_payload.get("organic", []):
-                    if not isinstance(result, Mapping):
-                        continue
-                    vacancy = _result_to_vacancy(
-                        result,
-                        self.settings.linkedin_post_search_location,
-                        source=LinkedInPostSerperAdapter.name,
-                    )
-                    if vacancy is None or not vacancy.url or vacancy.url in seen_urls:
-                        continue
-                    seen_urls.add(vacancy.url)
-                    vacancies.append(vacancy)
-                    if len(vacancies) >= limit:
+                    results = response_payload.get("organic", [])
+                    if not isinstance(results, list):
                         break
+                    for result in results:
+                        if not isinstance(result, Mapping):
+                            continue
+                        vacancy = _result_to_vacancy(
+                            result,
+                            self.settings.linkedin_post_search_location,
+                            source=LinkedInPostSerperAdapter.name,
+                        )
+                        if vacancy is None or not vacancy.url or vacancy.url in seen_urls:
+                            continue
+                        seen_urls.add(vacancy.url)
+                        vacancies.append(vacancy)
+                        if len(vacancies) >= limit:
+                            break
+                    if len(results) < request_limit:
+                        break
+                    page += 1
         return vacancies
 
 
