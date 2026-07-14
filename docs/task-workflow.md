@@ -11,6 +11,9 @@ or production behavior.
 - Check whether the task is documentation-only, code, integration, deployment,
   source-adapter, bugfix, or mixed.
 - Follow `docs/git-workflow.md` for branch, commit, and push behavior.
+- For normal feature and non-urgent bugfix work, start from current `develop`.
+  Only releases and urgent hotfixes may target `main` through their documented
+  GitFlow flows.
 - Before changing files, check the worktree state and preserve unrelated user
   changes.
 
@@ -69,6 +72,9 @@ or production behavior.
   risks.
 - Confirm documentation was updated when usage, setup, environment variables,
   public behavior, or contracts changed.
+- Before merging, confirm the target branch matches the GitFlow role: features
+  and bugfixes go to `develop`; releases and hotfixes go to `main` and are then
+  merged back into `develop`.
 
 ## Report
 
@@ -127,3 +133,5 @@ Stop and report clearly when any of these apply:
 - Required checks fail and the failure cannot be fixed within the task.
 - The requested behavior conflicts with the project rules for real integrations,
   LinkedIn opt-in boundaries, deduplication, or secret handling.
+- GitHub branch protection requires a pull request, review, or checks that are
+  not satisfied. Do not bypass the rule.

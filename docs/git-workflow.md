@@ -1,90 +1,76 @@
-# Git Workflow
+# GitFlow Workflow
 
-This project uses GitHub as the required remote repository. Every feature,
-fix, documentation update, or other completed change must leave a clear git
-trail: verified changes, logical commits, and a pushed task branch.
+This project uses GitHub with an adapted GitFlow process. Every completed
+change needs a clear trail: scoped work, relevant verification, an intentional
+commit, and a push to GitHub.
+
+## Branch Model
+
+- `main` — production-ready code only.
+- `develop` — normal integration branch for completed work awaiting release.
+- `feature/<short-name>` — new product work, created from `develop`.
+- `bugfix/<short-name>` — non-urgent fixes, created from `develop`.
+- `release/<version-or-date>` — release stabilization, created from `develop`.
+- `hotfix/<short-name>` — urgent production fixes, created from `main`.
+
+Codex-created task branches may use `codex/feature/<short-name>`,
+`codex/bugfix/<short-name>`, or `codex/hotfix/<short-name>` when that makes the
+author and role clear.
 
 ## Before Work
 
-- Read the required project context from `AGENTS.md`.
-- Check the current branch and worktree state:
+- Read the project instructions and check `git status --short --branch`.
+- Confirm the `origin` GitHub remote is configured and reachable.
+- Preserve unrelated worktree changes. Do not revert, overwrite, reformat, or
+  commit them.
+- Start normal work from the latest `develop`, not `main`.
+- Do not put secrets, `.env` files, local databases, logs, caches, virtual
+  environments, or intentionally ignored generated files into a commit.
 
-  ```powershell
-  git status --short --branch
-  ```
+## Feature And Bugfix Flow
 
-- Confirm the GitHub remote is configured and reachable enough for normal git
-  operations:
+1. Update `develop` from `origin/develop`.
+2. Create `feature/<short-name>` or `bugfix/<short-name>` from `develop`.
+3. Implement narrowly, run relevant checks, and inspect the diff.
+4. Commit and push the branch.
+5. Merge verified work into `develop`, then push `develop`.
 
-  ```powershell
-  git remote -v
-  ```
+## Release Flow
 
-- Work on a feature branch named `codex/<short-task-name>` unless the current
-  branch is already the correct task branch.
-- Do not start implementation directly on `main` unless the user explicitly
-  asks for that.
+1. Create `release/<version-or-date>` from the latest `develop`.
+2. Allow only stabilization: bug fixes, release/version notes, deployment, and
+   configuration documentation.
+3. Run the full relevant verification set and inspect the diff.
+4. Merge the verified release into `main`; add a tag when a release version is
+   defined.
+5. Merge the same release back into `develop` and push both branches (and the
+   tag, if created).
 
-## Dirty Worktree Rules
+## Hotfix Flow
 
-- If there are uncommitted changes before starting, inspect them first.
-- Preserve changes you did not make.
-- Do not revert, delete, overwrite, reformat, or commit unrelated user changes.
-- Continue only when the new task can be safely separated from existing
-  changes. If it cannot be separated safely, report the blocker.
+1. Create `hotfix/<short-name>` from the latest `main`.
+2. Make only the urgent production fix and run the smallest sufficient checks,
+   followed by broader checks when possible.
+3. Merge verified work into `main`, then merge it back into `develop` (or an
+   active release branch), and push every updated branch.
 
-## During Work
+## Verification And Merges
 
-- Keep each change scoped to the current task.
-- Make logical commits after a complete and verified unit of work.
-- Use concrete commit messages that describe what changed, for example:
+- Code changes require relevant checks; at minimum run
+  `./.venv/Scripts/python.exe -m pytest` when the project test environment is
+  available.
+- Documentation-only changes require re-reading the changed files and
+  inspecting `git diff`.
+- Validate real integration configuration and boundaries for integration work;
+  never replace missing services with fake behavior.
+- The owner authorizes Codex to create, push, and merge verified branches when
+  this workflow calls for it. Pull requests are optional unless the owner asks
+  for one or GitHub branch protection requires one.
+- Never bypass branch protection, required reviews, or required checks. Report
+  the blocker instead.
 
-  ```text
-  Add git workflow instructions
-  ```
+## Completion
 
-- Do not commit secrets, `.env` contents, local databases, logs, virtual
-  environments, caches, or generated artifacts that are intentionally ignored.
-
-## Verification Before Commit
-
-- Run checks that match the change.
-- For code changes, run at least:
-
-  ```powershell
-  .\.venv\Scripts\python.exe -m pytest
-  ```
-
-- For documentation-only changes, re-read the changed docs and inspect the diff.
-- If a required check cannot run, report why and what is needed to run it.
-- Do not mark work as complete if verification failed or was skipped without a
-  clear reason.
-
-## End Of Task
-
-- Inspect the final diff before committing:
-
-  ```powershell
-  git diff
-  ```
-
-- Commit the completed logical change.
-- Push the task branch to GitHub after the task is done and verified:
-
-  ```powershell
-  git push -u origin <branch-name>
-  ```
-
-- Do not create a pull request automatically. Create a PR only when the user
-  explicitly asks for one.
-- In the final report, include the changed files, checks run, commit hash,
-  branch name, and push result.
-
-## Never Treat As Ready
-
-- Unverified changes.
-- Work with failing checks unless the failure is reported as a blocker.
-- Placeholder integrations, fake Telegram publishing, fake source results, or
-  invented vacancies.
-- A local-only completed branch that has not been pushed, unless GitHub access
-  or network permissions blocked the push and the blocker is reported.
+Before reporting completion, inspect the final diff and confirm the commit is
+scoped to the task. Report the branch, commit hash, push result, and any check
+that could not run.
