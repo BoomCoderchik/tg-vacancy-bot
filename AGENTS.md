@@ -23,10 +23,9 @@ the blocker is reported clearly.
 
 This project uses an adapted GitFlow process. `main` contains production-ready
 code and `develop` is the normal integration branch. Start ordinary work from
-`develop` on `feature/<short-name>` or `bugfix/<short-name>`; Codex-created
-branches may use `codex/feature/<short-name>` or
-`codex/bugfix/<short-name>`. Use `release/<version-or-date>` only for release
-stabilization and `hotfix/<short-name>` only for urgent fixes from `main`.
+`develop` on `feature/<short-name>` or `bugfix/<short-name>`. Use
+`release/<version-or-date>` only for release stabilization and
+`hotfix/<short-name>` only for urgent fixes from `main`.
 
 The owner authorizes Codex to create, push, and merge verified GitFlow branches
 when the documented flow calls for it. A verified feature or bugfix may merge

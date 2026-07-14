@@ -13,9 +13,9 @@ commit, and a push to GitHub.
 - `release/<version-or-date>` — release stabilization, created from `develop`.
 - `hotfix/<short-name>` — urgent production fixes, created from `main`.
 
-Codex-created task branches may use `codex/feature/<short-name>`,
-`codex/bugfix/<short-name>`, or `codex/hotfix/<short-name>` when that makes the
-author and role clear.
+Use these role-based prefixes for every task branch. Do not use agent-specific
+prefixes such as `codex/`; the branch name itself must show whether the work is
+a feature, bugfix, release, or hotfix.
 
 ## Before Work
 
