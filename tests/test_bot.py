@@ -36,6 +36,7 @@ def test_build_status_text_reports_linkedin_post_search_missing_key() -> None:
         TARGET_CHAT_ID="@target",
         ENABLE_LINKEDIN_POST_SEARCH=True,
         SERPAPI_API_KEY="",
+        SERPER_API_KEY="",
         ENABLE_JOBSPY_LINKEDIN=False,
     )
 

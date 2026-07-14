@@ -37,6 +37,7 @@ def test_check_sources_reports_missing_linkedin_post_search_provider_key(capsys,
         ENABLE_LINKEDIN_POST_SEARCH=True,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
         SERPAPI_API_KEY="",
+        SERPER_API_KEY="",
     )
     monkeypatch.setattr("tg_vacancy_bot.app.get_settings", lambda: settings)
 
@@ -182,6 +183,7 @@ def test_preview_sources_shows_configuration_warning_when_adapter_is_missing(
         ENABLE_LINKEDIN_POST_SEARCH=True,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
         SERPAPI_API_KEY="",
+        SERPER_API_KEY="",
     )
     monkeypatch.setattr("tg_vacancy_bot.app.get_settings", lambda: settings)
 
@@ -300,6 +302,7 @@ def test_poll_once_warns_when_linkedin_posts_enabled_without_search_provider_key
         ENABLE_LINKEDIN_POST_SEARCH=True,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
         SERPAPI_API_KEY="",
+        SERPER_API_KEY="",
     )
 
     class FakePublisher:

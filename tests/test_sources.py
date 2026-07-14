@@ -29,6 +29,7 @@ def test_build_adapters_skips_keyed_sources_without_credentials() -> None:
         ENABLE_JOBSCOLLIDER=False,
         ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
+        SERPER_API_KEY="",
     )
 
     assert build_adapters(settings) == []
@@ -49,6 +50,7 @@ def test_build_adapters_adds_keyed_sources_with_credentials() -> None:
         ENABLE_JOBSCOLLIDER=False,
         ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
+        SERPER_API_KEY="",
         ADZUNA_APP_ID="app",
         ADZUNA_APP_KEY="key",
         JOOBLE_API_KEY="jooble",
@@ -74,6 +76,7 @@ def test_build_adapters_adds_jobspy_linkedin_when_enabled() -> None:
         ENABLE_JOBSCOLLIDER=False,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
         ENABLE_JOBSPY_LINKEDIN=True,
+        SERPER_API_KEY="",
     )
 
     names = [adapter.name for adapter in build_adapters(settings)]
@@ -98,6 +101,7 @@ def test_build_adapters_adds_linkedin_post_search_with_serpapi_key() -> None:
         ENABLE_LINKEDIN_POST_SEARCH=True,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
         SERPAPI_API_KEY="serp-key",
+        SERPER_API_KEY="",
     )
 
     names = [adapter.name for adapter in build_adapters(settings)]
@@ -145,6 +149,7 @@ def test_build_adapters_skips_linkedin_post_search_without_search_provider_key()
         ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SEARCH=True,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
+        SERPER_API_KEY="",
     )
 
     assert build_adapters(settings) == []
@@ -183,6 +188,7 @@ def test_build_adapters_adds_no_key_sources_by_default() -> None:
         ENABLE_HN_WHO_IS_HIRING=False,
         ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
+        SERPER_API_KEY="",
     )
 
     names = [adapter.name for adapter in build_adapters(settings)]
@@ -566,6 +572,49 @@ def test_linkedin_post_serper_adapter_maps_public_post_results(monkeypatch) -> N
             ),
         )
     ]
+
+
+def test_linkedin_post_serper_adapter_paginates_large_requested_result_count(monkeypatch) -> None:
+    calls = []
+
+    class FakeSession:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        def post(self, url: str, json: dict):
+            calls.append(json)
+            page = json.get("page", 1)
+            rows = [
+                {
+                    "title": f"Backend Engineer {index} | LinkedIn",
+                    "link": f"https://www.linkedin.com/posts/backend-{page}-{index}-activity-{page}{index}",
+                    "snippet": "We are hiring a Backend Engineer with Python.",
+                }
+                for index in range(10)
+            ]
+            return _FakeResponse(json_data={"organic": rows})
+
+    monkeypatch.setattr(
+        "tg_vacancy_bot.sources.adapters.linkedin_post_search.source_session",
+        lambda headers=None: FakeSession(),
+    )
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_LINKEDIN_POST_SEARCH=True,
+        SERPER_API_KEY="serper-key",
+        LINKEDIN_POST_SEARCH_QUERY="hiring backend engineer",
+        LINKEDIN_POST_SEARCH_RESULTS_WANTED="25",
+    )
+
+    vacancies = asyncio.run(LinkedInPostSerperAdapter(settings).fetch())
+
+    assert [call["num"] for call in calls] == [10, 10, 5]
+    assert [call.get("page") for call in calls] == [None, 2, 3]
+    assert len(vacancies) == 25
 
 
 def test_linkedin_post_scraper_maps_public_search_html(monkeypatch) -> None:
