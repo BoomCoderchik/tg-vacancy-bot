@@ -60,4 +60,8 @@ def source_configuration_warnings(settings: Settings) -> list[str]:
         warnings.append(
             "LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY or SERPER_API_KEY is missing."
         )
+    if settings.enable_linkedin_post_headless and not (settings.serpapi_api_key or settings.serper_api_key):
+        warnings.append(
+            "LinkedIn Headless source has no SERPAPI_API_KEY or SERPER_API_KEY; Bing discovery is best effort."
+        )
     return warnings

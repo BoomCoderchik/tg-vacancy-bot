@@ -83,10 +83,11 @@ The search depth is intentionally larger than the per-cycle publication budget: 
 
 ## Headless LinkedIn Hiring Post Parser
 
-The optional `LinkedInPostHeadlessAdapter` uses the project’s existing open-source [Playwright](https://github.com/microsoft/playwright-python) runtime to find publicly indexed post links through Bing and parse the text from those pages in a clean headless browser context:
+The optional `LinkedInPostHeadlessAdapter` uses the project’s existing open-source [Playwright](https://github.com/microsoft/playwright-python) runtime to parse publicly indexed LinkedIn post pages in a clean headless browser context. For reliable link discovery, configure an existing SerpApi or Serper key; without one it falls back to Bing, which is best effort and can return no rows when blocked:
 
 ```dotenv
 ENABLE_LINKEDIN_POST_HEADLESS=true
+SERPAPI_API_KEY=your_key # or SERPER_API_KEY=your_key
 LINKEDIN_POST_HEADLESS_QUERY=(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR hiring OR "ищем" OR "ищет") (frontend OR backend OR developer OR engineer OR react OR python OR разработчик OR инженер)
 LINKEDIN_POST_HEADLESS_LOCATION=Kazakhstan
 LINKEDIN_POST_HEADLESS_RESULTS_WANTED=10
