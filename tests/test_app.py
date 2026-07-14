@@ -33,7 +33,6 @@ def test_check_sources_reports_missing_linkedin_post_search_provider_key(capsys,
         ENABLE_HIMALAYAS=False,
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
-        ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SEARCH=True,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
         SERPAPI_API_KEY="",
@@ -66,7 +65,6 @@ def test_check_sources_reports_registered_linkedin_post_search_without_exposing_
         ENABLE_HIMALAYAS=False,
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
-        ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SEARCH=True,
         SERPAPI_API_KEY="serp-secret",
     )
@@ -93,7 +91,6 @@ def test_preview_sources_prints_filtered_candidates_without_publishing(capsys, m
         ENABLE_HIMALAYAS=False,
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
-        ENABLE_JOBSPY_LINKEDIN=False,
     )
 
     class FakeAdapter:
@@ -179,7 +176,6 @@ def test_preview_sources_shows_configuration_warning_when_adapter_is_missing(
         ENABLE_HIMALAYAS=False,
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
-        ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SEARCH=True,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
         SERPAPI_API_KEY="",
@@ -298,7 +294,6 @@ def test_poll_once_warns_when_linkedin_posts_enabled_without_search_provider_key
         ENABLE_HIMALAYAS=False,
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
-        ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SEARCH=True,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
         SERPAPI_API_KEY="",

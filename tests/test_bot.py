@@ -11,7 +11,7 @@ def test_build_status_text_does_not_expose_bot_token() -> None:
         OPERATOR_USER_IDS="",
         LOCALIZE_DESCRIPTIONS="true",
         ENABLE_LINKEDIN_POST_SEARCH=False,
-        ENABLE_JOBSPY_LINKEDIN=False,
+        ENABLE_LINKEDIN_POST_HEADLESS=False,
         ADZUNA_APP_ID="app",
         ADZUNA_APP_KEY="key",
     )
@@ -27,7 +27,7 @@ def test_build_status_text_does_not_expose_bot_token() -> None:
     assert "Arbeitnow=off" in text
     assert "Adzuna=on" in text
     assert "LinkedInPosts=off" in text
-    assert "JobSpyLinkedIn=off" in text
+    assert "LinkedInHeadless=off" in text
 
 
 def test_build_status_text_reports_linkedin_post_search_missing_key() -> None:
@@ -37,13 +37,13 @@ def test_build_status_text_reports_linkedin_post_search_missing_key() -> None:
         ENABLE_LINKEDIN_POST_SEARCH=True,
         SERPAPI_API_KEY="",
         SERPER_API_KEY="",
-        ENABLE_JOBSPY_LINKEDIN=False,
+        ENABLE_LINKEDIN_POST_HEADLESS=False,
     )
 
     text = build_status_text(settings)
 
     assert "LinkedInPosts=missing-key" in text
-    assert "JobSpyLinkedIn=off" in text
+    assert "LinkedInHeadless=off" in text
 
 
 def test_build_status_text_reports_linkedin_post_search_on_without_exposing_key() -> None:
@@ -52,13 +52,13 @@ def test_build_status_text_reports_linkedin_post_search_on_without_exposing_key(
         TARGET_CHAT_ID="@target",
         ENABLE_LINKEDIN_POST_SEARCH=True,
         SERPAPI_API_KEY="serp-secret",
-        ENABLE_JOBSPY_LINKEDIN=True,
+        ENABLE_LINKEDIN_POST_HEADLESS=True,
     )
 
     text = build_status_text(settings)
 
     assert "LinkedInPosts=on" in text
-    assert "JobSpyLinkedIn=on" in text
+    assert "LinkedInHeadless=on" in text
     assert "serp-secret" not in text
 
 
@@ -68,7 +68,7 @@ def test_build_status_text_reports_linkedin_post_search_on_with_serper_key() -> 
         TARGET_CHAT_ID="@target",
         ENABLE_LINKEDIN_POST_SEARCH=True,
         SERPER_API_KEY="serper-secret",
-        ENABLE_JOBSPY_LINKEDIN=False,
+        ENABLE_LINKEDIN_POST_HEADLESS=False,
     )
 
     text = build_status_text(settings)

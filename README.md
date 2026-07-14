@@ -13,7 +13,7 @@ The planned profile and controlled application automation feature is documented 
   - `copy`: copy the original message to the target channel after the same allowed-vacancy intake check.
 - Publishes only development/design/AI vacancies: backend, frontend, fullstack, design, LLM, AI, and clear software developer/engineer roles.
 - Stores message fingerprints in SQLite to avoid duplicates.
-- Includes source adapters for Remotive, Arbeitnow, RemoteOK, Hacker News "Who is Hiring", Jobicy, We Work Remotely, Himalayas, Real Work From Anywhere, JobsCollider, Adzuna, Jooble, opt-in LinkedIn hiring-post search, opt-in free LinkedIn hiring-post scraping, and opt-in JobSpy LinkedIn Jobs discovery.
+- Includes source adapters for Remotive, Arbeitnow, RemoteOK, Hacker News "Who is Hiring", Jobicy, We Work Remotely, Himalayas, Real Work From Anywhere, JobsCollider, Adzuna, Jooble, opt-in LinkedIn hiring-post search, free LinkedIn hiring-post scraping, and opt-in headless parsing of publicly available LinkedIn posts.
 - Polls configured public sources in the background while the bot is running.
 
 ## Profile storage foundation
@@ -78,23 +78,20 @@ This source scrapes public search-result HTML and keeps only real `linkedin.com/
 The scraper keeps only results with a reliable publication date (from the search result or the LinkedIn activity ID) and the normal `SOURCE_MAX_AGE_HOURS` freshness filter removes older posts before publishing.
 The search depth is intentionally larger than the per-cycle publication budget: SQLite deduplication lets later polls publish the remaining fresh posts. `LOCALIZATION_MAX_PER_POLL=12` caps localization attempts per poll when localization is enabled; lower it further if the provider is rate-limited.
 
-## JobSpy LinkedIn Jobs Discovery
+## Headless LinkedIn Hiring Post Parser
 
-LinkedIn Jobs discovery is available as an explicit opt-in source through [JobSpy](https://github.com/speedyapply/JobSpy). It is intended to send new LinkedIn Jobs links in the configured development/design/AI search scope through the same source polling flow as the other adapters: intake filter, freshness filter, SQLite deduplication, publication limit, and Telegram publishing.
-
-Enable it only when you accept LinkedIn's operational risk around automated access:
+The optional `LinkedInPostHeadlessAdapter` uses the project’s existing open-source [Playwright](https://github.com/microsoft/playwright-python) runtime to parse publicly indexed LinkedIn post pages in a clean headless browser context. For reliable link discovery, configure an existing SerpApi or Serper key; without one it falls back to Bing, which is best effort and can return no rows when blocked:
 
 ```dotenv
-ENABLE_JOBSPY_LINKEDIN=false
-JOBSPY_LINKEDIN_QUERY=backend OR frontend OR fullstack OR designer OR "AI engineer" OR "ML engineer" OR "LLM engineer"
-JOBSPY_LINKEDIN_LOCATION=Worldwide
-JOBSPY_LINKEDIN_RESULTS_WANTED=20
-JOBSPY_LINKEDIN_HOURS_OLD=48
-JOBSPY_LINKEDIN_FETCH_DESCRIPTION=false
-JOBSPY_LINKEDIN_PROXIES=
+ENABLE_LINKEDIN_POST_HEADLESS=true
+SERPAPI_API_KEY=your_key # or SERPER_API_KEY=your_key
+LINKEDIN_POST_HEADLESS_QUERY=(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR hiring OR "ищем" OR "ищет") (frontend OR backend OR developer OR engineer OR react OR python OR разработчик OR инженер)
+LINKEDIN_POST_HEADLESS_LOCATION=Kazakhstan
+LINKEDIN_POST_HEADLESS_RESULTS_WANTED=10
+LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS=20
 ```
 
-By default this publishes lightweight link cards from JobSpy LinkedIn Jobs search results. Set `JOBSPY_LINKEDIN_FETCH_DESCRIPTION=true` only if you want JobSpy to request each LinkedIn job page for fuller descriptions; that mode is slower and more likely to be rate-limited. No LinkedIn account login or browser automation is used.
+It does not use a LinkedIn account, cookies, proxies, fake identities, scrolling automation, or any CAPTCHA/login/2FA bypass. It publishes only posts whose public page contains extractable text and whose activity URL has a reliable publication date. A login or protection page is skipped without a fallback vacancy. On GitHub Actions, enabling the source installs Chromium before polling.
 
 ## Required Telegram Setup
 
@@ -250,6 +247,6 @@ Messages that do not look like allowed development/design/AI vacancies are skipp
 
 ## LinkedIn Boundary
 
-This project now permits three documented, opt-in LinkedIn paths: keyed Google Search-backed public hiring-post search through SerpApi or Serper, free public search-result scraping for hiring posts, and JobSpy-backed LinkedIn Jobs discovery. It does not log in with a LinkedIn account, invent vacancies, or publish fake fallback records when LinkedIn or a search provider blocks or returns no results.
+This project permits three documented, opt-in LinkedIn paths: keyed Google Search-backed public hiring-post search through SerpApi or Serper, free public search-result scraping, and headless parsing of publicly available post pages found through Bing. It does not log in with a LinkedIn account, use proxies or anti-bot bypasses, invent vacancies, or publish fake fallback records when LinkedIn or a search provider blocks or returns no results.
 
 LinkedIn links can also enter when an operator manually sends or forwards vacancy text containing a LinkedIn URL to the Telegram bot. In that case the normal forwarded-message parser can keep the URL and mark the vacancy source as `LinkedIn`.

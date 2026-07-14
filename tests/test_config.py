@@ -35,26 +35,22 @@ def test_settings_reads_source_max_age_hours() -> None:
     assert settings.source_max_age_hours == 12
 
 
-def test_settings_reads_jobspy_linkedin_options() -> None:
+def test_settings_reads_linkedin_post_headless_options() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
-        ENABLE_JOBSPY_LINKEDIN="true",
-        JOBSPY_LINKEDIN_QUERY="backend OR frontend",
-        JOBSPY_LINKEDIN_LOCATION="Worldwide",
-        JOBSPY_LINKEDIN_RESULTS_WANTED="7",
-        JOBSPY_LINKEDIN_HOURS_OLD="24",
-        JOBSPY_LINKEDIN_FETCH_DESCRIPTION="true",
-        JOBSPY_LINKEDIN_PROXIES="http://proxy-a, http://proxy-b",
+        ENABLE_LINKEDIN_POST_HEADLESS="true",
+        LINKEDIN_POST_HEADLESS_QUERY='site:linkedin.com/posts "ищем" frontend',
+        LINKEDIN_POST_HEADLESS_LOCATION="Kazakhstan",
+        LINKEDIN_POST_HEADLESS_RESULTS_WANTED="7",
+        LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS="25",
     )
 
-    assert settings.enable_jobspy_linkedin is True
-    assert settings.jobspy_linkedin_query == "backend OR frontend"
-    assert settings.jobspy_linkedin_location == "Worldwide"
-    assert settings.jobspy_linkedin_results_wanted == 7
-    assert settings.jobspy_linkedin_hours_old == 24
-    assert settings.jobspy_linkedin_fetch_description is True
-    assert settings.jobspy_linkedin_proxies == ("http://proxy-a", "http://proxy-b")
+    assert settings.enable_linkedin_post_headless is True
+    assert settings.linkedin_post_headless_query == 'site:linkedin.com/posts "ищем" frontend'
+    assert settings.linkedin_post_headless_location == "Kazakhstan"
+    assert settings.linkedin_post_headless_results_wanted == 7
+    assert settings.linkedin_post_headless_timeout_seconds == 25
 
 
 def test_settings_reads_linkedin_post_search_options() -> None:

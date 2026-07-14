@@ -3,13 +3,17 @@ from datetime import UTC, datetime
 
 from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
-from tg_vacancy_bot.sources import build_adapters, filter_it_vacancies
+from tg_vacancy_bot.sources import build_adapters, filter_it_vacancies, source_configuration_warnings
 from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import (
     LinkedInPostScraperAdapter,
     _html_to_vacancies,
 )
+from tg_vacancy_bot.sources.adapters.linkedin_post_headless import (
+    LinkedInPostHeadlessAdapter,
+    _extract_post_text,
+    _requires_manual_access,
+)
 from tg_vacancy_bot.sources.adapters.linkedin_post_search import LinkedInPostSearchAdapter, LinkedInPostSerperAdapter
-from tg_vacancy_bot.sources.adapters.jobspy_linkedin import JobSpyLinkedInAdapter
 from tg_vacancy_bot.sources.adapters.jobicy import JobicyAdapter
 from tg_vacancy_bot.sources.rss import RssFeedAdapter, RssFeedConfig
 
@@ -27,7 +31,6 @@ def test_build_adapters_skips_keyed_sources_without_credentials() -> None:
         ENABLE_HIMALAYAS=False,
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
-        ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
         SERPER_API_KEY="",
     )
@@ -48,7 +51,6 @@ def test_build_adapters_adds_keyed_sources_with_credentials() -> None:
         ENABLE_HIMALAYAS=False,
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
-        ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
         SERPER_API_KEY="",
         ADZUNA_APP_ID="app",
@@ -61,7 +63,7 @@ def test_build_adapters_adds_keyed_sources_with_credentials() -> None:
     assert names == ["Adzuna", "Jooble"]
 
 
-def test_build_adapters_adds_jobspy_linkedin_when_enabled() -> None:
+def test_build_adapters_adds_linkedin_post_headless_when_enabled() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
@@ -75,13 +77,64 @@ def test_build_adapters_adds_jobspy_linkedin_when_enabled() -> None:
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
-        ENABLE_JOBSPY_LINKEDIN=True,
+        ENABLE_LINKEDIN_POST_HEADLESS=True,
         SERPER_API_KEY="",
     )
 
     names = [adapter.name for adapter in build_adapters(settings)]
 
-    assert names == ["JobSpy LinkedIn"]
+    assert names == ["LinkedIn Hiring Posts (Headless)"]
+
+
+def test_linkedin_post_headless_uses_keyed_search_urls_before_bing(monkeypatch) -> None:
+    class FakeSearchAdapter:
+        def __init__(self, settings: Settings) -> None:
+            assert settings.linkedin_post_search_query == 'site:linkedin.com/posts "hiring"'
+            assert settings.linkedin_post_search_location == "Kazakhstan"
+            assert settings.linkedin_post_search_results_wanted == 1
+
+        async def fetch(self) -> list[Vacancy]:
+            return [
+                Vacancy(
+                    title="Backend Engineer",
+                    description="We are hiring.",
+                    source="Test",
+                    url="https://www.linkedin.com/posts/example_hiring-activity-7446240742659821568-DPvt",
+                )
+            ]
+
+    monkeypatch.setattr(
+        "tg_vacancy_bot.sources.adapters.linkedin_post_headless.LinkedInPostSearchAdapter",
+        FakeSearchAdapter,
+    )
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_LINKEDIN_POST_SEARCH=False,
+        ENABLE_LINKEDIN_POST_HEADLESS=True,
+        LINKEDIN_POST_HEADLESS_QUERY='site:linkedin.com/posts "hiring"',
+        LINKEDIN_POST_HEADLESS_RESULTS_WANTED=1,
+        SERPAPI_API_KEY="serp-key",
+    )
+
+    urls = asyncio.run(LinkedInPostHeadlessAdapter(settings)._discover_keyed_post_urls(1))
+
+    assert urls == ("https://www.linkedin.com/posts/example_hiring-activity-7446240742659821568-DPvt",)
+
+
+def test_linkedin_post_headless_warns_when_only_bing_discovery_is_available() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_LINKEDIN_POST_SEARCH=False,
+        ENABLE_LINKEDIN_POST_HEADLESS=True,
+        SERPAPI_API_KEY="",
+        SERPER_API_KEY="",
+    )
+
+    assert source_configuration_warnings(settings) == [
+        "LinkedIn Headless source has no SERPAPI_API_KEY or SERPER_API_KEY; Bing discovery is best effort."
+    ]
 
 
 def test_build_adapters_adds_linkedin_post_search_with_serpapi_key() -> None:
@@ -97,7 +150,6 @@ def test_build_adapters_adds_linkedin_post_search_with_serpapi_key() -> None:
         ENABLE_HIMALAYAS=False,
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
-        ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SEARCH=True,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
         SERPAPI_API_KEY="serp-key",
@@ -122,7 +174,6 @@ def test_build_adapters_adds_linkedin_post_search_with_serper_key() -> None:
         ENABLE_HIMALAYAS=False,
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
-        ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SEARCH=True,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
         SERPER_API_KEY="serper-key",
@@ -146,7 +197,6 @@ def test_build_adapters_skips_linkedin_post_search_without_search_provider_key()
         ENABLE_HIMALAYAS=False,
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
-        ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SEARCH=True,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
         SERPER_API_KEY="",
@@ -168,7 +218,6 @@ def test_build_adapters_adds_linkedin_post_scraper_without_api_key() -> None:
         ENABLE_HIMALAYAS=False,
         ENABLE_REAL_WORK_FROM_ANYWHERE=False,
         ENABLE_JOBSCOLLIDER=False,
-        ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SEARCH=False,
         ENABLE_LINKEDIN_POST_SCRAPER=True,
     )
@@ -186,7 +235,6 @@ def test_build_adapters_adds_no_key_sources_by_default() -> None:
         ENABLE_ARBEITNOW=False,
         ENABLE_REMOTEOK=False,
         ENABLE_HN_WHO_IS_HIRING=False,
-        ENABLE_JOBSPY_LINKEDIN=False,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
         SERPER_API_KEY="",
     )
@@ -272,79 +320,6 @@ def test_rss_feed_adapter_maps_public_feed_item(monkeypatch) -> None:
             stack=("Python", "FastAPI"),
             published_at=datetime(2026, 7, 6, 16, 25, 2, tzinfo=UTC),
             raw_text="Remote backend work with Python and FastAPI.",
-        )
-    ]
-
-
-def test_jobspy_linkedin_adapter_maps_jobspy_records(monkeypatch) -> None:
-    calls = []
-
-    class FakeFrame:
-        def to_dict(self, orient: str):
-            assert orient == "records"
-            return [
-                {
-                    "title": "Senior Backend Engineer",
-                    "company": "Example Co",
-                    "job_url": "https://www.linkedin.com/jobs/view/123",
-                    "location": "Remote",
-                    "description": "Build Python APIs with FastAPI.",
-                    "date_posted": "2026-07-08",
-                    "is_remote": True,
-                    "job_type": "fulltime",
-                    "emails": ["jobs@example.com"],
-                },
-                {
-                    "title": "",
-                    "job_url": "",
-                },
-            ]
-
-    def fake_scrape_jobs(**kwargs):
-        calls.append(kwargs)
-        return FakeFrame()
-
-    monkeypatch.setattr(
-        "tg_vacancy_bot.sources.adapters.jobspy_linkedin._load_scrape_jobs",
-        lambda: fake_scrape_jobs,
-    )
-
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        JOBSPY_LINKEDIN_QUERY="backend OR frontend",
-        JOBSPY_LINKEDIN_LOCATION="Worldwide",
-        JOBSPY_LINKEDIN_RESULTS_WANTED="5",
-        JOBSPY_LINKEDIN_HOURS_OLD="24",
-        JOBSPY_LINKEDIN_PROXIES="http://proxy-a,http://proxy-b",
-    )
-
-    vacancies = asyncio.run(JobSpyLinkedInAdapter(settings).fetch())
-
-    assert calls == [
-        {
-            "site_name": "linkedin",
-            "search_term": "backend OR frontend",
-            "location": "Worldwide",
-            "results_wanted": 5,
-            "hours_old": 24,
-            "is_remote": True,
-            "linkedin_fetch_description": False,
-            "proxies": ["http://proxy-a", "http://proxy-b"],
-            "verbose": 0,
-        }
-    ]
-    assert vacancies == [
-        Vacancy(
-            title="Senior Backend Engineer",
-            company="Example Co",
-            location="Remote",
-            description="Build Python APIs with FastAPI.",
-            source="JobSpy LinkedIn",
-            url="https://www.linkedin.com/jobs/view/123",
-            stack=("LinkedIn", "Remote", "fulltime", "jobs@example.com"),
-            published_at=datetime(2026, 7, 8, tzinfo=UTC),
-            raw_text="Senior Backend Engineer Example Co Remote Build Python APIs with FastAPI.",
         )
     ]
 
@@ -820,6 +795,22 @@ def test_linkedin_post_scraper_reports_search_challenge(monkeypatch) -> None:
         assert "anti-bot challenge" in str(exc)
     else:
         raise AssertionError("Expected scraper to report the search provider challenge.")
+
+
+def test_linkedin_post_headless_helpers_extract_public_text_and_stop_for_manual_access() -> None:
+    public_post = """
+    <article>
+      <div class="feed-shared-update-v2__description-wrapper">
+        We are hiring a Senior Backend Engineer with Python and FastAPI.
+      </div>
+    </article>
+    """
+
+    assert _extract_post_text(public_post) == "We are hiring a Senior Backend Engineer with Python and FastAPI."
+    assert _requires_manual_access(public_post) is False
+    assert _requires_manual_access('<input type="password"><p>Sign in to LinkedIn</p>') is True
+    assert _requires_manual_access('<input type="password">' + public_post) is False
+    assert _requires_manual_access("<p>Complete the CAPTCHA to continue</p>") is True
 
 
 def test_filter_it_vacancies_rejects_courses() -> None:

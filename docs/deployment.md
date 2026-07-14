@@ -176,7 +176,8 @@ Optional secrets can override defaults, including `SOURCE_MAX_PUBLISH_PER_POLL`,
 `SOURCE_MAX_AGE_HOURS`, `LOCALIZE_DESCRIPTIONS`, `OPENAI_MODEL`,
 `OPENAI_BASE_URL`, and source toggles such as `ENABLE_REMOTIVE`,
 `ENABLE_JOBICY`, `ENABLE_LINKEDIN_POST_SCRAPER`, and
-`ENABLE_JOBSPY_LINKEDIN`.
+`ENABLE_LINKEDIN_POST_HEADLESS`. When the headless source is enabled, the
+scheduled workflow installs Chromium before polling.
 
 The workflow stores the SQLite deduplication database in `data/` and restores it
 through the GitHub Actions cache. Keep only one production scheduler active for
