@@ -43,6 +43,20 @@ def test_store_deduplicates_linked_vacancies_by_url(tmp_path) -> None:
     assert store.mark_published(duplicate) is False
 
 
+def test_store_resolves_published_vacancy_url_by_short_callback_id(tmp_path) -> None:
+    store = VacancyStore(str(tmp_path / "vacancies.sqlite3"))
+    vacancy = Vacancy(
+        title="Python Engineer",
+        description="Remote backend role",
+        source="Test",
+        url="https://example.com/jobs/42?secret=must-not-be-in-callback",
+    )
+
+    assert store.mark_published(vacancy) is True
+    assert store.published_vacancy_url(store.fingerprint(vacancy)) == vacancy.url
+    assert store.published_vacancy_url("not-a-valid-id") is None
+
+
 def test_store_migrates_and_persists_operator_profile(tmp_path) -> None:
     database_path = tmp_path / "vacancies.sqlite3"
     with sqlite3.connect(database_path) as connection:

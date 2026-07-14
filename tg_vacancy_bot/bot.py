@@ -13,6 +13,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from .access_control import is_authorized_user
+from .application_buttons import APPLICATION_CALLBACK_PREFIX, application_button
 from .config import Settings
 from .description_localization import localize_vacancy_description
 from .formatting import format_vacancy_card
@@ -276,6 +277,13 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
         await state.clear()
         await callback.message.answer("Профиль удалён.", reply_markup=profile_menu())
 
+    @dp.callback_query(F.data.startswith(APPLICATION_CALLBACK_PREFIX))
+    async def application_button_pending(callback: CallbackQuery) -> None:
+        if not is_profile_operator(callback.from_user.id if callback.from_user else None, settings.operator_user_ids):
+            await callback.answer("Отклик доступен только оператору.", show_alert=True)
+            return
+        await callback.answer("Отклик будет обработан на следующем этапе.", show_alert=True)
+
     @dp.message(Command("start", "help"))
     async def start(message: Message) -> None:
         await message.answer(
@@ -337,6 +345,7 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             text=card,
             parse_mode=ParseMode.HTML,
             disable_web_page_preview=True,
+            reply_markup=application_button(vacancy),
         )
         store.mark_published(vacancy)
         await message.reply("Опубликовал вакансию в канал.")
