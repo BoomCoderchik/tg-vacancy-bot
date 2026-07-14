@@ -58,13 +58,11 @@ jobs:
       LINKEDIN_POST_SCRAPER_QUERY: ${{ secrets.LINKEDIN_POST_SCRAPER_QUERY || 'site:linkedin.com/posts hiring developer || site:linkedin.com/posts "we are hiring" developer || site:linkedin.com/posts "join our team" developer || site:linkedin.com/posts "looking for" developer || site:linkedin.com/posts "ищем" разработчик || site:linkedin.com/posts "ищет" разработчик || site:linkedin.com/posts frontend || site:linkedin.com/posts backend || site:linkedin.com/feed/update hiring frontend || site:linkedin.com/feed/update hiring backend' }}
       LINKEDIN_POST_SCRAPER_LOCATION: ${{ secrets.LINKEDIN_POST_SCRAPER_LOCATION || 'Kazakhstan' }}
       LINKEDIN_POST_SCRAPER_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SCRAPER_RESULTS_WANTED || '100' }}
-      ENABLE_JOBSPY_LINKEDIN: ${{ secrets.ENABLE_JOBSPY_LINKEDIN || 'false' }}
-      JOBSPY_LINKEDIN_QUERY: ${{ secrets.JOBSPY_LINKEDIN_QUERY || 'backend OR frontend OR fullstack OR designer OR "AI engineer" OR "ML engineer" OR "LLM engineer"' }}
-      JOBSPY_LINKEDIN_LOCATION: ${{ secrets.JOBSPY_LINKEDIN_LOCATION || 'Worldwide' }}
-      JOBSPY_LINKEDIN_RESULTS_WANTED: ${{ secrets.JOBSPY_LINKEDIN_RESULTS_WANTED || '20' }}
-      JOBSPY_LINKEDIN_HOURS_OLD: ${{ secrets.JOBSPY_LINKEDIN_HOURS_OLD || '48' }}
-      JOBSPY_LINKEDIN_FETCH_DESCRIPTION: ${{ secrets.JOBSPY_LINKEDIN_FETCH_DESCRIPTION || 'false' }}
-      JOBSPY_LINKEDIN_PROXIES: ${{ secrets.JOBSPY_LINKEDIN_PROXIES }}
+      ENABLE_LINKEDIN_POST_HEADLESS: ${{ secrets.ENABLE_LINKEDIN_POST_HEADLESS || 'false' }}
+      LINKEDIN_POST_HEADLESS_QUERY: ${{ secrets.LINKEDIN_POST_HEADLESS_QUERY || 'site:linkedin.com/posts hiring developer || site:linkedin.com/posts "we are hiring" developer || site:linkedin.com/posts "join our team" developer || site:linkedin.com/posts "looking for" developer || site:linkedin.com/posts "ищем" разработчик || site:linkedin.com/posts "ищет" разработчик || site:linkedin.com/feed/update hiring frontend || site:linkedin.com/feed/update hiring backend' }}
+      LINKEDIN_POST_HEADLESS_LOCATION: ${{ secrets.LINKEDIN_POST_HEADLESS_LOCATION || 'Kazakhstan' }}
+      LINKEDIN_POST_HEADLESS_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_HEADLESS_RESULTS_WANTED || '10' }}
+      LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS: ${{ secrets.LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS || '20' }}
       ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
       ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
       ADZUNA_COUNTRY: ${{ secrets.ADZUNA_COUNTRY || 'us' }}
@@ -91,6 +89,10 @@ jobs:
 
       - name: Install bot
         run: pip install .
+
+      - name: Install Chromium for optional LinkedIn headless source
+        if: env.ENABLE_LINKEDIN_POST_HEADLESS == 'true'
+        run: python -m playwright install --with-deps chromium
 
       # Production posts must use the current compact card, not the old channel label.
       - name: Verify production card formatting

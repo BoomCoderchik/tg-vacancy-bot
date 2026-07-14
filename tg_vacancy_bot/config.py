@@ -54,9 +54,9 @@ class Settings(BaseSettings):
     enable_himalayas: bool = Field(default=True, alias="ENABLE_HIMALAYAS")
     enable_real_work_from_anywhere: bool = Field(default=True, alias="ENABLE_REAL_WORK_FROM_ANYWHERE")
     enable_jobscollider: bool = Field(default=True, alias="ENABLE_JOBSCOLLIDER")
-    enable_jobspy_linkedin: bool = Field(default=False, alias="ENABLE_JOBSPY_LINKEDIN")
     enable_linkedin_post_search: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SEARCH")
     enable_linkedin_post_scraper: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SCRAPER")
+    enable_linkedin_post_headless: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_HEADLESS")
     serpapi_api_key: str = Field(default="", alias="SERPAPI_API_KEY")
     serper_api_key: str = Field(default="", alias="SERPER_API_KEY")
     linkedin_post_search_query: str = Field(
@@ -84,19 +84,18 @@ class Settings(BaseSettings):
     # Search depth is intentionally larger than the per-cycle publication
     # budget: deduplication lets later polls publish the remaining fresh posts.
     linkedin_post_scraper_results_wanted: int = Field(default=100, alias="LINKEDIN_POST_SCRAPER_RESULTS_WANTED")
+    linkedin_post_headless_query: str = Field(
+        default=DEFAULT_LINKEDIN_POST_SCRAPER_QUERY,
+        alias="LINKEDIN_POST_HEADLESS_QUERY",
+    )
+    linkedin_post_headless_location: str = Field(default="Kazakhstan", alias="LINKEDIN_POST_HEADLESS_LOCATION")
+    linkedin_post_headless_results_wanted: int = Field(default=10, alias="LINKEDIN_POST_HEADLESS_RESULTS_WANTED")
+    linkedin_post_headless_timeout_seconds: int = Field(
+        default=20,
+        alias="LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS",
+        gt=0,
+    )
     localization_max_per_poll: int = Field(default=12, alias="LOCALIZATION_MAX_PER_POLL")
-    jobspy_linkedin_query: str = Field(
-        default='backend OR frontend OR fullstack OR designer OR "AI engineer" OR "ML engineer" OR "LLM engineer"',
-        alias="JOBSPY_LINKEDIN_QUERY",
-    )
-    jobspy_linkedin_location: str = Field(default="Worldwide", alias="JOBSPY_LINKEDIN_LOCATION")
-    jobspy_linkedin_results_wanted: int = Field(default=20, alias="JOBSPY_LINKEDIN_RESULTS_WANTED")
-    jobspy_linkedin_hours_old: int = Field(default=48, alias="JOBSPY_LINKEDIN_HOURS_OLD")
-    jobspy_linkedin_fetch_description: bool = Field(
-        default=False,
-        alias="JOBSPY_LINKEDIN_FETCH_DESCRIPTION",
-    )
-    jobspy_linkedin_proxies_raw: str = Field(default="", alias="JOBSPY_LINKEDIN_PROXIES")
     adzuna_app_id: str = Field(default="", alias="ADZUNA_APP_ID")
     adzuna_app_key: str = Field(default="", alias="ADZUNA_APP_KEY")
     adzuna_country: str = Field(default="us", alias="ADZUNA_COUNTRY")
@@ -170,10 +169,6 @@ class Settings(BaseSettings):
         if self.localization_provider == "groq":
             return "GROQ_API_KEY"
         return "OPENAI_API_KEY"
-
-    @property
-    def jobspy_linkedin_proxies(self) -> tuple[str, ...]:
-        return tuple(proxy.strip() for proxy in self.jobspy_linkedin_proxies_raw.split(",") if proxy.strip())
 
     @property
     def linkedin_post_scraper_search_providers(self) -> tuple[str, ...]:
