@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+from io import BytesIO
 import logging
-from dataclasses import replace
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from .access_control import is_authorized_user
 from .config import Settings
@@ -17,11 +19,38 @@ from .formatting import format_vacancy_card
 from .intake import looks_like_vacancy_message
 from .preview import parse_publishable_message
 from .runtime_lock import SingleInstanceLock, bot_run_lock_path
+from .models import OperatorProfile
+from .profile_flow import (
+    CANCEL_TEXT,
+    DONE_TEXT,
+    PROFILE_FIELDS,
+    SKIP_TEXT,
+    clean_profile_value,
+    format_profile_summary,
+    is_profile_operator,
+    parse_extra_field,
+    profile_with_extra_field,
+    profile_with_field,
+)
+from .resume_storage import ResumeStorage
+from .profile_service import ProfileService
 from .source_polling import poll_sources_forever
 from .storage import VacancyStore
 from .telegram_origin import forwarded_public_post_url
 
 logger = logging.getLogger(__name__)
+
+
+class ProfileForm(StatesGroup):
+    full_name = State()
+    email = State()
+    phone = State()
+    desired_salary = State()
+    location = State()
+    work_format = State()
+    employment_type = State()
+    extra_fields = State()
+    resume = State()
 
 
 def build_status_text(settings: Settings) -> str:
@@ -63,8 +92,189 @@ def format_whoami_text(user_id: int | None) -> str:
     return f"Your Telegram user ID: {user_id}"
 
 
+def profile_menu() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Заполнить поля", callback_data="profile:edit")],
+            [InlineKeyboardButton(text="Загрузить резюме", callback_data="profile:resume")],
+            [InlineKeyboardButton(text="Удалить профиль", callback_data="profile:delete")],
+        ]
+    )
+
+
+def profile_confirm_delete_menu() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Удалить", callback_data="profile:delete:confirm")],
+            [InlineKeyboardButton(text="Отмена", callback_data="profile:delete:cancel")],
+        ]
+    )
+
+
 def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
     dp = Dispatcher()
+    resume_storage = ResumeStorage(settings.resume_storage_dir, settings.resume_max_size_bytes)
+    profile_service = ProfileService(store, resume_storage)
+
+    def profile_operator_from_message(message: Message) -> int | None:
+        user_id = message.from_user.id if message.from_user else None
+        return user_id if is_profile_operator(user_id, settings.operator_user_ids) else None
+
+    def profile_operator_from_callback(callback: CallbackQuery) -> int | None:
+        user_id = callback.from_user.id if callback.from_user else None
+        return user_id if is_profile_operator(user_id, settings.operator_user_ids) else None
+
+    async def deny_profile_message(message: Message) -> None:
+        await message.answer("Профиль доступен только пользователю из OPERATOR_USER_IDS.")
+
+    async def deny_profile_callback(callback: CallbackQuery) -> None:
+        await callback.answer("Профиль доступен только оператору.", show_alert=True)
+
+    @dp.message(Command("profile"))
+    async def profile_command(message: Message, state: FSMContext) -> None:
+        operator_user_id = profile_operator_from_message(message)
+        if operator_user_id is None:
+            await deny_profile_message(message)
+            return
+        await state.clear()
+        await message.answer(format_profile_summary(store.get_operator_profile(operator_user_id)), reply_markup=profile_menu())
+
+    @dp.callback_query(F.data == "profile:edit")
+    async def profile_edit(callback: CallbackQuery, state: FSMContext) -> None:
+        operator_user_id = profile_operator_from_callback(callback)
+        if operator_user_id is None:
+            await deny_profile_callback(callback)
+            return
+        await callback.answer()
+        profile = store.get_operator_profile(operator_user_id) or OperatorProfile(operator_user_id=operator_user_id)
+        await state.set_state(ProfileForm.full_name)
+        await state.update_data(profile=profile)
+        await callback.message.answer(_profile_prompt("full_name"))
+
+    @dp.message(ProfileForm.full_name, F.text)
+    async def profile_full_name(message: Message, state: FSMContext) -> None:
+        await _capture_profile_field(message, state, "full_name", ProfileForm.email)
+
+    @dp.message(ProfileForm.email, F.text)
+    async def profile_email(message: Message, state: FSMContext) -> None:
+        await _capture_profile_field(message, state, "email", ProfileForm.phone)
+
+    @dp.message(ProfileForm.phone, F.text)
+    async def profile_phone(message: Message, state: FSMContext) -> None:
+        await _capture_profile_field(message, state, "phone", ProfileForm.desired_salary)
+
+    @dp.message(ProfileForm.desired_salary, F.text)
+    async def profile_desired_salary(message: Message, state: FSMContext) -> None:
+        await _capture_profile_field(message, state, "desired_salary", ProfileForm.location)
+
+    @dp.message(ProfileForm.location, F.text)
+    async def profile_location(message: Message, state: FSMContext) -> None:
+        await _capture_profile_field(message, state, "location", ProfileForm.work_format)
+
+    @dp.message(ProfileForm.work_format, F.text)
+    async def profile_work_format(message: Message, state: FSMContext) -> None:
+        await _capture_profile_field(message, state, "work_format", ProfileForm.employment_type)
+
+    @dp.message(ProfileForm.employment_type, F.text)
+    async def profile_employment_type(message: Message, state: FSMContext) -> None:
+        await _capture_profile_field(message, state, "employment_type", ProfileForm.extra_fields)
+
+    @dp.message(ProfileForm.extra_fields, F.text)
+    async def profile_extra_fields(message: Message, state: FSMContext) -> None:
+        if await _cancel_profile_edit(message, state):
+            return
+        profile = (await state.get_data())["profile"]
+        text = message.text or ""
+        if text == DONE_TEXT or text == SKIP_TEXT:
+            store.save_operator_profile(profile)
+            await state.clear()
+            await message.answer("Профиль сохранён. Резюме можно загрузить через /profile.", reply_markup=profile_menu())
+            return
+        try:
+            name, value = parse_extra_field(text)
+            profile = profile_with_extra_field(profile, name, value)
+        except ValueError as exc:
+            await message.answer(str(exc))
+            return
+        await state.update_data(profile=profile)
+        await message.answer("Поле сохранено. Добавьте ещё одно или нажмите «Готово».")
+
+    @dp.callback_query(F.data == "profile:resume")
+    async def profile_resume(callback: CallbackQuery, state: FSMContext) -> None:
+        if profile_operator_from_callback(callback) is None:
+            await deny_profile_callback(callback)
+            return
+        await callback.answer()
+        await state.set_state(ProfileForm.resume)
+        await callback.message.answer(
+            "Отправьте файл резюме в PDF или DOCX. Чтобы отменить, отправьте «Отмена»."
+        )
+
+    @dp.message(ProfileForm.resume, F.document)
+    async def profile_resume_upload(message: Message, bot: Bot, state: FSMContext) -> None:
+        operator_user_id = profile_operator_from_message(message)
+        if operator_user_id is None:
+            await state.clear()
+            await deny_profile_message(message)
+            return
+        document = message.document
+        if document is None or document.file_size is None or document.file_size > settings.resume_max_size_bytes:
+            await message.answer("Файл резюме превышает допустимый размер.")
+            return
+        content = BytesIO()
+        try:
+            await bot.download(document, destination=content)
+            profile_service.save_resume(operator_user_id, document.file_name or "", content.getvalue())
+        except ValueError as exc:
+            await message.answer(str(exc))
+            return
+        except Exception:
+            logger.exception("Resume download failed")
+            await message.answer("Не удалось сохранить файл резюме. Попробуйте ещё раз.")
+            return
+
+        await state.clear()
+        await message.answer("Резюме сохранено. Текст будет извлекаться на следующем этапе.", reply_markup=profile_menu())
+
+    @dp.message(ProfileForm.resume)
+    async def profile_resume_requires_document(message: Message, state: FSMContext) -> None:
+        if message.text == CANCEL_TEXT:
+            await state.clear()
+            await message.answer("Загрузка резюме отменена.", reply_markup=profile_menu())
+            return
+        await message.answer("Отправьте PDF/DOCX как документ или «Отмена».")
+
+    @dp.callback_query(F.data == "profile:delete")
+    async def profile_delete(callback: CallbackQuery) -> None:
+        if profile_operator_from_callback(callback) is None:
+            await deny_profile_callback(callback)
+            return
+        await callback.answer()
+        await callback.message.answer(
+            "Удалить профиль и локальный файл резюме? Это действие нельзя отменить.",
+            reply_markup=profile_confirm_delete_menu(),
+        )
+
+    @dp.callback_query(F.data == "profile:delete:cancel")
+    async def profile_delete_cancel(callback: CallbackQuery) -> None:
+        if profile_operator_from_callback(callback) is None:
+            await deny_profile_callback(callback)
+            return
+        await callback.answer("Удаление отменено.")
+        await callback.message.answer("Удаление профиля отменено.", reply_markup=profile_menu())
+
+    @dp.callback_query(F.data == "profile:delete:confirm")
+    async def profile_delete_confirm(callback: CallbackQuery, state: FSMContext) -> None:
+        operator_user_id = profile_operator_from_callback(callback)
+        if operator_user_id is None:
+            await deny_profile_callback(callback)
+            return
+        await callback.answer()
+        if not profile_service.delete_profile(operator_user_id):
+            await callback.message.answer("Профиль уже удалён.", reply_markup=profile_menu())
+            return
+        await state.clear()
+        await callback.message.answer("Профиль удалён.", reply_markup=profile_menu())
 
     @dp.message(Command("start", "help"))
     async def start(message: Message) -> None:
@@ -132,6 +342,41 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
         await message.reply("Опубликовал вакансию в канал.")
 
     return dp
+
+
+def _profile_prompt(field_name: str) -> str:
+    label = dict(PROFILE_FIELDS)[field_name]
+    return f"{label}. Отправьте значение, «{SKIP_TEXT}» или «{CANCEL_TEXT}»."
+
+
+async def _capture_profile_field(
+    message: Message, state: FSMContext, field_name: str, next_state: State
+) -> None:
+    if await _cancel_profile_edit(message, state):
+        return
+    try:
+        value = clean_profile_value(message.text or "")
+    except ValueError as exc:
+        await message.answer(str(exc))
+        return
+    profile = profile_with_field((await state.get_data())["profile"], field_name, value)
+    await state.update_data(profile=profile)
+    await state.set_state(next_state)
+    if next_state == ProfileForm.extra_fields:
+        await message.answer(
+            f"Добавьте дополнительные поля в формате «название: значение». Нажмите «{DONE_TEXT}», когда закончите, "
+            f"или «{SKIP_TEXT}», если дополнительных полей нет."
+        )
+        return
+    await message.answer(_profile_prompt(next_state.state.rsplit(":", maxsplit=1)[-1]))
+
+
+async def _cancel_profile_edit(message: Message, state: FSMContext) -> bool:
+    if message.text != CANCEL_TEXT:
+        return False
+    await state.clear()
+    await message.answer("Редактирование профиля отменено.", reply_markup=profile_menu())
+    return True
 
 
 def _message_is_authorized(message: Message, settings: Settings) -> bool:
