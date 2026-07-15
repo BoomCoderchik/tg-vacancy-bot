@@ -8,6 +8,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramRetryAfter
 
+from .application_buttons import application_button
 from .config import Settings
 from .description_localization import localize_vacancy_description
 from .formatting import format_vacancy_card
@@ -48,6 +49,7 @@ class TelegramPublisher:
                     text=format_vacancy_card(public_vacancy),
                     parse_mode=ParseMode.HTML,
                     disable_web_page_preview=True,
+                    reply_markup=application_button(vacancy),
                 )
             except TelegramRetryAfter as exc:
                 retry_after = int(getattr(exc, "retry_after", 1))
@@ -58,6 +60,7 @@ class TelegramPublisher:
                     text=format_vacancy_card(public_vacancy),
                     parse_mode=ParseMode.HTML,
                     disable_web_page_preview=True,
+                    reply_markup=application_button(vacancy),
                 )
             if self.store.mark_published(vacancy):
                 published += 1

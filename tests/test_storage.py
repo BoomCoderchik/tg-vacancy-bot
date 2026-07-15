@@ -43,6 +43,57 @@ def test_store_deduplicates_linked_vacancies_by_url(tmp_path) -> None:
     assert store.mark_published(duplicate) is False
 
 
+def test_store_resolves_published_vacancy_url_by_short_callback_id(tmp_path) -> None:
+    store = VacancyStore(str(tmp_path / "vacancies.sqlite3"))
+    vacancy = Vacancy(
+        title="Python Engineer",
+        description="Remote backend role",
+        source="Test",
+        url="https://example.com/jobs/42?secret=must-not-be-in-callback",
+    )
+
+    assert store.mark_published(vacancy) is True
+    assert store.published_vacancy_url(store.fingerprint(vacancy)) == vacancy.url
+    assert store.published_vacancy_url("not-a-valid-id") is None
+
+
+def test_store_creates_one_application_per_operator_and_vacancy(tmp_path) -> None:
+    store = VacancyStore(str(tmp_path / "vacancies.sqlite3"))
+    vacancy = Vacancy(title="Python Engineer", description="Remote role", source="Test", url="https://jobs.example.com/42")
+    assert store.mark_published(vacancy) is True
+
+    first, created = store.create_application(42, store.fingerprint(vacancy))
+    duplicate, created_again = store.create_application(42, store.fingerprint(vacancy))
+
+    assert created is True
+    assert first.status == "created"
+    assert first.site == "jobs.example.com"
+    assert duplicate.application_id == first.application_id
+    assert created_again is False
+
+
+def test_store_marks_application_failed_when_vacancy_has_no_url(tmp_path) -> None:
+    store = VacancyStore(str(tmp_path / "vacancies.sqlite3"))
+    vacancy = Vacancy(title="Python Engineer", description="Remote role", source="Test")
+    store.mark_published(vacancy)
+
+    application, created = store.create_application(42, store.fingerprint(vacancy))
+
+    assert created is True
+    assert application.status == "failed"
+    assert application.error_description
+
+
+def test_store_updates_application_status(tmp_path) -> None:
+    store = VacancyStore(str(tmp_path / "vacancies.sqlite3"))
+    vacancy = Vacancy(title="Python Engineer", description="Remote role", source="Test", url="https://jobs.example.com/42")
+    store.mark_published(vacancy)
+    application, _ = store.create_application(42, store.fingerprint(vacancy))
+
+    assert store.update_application_status(application.application_id, "manual_required", "Login required") is True
+    assert store.update_application_status("missing", "failed") is False
+
+
 def test_store_migrates_and_persists_operator_profile(tmp_path) -> None:
     database_path = tmp_path / "vacancies.sqlite3"
     with sqlite3.connect(database_path) as connection:
@@ -65,7 +116,7 @@ def test_store_migrates_and_persists_operator_profile(tmp_path) -> None:
 
     assert store.get_operator_profile(42) == profile
     with sqlite3.connect(database_path) as connection:
-        assert connection.execute("SELECT version FROM schema_migrations").fetchall() == [(1,)]
+        assert connection.execute("SELECT version FROM schema_migrations").fetchall() == [(1,), (2,)]
 
 
 def test_store_updates_and_deletes_operator_profile(tmp_path) -> None:

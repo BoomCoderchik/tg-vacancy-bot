@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     database_path: str = Field(default="data/vacancies.sqlite3", alias="DATABASE_PATH")
     resume_storage_dir: str = Field(default="data/resumes", alias="RESUME_STORAGE_DIR")
     resume_max_size_bytes: int = Field(default=10 * 1024 * 1024, alias="RESUME_MAX_SIZE_BYTES", gt=0)
+    browser_profile_dir: str = Field(default="data/browser-profile", alias="BROWSER_PROFILE_DIR")
+    browser_headless: bool = Field(default=True, alias="BROWSER_HEADLESS")
+    browser_timeout_seconds: int = Field(default=30, alias="BROWSER_TIMEOUT_SECONDS", gt=0)
+    application_allowed_domains_raw: str = Field(default="", alias="APPLICATION_ALLOWED_DOMAINS")
     source_poll_interval_seconds: int = Field(default=900, alias="SOURCE_POLL_INTERVAL_SECONDS")
     source_max_publish_per_poll: int = Field(default=20, alias="SOURCE_MAX_PUBLISH_PER_POLL")
     source_max_age_hours: int = Field(default=48, alias="SOURCE_MAX_AGE_HOURS")
@@ -114,6 +118,10 @@ class Settings(BaseSettings):
     @property
     def operator_user_ids(self) -> tuple[int, ...]:
         return parse_operator_user_ids(self.operator_user_ids_raw)
+
+    @property
+    def application_allowed_domains(self) -> tuple[str, ...]:
+        return tuple(dict.fromkeys(item.strip().lower() for item in self.application_allowed_domains_raw.split(",") if item.strip()))
 
     @property
     def openai_fallback_models(self) -> tuple[str, ...]:
