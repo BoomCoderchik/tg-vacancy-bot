@@ -33,6 +33,7 @@ def test_poll_sources_workflow_defaults_optional_runtime_values() -> None:
 
     assert "SOURCE_MAX_PUBLISH_PER_POLL: ${{ secrets.SOURCE_MAX_PUBLISH_PER_POLL || '20' }}" in text
     assert "SOURCE_MAX_AGE_HOURS: ${{ secrets.SOURCE_MAX_AGE_HOURS || '48' }}" in text
+    assert 'LINKEDIN_POST_MAX_AGE_HOURS: "120"' in text
     assert "LOCALIZE_DESCRIPTIONS: ${{ secrets.LOCALIZE_DESCRIPTIONS || 'false' }}" in text
     assert "LOCALIZATION_MAX_PER_POLL: ${{ secrets.LOCALIZATION_MAX_PER_POLL || '12' }}" in text
     assert "ENABLE_JOBICY: ${{ secrets.ENABLE_JOBICY || 'true' }}" in text

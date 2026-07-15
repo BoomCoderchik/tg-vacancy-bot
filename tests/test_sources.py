@@ -90,7 +90,6 @@ def test_linkedin_post_headless_uses_keyed_search_urls_before_bing(monkeypatch) 
     class FakeSearchAdapter:
         def __init__(self, settings: Settings) -> None:
             assert settings.linkedin_post_search_query == 'site:linkedin.com/posts "hiring"'
-            assert settings.linkedin_post_search_location == "Kazakhstan"
             assert settings.linkedin_post_search_results_wanted == 1
 
         async def fetch(self) -> list[Vacancy]:
@@ -361,6 +360,10 @@ def test_linkedin_post_search_adapter_maps_public_post_results(monkeypatch) -> N
         "tg_vacancy_bot.sources.adapters.linkedin_post_search.source_session",
         lambda: FakeSession(),
     )
+    monkeypatch.setattr(
+        "tg_vacancy_bot.sources.adapters.linkedin_post_search.utcnow",
+        lambda: datetime(2026, 7, 9, tzinfo=UTC),
+    )
 
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
@@ -368,7 +371,6 @@ def test_linkedin_post_search_adapter_maps_public_post_results(monkeypatch) -> N
         ENABLE_LINKEDIN_POST_SEARCH=True,
         SERPAPI_API_KEY="serp-key",
         LINKEDIN_POST_SEARCH_QUERY='site:linkedin.com/posts "Ищем" frontend',
-        LINKEDIN_POST_SEARCH_LOCATION="Kazakhstan",
         LINKEDIN_POST_SEARCH_RESULTS_WANTED="5",
     )
 
@@ -382,7 +384,6 @@ def test_linkedin_post_search_adapter_maps_public_post_results(monkeypatch) -> N
                 "api_key": "serp-key",
                 "q": 'site:linkedin.com/posts "Ищем" frontend',
                 "num": 5,
-                "location": "Kazakhstan",
                 "hl": "ru",
             },
         )
@@ -396,7 +397,7 @@ def test_linkedin_post_search_adapter_maps_public_post_results(monkeypatch) -> N
             ),
             source="LinkedIn Hiring Posts",
             url="https://www.linkedin.com/posts/example_hiring-junior-frontend-activity-123",
-            location="Kazakhstan",
+            location=None,
             stack=("LinkedIn post", "frontend", "Angular", "TypeScript"),
             published_at=datetime(2026, 7, 8, tzinfo=UTC),
             raw_text=(
@@ -426,6 +427,7 @@ def test_linkedin_post_search_adapter_tries_fallback_queries_and_dedupes(monkeyp
                         "title": "Backend Engineer | LinkedIn",
                         "link": "https://www.linkedin.com/posts/backend-activity-123",
                         "snippet": "We are hiring a Backend Engineer with Python.",
+                        "date": "Jul 8, 2026",
                     }
                 ]
             else:
@@ -434,11 +436,13 @@ def test_linkedin_post_search_adapter_tries_fallback_queries_and_dedupes(monkeyp
                         "title": "Backend Engineer | LinkedIn",
                         "link": "https://www.linkedin.com/posts/backend-activity-123",
                         "snippet": "Duplicate backend post.",
+                        "date": "Jul 8, 2026",
                     },
                     {
                         "title": "Frontend Developer | LinkedIn",
                         "link": "https://www.linkedin.com/posts/frontend-activity-456",
                         "snippet": "Looking for a Frontend Developer with React.",
+                        "date": "Jul 8, 2026",
                     },
                 ]
             return _FakeResponse(json_data={"organic_results": rows})
@@ -447,6 +451,10 @@ def test_linkedin_post_search_adapter_tries_fallback_queries_and_dedupes(monkeyp
         "tg_vacancy_bot.sources.adapters.linkedin_post_search.source_session",
         lambda: FakeSession(),
     )
+    monkeypatch.setattr(
+        "tg_vacancy_bot.sources.adapters.linkedin_post_search.utcnow",
+        lambda: datetime(2026, 7, 9, tzinfo=UTC),
+    )
 
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
@@ -454,7 +462,6 @@ def test_linkedin_post_search_adapter_tries_fallback_queries_and_dedupes(monkeyp
         ENABLE_LINKEDIN_POST_SEARCH=True,
         SERPAPI_API_KEY="serp-key",
         LINKEDIN_POST_SEARCH_QUERY="first || second",
-        LINKEDIN_POST_SEARCH_LOCATION="Kazakhstan",
         LINKEDIN_POST_SEARCH_RESULTS_WANTED="5",
     )
 
@@ -504,6 +511,10 @@ def test_linkedin_post_serper_adapter_maps_public_post_results(monkeypatch) -> N
         "tg_vacancy_bot.sources.adapters.linkedin_post_search.source_session",
         lambda headers=None: FakeSession(),
     )
+    monkeypatch.setattr(
+        "tg_vacancy_bot.sources.adapters.linkedin_post_search.utcnow",
+        lambda: datetime(2026, 7, 9, tzinfo=UTC),
+    )
 
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
@@ -511,7 +522,6 @@ def test_linkedin_post_serper_adapter_maps_public_post_results(monkeypatch) -> N
         ENABLE_LINKEDIN_POST_SEARCH=True,
         SERPER_API_KEY="serper-key",
         LINKEDIN_POST_SEARCH_QUERY='site:linkedin.com/posts "Ищем" frontend',
-        LINKEDIN_POST_SEARCH_LOCATION="Kazakhstan",
         LINKEDIN_POST_SEARCH_RESULTS_WANTED="5",
     )
 
@@ -524,7 +534,6 @@ def test_linkedin_post_serper_adapter_maps_public_post_results(monkeypatch) -> N
                 "q": 'site:linkedin.com/posts "Ищем" frontend',
                 "num": 5,
                 "hl": "ru",
-                "location": "Kazakhstan",
             },
         )
     ]
@@ -537,7 +546,7 @@ def test_linkedin_post_serper_adapter_maps_public_post_results(monkeypatch) -> N
             ),
             source="LinkedIn Hiring Posts (Serper)",
             url="https://www.linkedin.com/posts/example_hiring-junior-frontend-activity-123",
-            location="Kazakhstan",
+            location=None,
             stack=("LinkedIn post", "frontend", "Angular", "TypeScript"),
             published_at=datetime(2026, 7, 8, tzinfo=UTC),
             raw_text=(
@@ -565,8 +574,9 @@ def test_linkedin_post_serper_adapter_paginates_large_requested_result_count(mon
             rows = [
                 {
                     "title": f"Backend Engineer {index} | LinkedIn",
-                    "link": f"https://www.linkedin.com/posts/backend-{page}-{index}-activity-{page}{index}",
-                    "snippet": "We are hiring a Backend Engineer with Python.",
+                        "link": f"https://www.linkedin.com/posts/backend-{page}-{index}-activity-{page}{index}",
+                        "snippet": "We are hiring a Backend Engineer with Python.",
+                        "date": "Jul 8, 2026",
                 }
                 for index in range(10)
             ]
@@ -575,6 +585,10 @@ def test_linkedin_post_serper_adapter_paginates_large_requested_result_count(mon
     monkeypatch.setattr(
         "tg_vacancy_bot.sources.adapters.linkedin_post_search.source_session",
         lambda headers=None: FakeSession(),
+    )
+    monkeypatch.setattr(
+        "tg_vacancy_bot.sources.adapters.linkedin_post_search.utcnow",
+        lambda: datetime(2026, 7, 9, tzinfo=UTC),
     )
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
@@ -626,13 +640,16 @@ def test_linkedin_post_scraper_maps_public_search_html(monkeypatch) -> None:
         "tg_vacancy_bot.sources.adapters.linkedin_post_scraper.source_session",
         lambda headers=None: FakeSession(),
     )
+    monkeypatch.setattr(
+        "tg_vacancy_bot.sources.adapters.linkedin_post_scraper.utcnow",
+        lambda: datetime(2026, 7, 10, tzinfo=UTC),
+    )
 
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
         ENABLE_LINKEDIN_POST_SCRAPER=True,
         LINKEDIN_POST_SCRAPER_QUERY='site:linkedin.com/posts "Ищем" frontend',
-        LINKEDIN_POST_SCRAPER_LOCATION="Kazakhstan",
         LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS="duckduckgo",
         LINKEDIN_POST_SCRAPER_RESULTS_WANTED="5",
     )
@@ -651,7 +668,7 @@ def test_linkedin_post_scraper_maps_public_search_html(monkeypatch) -> None:
             description="г. Алматы. Ищем Junior Front-End Developer. Angular от 1 года, TypeScript, HTML/CSS.",
             source="LinkedIn Hiring Post Scraper",
             url="https://www.linkedin.com/posts/example_hiring-junior-frontend-activity-7480965762036461568",
-            location="Kazakhstan",
+            location=None,
             stack=("LinkedIn post", "frontend", "Angular", "TypeScript"),
             published_at=datetime(2026, 7, 9, 12, 47, 7, 292000, tzinfo=UTC),
             raw_text=(
@@ -700,13 +717,16 @@ def test_linkedin_post_scraper_falls_back_when_duckduckgo_is_blocked(monkeypatch
         "tg_vacancy_bot.sources.adapters.linkedin_post_scraper.source_session",
         lambda headers=None: FakeSession(),
     )
+    monkeypatch.setattr(
+        "tg_vacancy_bot.sources.adapters.linkedin_post_scraper.utcnow",
+        lambda: datetime(2026, 7, 10, tzinfo=UTC),
+    )
 
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
         ENABLE_LINKEDIN_POST_SCRAPER=True,
         LINKEDIN_POST_SCRAPER_QUERY="site:linkedin.com/posts backend engineer",
-        LINKEDIN_POST_SCRAPER_LOCATION="Kazakhstan",
         LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS="duckduckgo,bing",
         LINKEDIN_POST_SCRAPER_RESULTS_WANTED="5",
     )
@@ -720,7 +740,7 @@ def test_linkedin_post_scraper_falls_back_when_duckduckgo_is_blocked(monkeypatch
         ),
         (
             "https://www.bing.com/search",
-            {"q": "site:linkedin.com/posts backend engineer", "setlang": "ru"},
+                {"q": "site:linkedin.com/posts backend engineer", "setlang": "en"},
         ),
     ]
     assert vacancies == [
@@ -729,7 +749,7 @@ def test_linkedin_post_scraper_falls_back_when_duckduckgo_is_blocked(monkeypatch
             description="We are hiring a Backend Engineer with Python and REST API experience.",
             source="LinkedIn Hiring Post Scraper",
             url="https://www.linkedin.com/posts/example_hiring-backend-engineer-activity-7480965762036461568",
-            location="Kazakhstan",
+            location=None,
             stack=("LinkedIn post", "backend", "Python", "REST API"),
             published_at=datetime(2026, 7, 9, 12, 47, 7, 292000, tzinfo=UTC),
             raw_text="Backend Engineer We are hiring a Backend Engineer with Python and REST API experience.",
@@ -749,7 +769,7 @@ def test_linkedin_post_scraper_uses_role_title_instead_of_hashtags() -> None:
     </div>
     """
 
-    vacancies = _html_to_vacancies(html, location="Kazakhstan", limit=5)
+    vacancies = _html_to_vacancies(html, limit=5)
 
     assert len(vacancies) == 1
     assert vacancies[0].title == "Software Developer"
@@ -764,7 +784,7 @@ def test_linkedin_post_scraper_skips_results_without_a_reliable_date() -> None:
     <a class="result__snippet">We are hiring a backend developer.</a>
     """
 
-    assert _html_to_vacancies(html, location="Kazakhstan", limit=5) == []
+    assert _html_to_vacancies(html, limit=5) == []
 
 
 def test_linkedin_post_scraper_reports_search_challenge(monkeypatch) -> None:

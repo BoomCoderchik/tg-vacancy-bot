@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup, Tag
 from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.sources.base import SourceAdapter, html_to_text, source_session
+from tg_vacancy_bot.sources.freshness import filter_fresh_vacancies
 from tg_vacancy_bot.sources.adapters.linkedin_post_search import (
     _clean_title,
     _is_linkedin_post_url,
@@ -28,9 +29,13 @@ BROWSER_HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
     ),
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "ru,en;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
 }
 ACTIVITY_ID_PATTERN = re.compile(r"activity-(\d{15,20})(?:[-/?#]|$)", re.IGNORECASE)
+
+
+def utcnow() -> datetime:
+    return datetime.now(UTC)
 
 
 @dataclass(frozen=True)
@@ -68,7 +73,6 @@ class LinkedInPostScraperAdapter(SourceAdapter):
                     vacancies.extend(
                         _html_to_vacancies(
                             html,
-                            location=self.settings.linkedin_post_scraper_location,
                             limit=limit - len(vacancies),
                             seen_urls=seen_urls,
                         )
@@ -76,10 +80,15 @@ class LinkedInPostScraperAdapter(SourceAdapter):
         if not vacancies and challenged_providers and challenged_providers == attempted_providers:
             providers = ", ".join(sorted(challenged_providers))
             raise RuntimeError(f"Public search HTML providers returned anti-bot challenges: {providers}.")
-        return vacancies
+        return filter_fresh_vacancies(
+            vacancies,
+            max_age_hours=self.settings.linkedin_post_max_age_hours,
+            current_time=utcnow(),
+            require_published_at=True,
+        )
 
 
-def _html_to_vacancies(html: str, location: str, limit: int, seen_urls: set[str] | None = None) -> list[Vacancy]:
+def _html_to_vacancies(html: str, limit: int, seen_urls: set[str] | None = None) -> list[Vacancy]:
     soup = BeautifulSoup(html or "", "html.parser")
     vacancies: list[Vacancy] = []
     seen = seen_urls if seen_urls is not None else set()
@@ -107,7 +116,7 @@ def _html_to_vacancies(html: str, location: str, limit: int, seen_urls: set[str]
                 description=snippet,
                 source=LinkedInPostScraperAdapter.name,
                 url=link,
-                location=location or None,
+                location=None,
                 stack=_stack_from_text(f"{title} {snippet} {search_title}"),
                 published_at=published_at,
                 raw_text=f"{title} {snippet}",
@@ -120,7 +129,7 @@ def _html_to_vacancies(html: str, location: str, limit: int, seen_urls: set[str]
 
 async def _fetch_search_html(session, provider: str, query: str) -> str:
     if provider == "bing":
-        async with session.get(BING_SEARCH_URL, params={"q": query, "setlang": "ru"}) as response:
+        async with session.get(BING_SEARCH_URL, params={"q": query, "setlang": "en"}) as response:
             response.raise_for_status()
             return await response.text()
     async with session.get(DUCKDUCKGO_HTML_SEARCH_URL, params={"q": query}) as response:
