@@ -1,3 +1,6 @@
+import pytest
+from pydantic import ValidationError
+
 from tg_vacancy_bot.config import Settings
 
 
@@ -41,14 +44,12 @@ def test_settings_reads_linkedin_post_headless_options() -> None:
         TARGET_CHAT_ID="@target",
         ENABLE_LINKEDIN_POST_HEADLESS="true",
         LINKEDIN_POST_HEADLESS_QUERY='site:linkedin.com/posts "ищем" frontend',
-        LINKEDIN_POST_HEADLESS_LOCATION="Kazakhstan",
         LINKEDIN_POST_HEADLESS_RESULTS_WANTED="7",
         LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS="25",
     )
 
     assert settings.enable_linkedin_post_headless is True
     assert settings.linkedin_post_headless_query == 'site:linkedin.com/posts "ищем" frontend'
-    assert settings.linkedin_post_headless_location == "Kazakhstan"
     assert settings.linkedin_post_headless_results_wanted == 7
     assert settings.linkedin_post_headless_timeout_seconds == 25
 
@@ -61,7 +62,6 @@ def test_settings_reads_linkedin_post_search_options() -> None:
         SERPAPI_API_KEY="serp-key",
         SERPER_API_KEY="serper-key",
         LINKEDIN_POST_SEARCH_QUERY='site:linkedin.com/posts "Ищем" frontend',
-        LINKEDIN_POST_SEARCH_LOCATION="Kazakhstan",
         LINKEDIN_POST_SEARCH_RESULTS_WANTED="8",
     )
 
@@ -69,7 +69,6 @@ def test_settings_reads_linkedin_post_search_options() -> None:
     assert settings.serpapi_api_key == "serp-key"
     assert settings.serper_api_key == "serper-key"
     assert settings.linkedin_post_search_query == 'site:linkedin.com/posts "Ищем" frontend'
-    assert settings.linkedin_post_search_location == "Kazakhstan"
     assert settings.linkedin_post_search_results_wanted == 8
 
 
@@ -79,16 +78,31 @@ def test_settings_reads_linkedin_post_scraper_options() -> None:
         TARGET_CHAT_ID="@target",
         ENABLE_LINKEDIN_POST_SCRAPER="true",
         LINKEDIN_POST_SCRAPER_QUERY='site:linkedin.com/posts "ищем" frontend',
-        LINKEDIN_POST_SCRAPER_LOCATION="Kazakhstan",
         LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS="ddg, bing, unknown, duckduckgo",
         LINKEDIN_POST_SCRAPER_RESULTS_WANTED="8",
     )
 
     assert settings.enable_linkedin_post_scraper is True
     assert settings.linkedin_post_scraper_query == 'site:linkedin.com/posts "ищем" frontend'
-    assert settings.linkedin_post_scraper_location == "Kazakhstan"
     assert settings.linkedin_post_scraper_search_providers == ("duckduckgo", "bing")
     assert settings.linkedin_post_scraper_results_wanted == 8
+
+
+def test_settings_limits_linkedin_post_age_to_five_days() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        LINKEDIN_POST_MAX_AGE_HOURS="120",
+    )
+
+    assert settings.linkedin_post_max_age_hours == 120
+
+    with pytest.raises(ValidationError):
+        Settings(
+            TELEGRAM_BOT_TOKEN="token",
+            TARGET_CHAT_ID="@target",
+            LINKEDIN_POST_MAX_AGE_HOURS="121",
+        )
 
 
 def test_settings_reads_description_localization_options() -> None:

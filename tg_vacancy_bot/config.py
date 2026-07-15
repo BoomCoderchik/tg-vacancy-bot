@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     enable_linkedin_post_search: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SEARCH")
     enable_linkedin_post_scraper: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SCRAPER")
     enable_linkedin_post_headless: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_HEADLESS")
+    # LinkedIn posts must have a verifiable publication date and remain no more
+    # than five days old. A lower value is allowed, but never a longer window.
+    linkedin_post_max_age_hours: int = Field(default=120, alias="LINKEDIN_POST_MAX_AGE_HOURS", gt=0, le=120)
     serpapi_api_key: str = Field(default="", alias="SERPAPI_API_KEY")
     serper_api_key: str = Field(default="", alias="SERPER_API_KEY")
     linkedin_post_search_query: str = Field(
@@ -70,13 +73,11 @@ class Settings(BaseSettings):
         ),
         alias="LINKEDIN_POST_SEARCH_QUERY",
     )
-    linkedin_post_search_location: str = Field(default="Kazakhstan", alias="LINKEDIN_POST_SEARCH_LOCATION")
     linkedin_post_search_results_wanted: int = Field(default=10, alias="LINKEDIN_POST_SEARCH_RESULTS_WANTED")
     linkedin_post_scraper_query: str = Field(
         default=DEFAULT_LINKEDIN_POST_SCRAPER_QUERY,
         alias="LINKEDIN_POST_SCRAPER_QUERY",
     )
-    linkedin_post_scraper_location: str = Field(default="Kazakhstan", alias="LINKEDIN_POST_SCRAPER_LOCATION")
     linkedin_post_scraper_search_providers_raw: str = Field(
         default="duckduckgo,bing",
         alias="LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS",
@@ -88,7 +89,6 @@ class Settings(BaseSettings):
         default=DEFAULT_LINKEDIN_POST_SCRAPER_QUERY,
         alias="LINKEDIN_POST_HEADLESS_QUERY",
     )
-    linkedin_post_headless_location: str = Field(default="Kazakhstan", alias="LINKEDIN_POST_HEADLESS_LOCATION")
     linkedin_post_headless_results_wanted: int = Field(default=10, alias="LINKEDIN_POST_HEADLESS_RESULTS_WANTED")
     linkedin_post_headless_timeout_seconds: int = Field(
         default=20,

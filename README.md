@@ -43,6 +43,7 @@ For an always-on vacancy parser, run the bot continuously with source polling en
 SOURCE_POLL_INTERVAL_SECONDS=60
 SOURCE_MAX_AGE_HOURS=48
 SOURCE_MAX_PUBLISH_PER_POLL=20
+LINKEDIN_POST_MAX_AGE_HOURS=120
 ```
 
 The bot does not wait for manual forwarding in this mode. It polls real configured sources, publishes vacancies that are new to the bot, skips repeats through SQLite deduplication, and drops dated source vacancies older than `SOURCE_MAX_AGE_HOURS`. Vacancies from sources without a publication date are not assigned a fake date; they rely on source ordering, the publish limit, and deduplication.
@@ -59,11 +60,10 @@ SERPAPI_API_KEY=
 # Or use Serper instead of SerpApi:
 SERPER_API_KEY=
 LINKEDIN_POST_SEARCH_QUERY=(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR "we're hiring" OR hiring OR "looking for" OR "join our team" OR "open role" OR "ищем" OR "ищет" OR "нанимаем" OR "в команду") (frontend OR "front-end" OR backend OR fullstack OR "full-stack" OR "software developer" OR "software engineer" OR developer OR engineer OR react OR python OR designer OR "AI engineer" OR "ML engineer" OR "LLM engineer" OR разработчик OR инженер)
-LINKEDIN_POST_SEARCH_LOCATION=Kazakhstan
 LINKEDIN_POST_SEARCH_RESULTS_WANTED=10
 ```
 
-This source uses SerpApi or Serper Google Search results for publicly indexed LinkedIn post URLs. It publishes only real search results with a short snippet-based summary and the LinkedIn post link. Use `||` to separate fallback search queries when you want the keyed provider to try several hiring-post searches. If neither `SERPAPI_API_KEY` nor `SERPER_API_KEY` is set, the source is not registered.
+This source uses SerpApi or Serper Google Search results for publicly indexed LinkedIn post URLs worldwide. It publishes only real search results with a short snippet-based summary and the LinkedIn post link. Every LinkedIn result needs a reliable publication date and is rejected once it is older than `LINKEDIN_POST_MAX_AGE_HOURS` (maximum 120 hours). Use `||` to separate fallback search queries when you want the keyed provider to try several hiring-post searches. If neither `SERPAPI_API_KEY` nor `SERPER_API_KEY` is set, the source is not registered.
 
 ## Free LinkedIn Hiring Post Scraper
 
@@ -72,13 +72,12 @@ To avoid paid search APIs, enable the free scraper source:
 ```dotenv
 ENABLE_LINKEDIN_POST_SCRAPER=true
 LINKEDIN_POST_SCRAPER_QUERY=(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR "we're hiring" OR hiring) (frontend OR backend OR fullstack OR "software developer" OR "software engineer" OR react OR python) || (site:linkedin.com/posts OR site:linkedin.com/feed/update) ("looking for" OR "join our team" OR "open role") (developer OR engineer OR frontend OR backend OR fullstack OR react OR python) || (site:linkedin.com/posts OR site:linkedin.com/feed/update) ("ищем" OR "ищет" OR "нанимаем" OR "в команду") (разработчик OR инженер OR frontend OR backend OR fullstack OR react OR python)
-LINKEDIN_POST_SCRAPER_LOCATION=Kazakhstan
 LINKEDIN_POST_SCRAPER_RESULTS_WANTED=100
 ```
 
 This source scrapes public search-result HTML and keeps only real `linkedin.com/posts/...` and `linkedin.com/feed/update/...` links. It does not require an API key and does not create placeholder vacancies. Use `||` to separate fallback search queries. Because it depends on public search-result markup, it can be less stable than SerpApi and may return no rows when the search engine changes HTML or rate-limits requests.
 
-The scraper keeps only results with a reliable publication date (from the search result or the LinkedIn activity ID) and the normal `SOURCE_MAX_AGE_HOURS` freshness filter removes older posts before publishing.
+The scraper searches public, globally indexed results. It keeps only results with a reliable publication date (from the search result or the LinkedIn activity ID) and rejects posts older than `LINKEDIN_POST_MAX_AGE_HOURS` (maximum 120 hours) before they reach the common polling layer.
 The search depth is intentionally larger than the per-cycle publication budget: SQLite deduplication lets later polls publish the remaining fresh posts. `LOCALIZATION_MAX_PER_POLL=12` caps localization attempts per poll when localization is enabled; lower it further if the provider is rate-limited.
 
 ## Headless LinkedIn Hiring Post Parser
@@ -89,12 +88,11 @@ The optional `LinkedInPostHeadlessAdapter` uses the project’s existing open-so
 ENABLE_LINKEDIN_POST_HEADLESS=true
 SERPAPI_API_KEY=your_key # or SERPER_API_KEY=your_key
 LINKEDIN_POST_HEADLESS_QUERY=(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR hiring OR "ищем" OR "ищет") (frontend OR backend OR developer OR engineer OR react OR python OR разработчик OR инженер)
-LINKEDIN_POST_HEADLESS_LOCATION=Kazakhstan
 LINKEDIN_POST_HEADLESS_RESULTS_WANTED=10
 LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS=20
 ```
 
-It does not use a LinkedIn account, cookies, proxies, fake identities, scrolling automation, or any CAPTCHA/login/2FA bypass. It publishes only posts whose public page contains extractable text and whose activity URL has a reliable publication date. A login or protection page is skipped without a fallback vacancy. On GitHub Actions, enabling the source installs Chromium before polling.
+It discovers globally indexed public posts without a country restriction. It does not use a LinkedIn account, cookies, proxies, fake identities, scrolling automation, or any CAPTCHA/login/2FA bypass. It publishes only posts whose public page contains extractable text, whose activity URL has a reliable publication date, and whose date is no more than five days old. A login or protection page is skipped without a fallback vacancy. On GitHub Actions, enabling the source installs Chromium before polling.
 
 ## Required Telegram Setup
 

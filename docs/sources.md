@@ -65,16 +65,16 @@
 - LinkedIn Hiring Posts
   - Enabled only when `ENABLE_LINKEDIN_POST_SEARCH=true` and `SERPAPI_API_KEY` or `SERPER_API_KEY` are set.
   - Uses SerpApi Google Search (`https://serpapi.com/search.json`) or Serper Google Search (`https://google.serper.dev/search`) to find publicly indexed LinkedIn post URLs, not LinkedIn Jobs pages.
-  - Query configured by `LINKEDIN_POST_SEARCH_QUERY`, `LINKEDIN_POST_SEARCH_LOCATION`, and `LINKEDIN_POST_SEARCH_RESULTS_WANTED`; separate fallback search queries with `||`.
-  - Maps search `title`, `snippet`, `link`, and optional `date` into a short `Vacancy` card with source `LinkedIn Hiring Posts`. Hashtag-heavy search titles are normalized into the detected role when the role is present in the title or snippet.
+  - Searches globally indexed posts; query configured by `LINKEDIN_POST_SEARCH_QUERY` and `LINKEDIN_POST_SEARCH_RESULTS_WANTED`; separate fallback search queries with `||`.
+  - Maps search `title`, `snippet`, `link`, and date into a short `Vacancy` card with source `LinkedIn Hiring Posts`. A reliable date is required and posts older than `LINKEDIN_POST_MAX_AGE_HOURS` (at most 120 hours) are rejected. Hashtag-heavy search titles are normalized into the detected role when the role is present in the title or snippet.
   - Drops results that are not `linkedin.com/posts/...` or `linkedin.com/feed/update/...`.
 
 - LinkedIn Hiring Post Scraper
   - Enabled with `ENABLE_LINKEDIN_POST_SCRAPER=true`.
   - Scrapes public search-result HTML to find publicly indexed LinkedIn post URLs, not LinkedIn Jobs pages.
   - Uses the configured `LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS` list, defaulting to `duckduckgo,bing`, so a DuckDuckGo anti-bot challenge does not stop the whole source while another public HTML provider is available.
-  - Requires a publication date: it reads a date exposed by the search result or derives it from the LinkedIn `activity-...` ID. Results without a reliable date are skipped, so old indexed posts are not published.
-  - Query configured by `LINKEDIN_POST_SCRAPER_QUERY`, `LINKEDIN_POST_SCRAPER_LOCATION`, `LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS`, and `LINKEDIN_POST_SCRAPER_RESULTS_WANTED`; separate fallback search queries with `||`.
+  - Requires a publication date: it reads a date exposed by the search result or derives it from the LinkedIn `activity-...` ID. Results without a reliable date and posts older than `LINKEDIN_POST_MAX_AGE_HOURS` (at most 120 hours) are skipped.
+  - Searches globally indexed posts; query configured by `LINKEDIN_POST_SCRAPER_QUERY`, `LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS`, and `LINKEDIN_POST_SCRAPER_RESULTS_WANTED`; separate fallback search queries with `||`.
   - The default search depth is 100 candidates. This is a collection limit, not a publication limit; source polling and SQLite deduplication publish the candidates in later safe batches.
   - Maps result title, snippet, and link into a short `Vacancy` card with source `LinkedIn Hiring Post Scraper`.
   - Hashtag-heavy search titles are normalized into the detected role when the role is present in the title or snippet.
@@ -84,9 +84,9 @@
 - LinkedIn Hiring Posts (Headless)
   - Enabled with `ENABLE_LINKEDIN_POST_HEADLESS=true`; disabled by default.
   - Uses SerpApi or Serper, when their existing key is configured, to discover public LinkedIn post URLs, then opens those URLs in a clean Playwright browser context. Without a search-provider key it uses Bing discovery as a best-effort fallback, which can return no rows when blocked.
-  - Query configured by `LINKEDIN_POST_HEADLESS_QUERY`, `LINKEDIN_POST_HEADLESS_LOCATION`, `LINKEDIN_POST_HEADLESS_RESULTS_WANTED`, and `LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS`.
+  - Searches globally indexed posts; query configured by `LINKEDIN_POST_HEADLESS_QUERY`, `LINKEDIN_POST_HEADLESS_RESULTS_WANTED`, and `LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS`.
   - Does not use a LinkedIn account, cookies, proxies, identity masking, or protection bypasses. Pages that require login or show CAPTCHA/2FA are skipped.
-  - Requires text in a public post container and derives the publication date from the LinkedIn activity ID; otherwise it does not create a vacancy.
+  - Requires text in a public post container, derives the publication date from the LinkedIn activity ID, and rejects posts older than `LINKEDIN_POST_MAX_AGE_HOURS` (at most 120 hours); otherwise it does not create a vacancy.
 
 ## Intake Sources
 

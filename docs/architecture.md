@@ -47,9 +47,9 @@
   - Controls source polling with `SOURCE_POLL_INTERVAL_SECONDS`, `SOURCE_MAX_PUBLISH_PER_POLL`, and `SOURCE_MAX_AGE_HOURS`.
   - Controls localization load with `LOCALIZATION_MAX_PER_POLL`; already-Russian descriptions bypass the model.
   - Supports optional OpenAI/OpenAI-compatible description localization with `LOCALIZE_DESCRIPTIONS`, `LOCALIZATION_PROVIDER`, `OPENAI_*`, and the built-in Groq mode (`GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_FALLBACK_MODELS`).
-  - Supports opt-in LinkedIn hiring-post search with `ENABLE_LINKEDIN_POST_SEARCH`, `SERPAPI_API_KEY` or `SERPER_API_KEY`, `LINKEDIN_POST_SEARCH_QUERY`, `LINKEDIN_POST_SEARCH_LOCATION`, and `LINKEDIN_POST_SEARCH_RESULTS_WANTED`.
-  - Supports opt-in free LinkedIn hiring-post scraping with `ENABLE_LINKEDIN_POST_SCRAPER`, `LINKEDIN_POST_SCRAPER_QUERY`, `LINKEDIN_POST_SCRAPER_LOCATION`, `LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS`, and `LINKEDIN_POST_SCRAPER_RESULTS_WANTED`.
-  - Supports opt-in headless parsing of publicly available LinkedIn posts with `ENABLE_LINKEDIN_POST_HEADLESS`, `LINKEDIN_POST_HEADLESS_QUERY`, `LINKEDIN_POST_HEADLESS_LOCATION`, `LINKEDIN_POST_HEADLESS_RESULTS_WANTED`, and `LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS`. It reuses `SERPAPI_API_KEY` or `SERPER_API_KEY` for reliable link discovery and falls back to best-effort Bing when neither key is configured.
+  - Supports opt-in, globally scoped LinkedIn hiring-post search with `ENABLE_LINKEDIN_POST_SEARCH`, `SERPAPI_API_KEY` or `SERPER_API_KEY`, `LINKEDIN_POST_SEARCH_QUERY`, and `LINKEDIN_POST_SEARCH_RESULTS_WANTED`.
+  - Supports opt-in, globally scoped free LinkedIn hiring-post scraping with `ENABLE_LINKEDIN_POST_SCRAPER`, `LINKEDIN_POST_SCRAPER_QUERY`, `LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS`, and `LINKEDIN_POST_SCRAPER_RESULTS_WANTED`.
+  - Supports opt-in, globally scoped headless parsing of publicly available LinkedIn posts with `ENABLE_LINKEDIN_POST_HEADLESS`, `LINKEDIN_POST_HEADLESS_QUERY`, `LINKEDIN_POST_HEADLESS_RESULTS_WANTED`, and `LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS`. It reuses `SERPAPI_API_KEY` or `SERPER_API_KEY` for reliable link discovery and falls back to best-effort Bing when neither key is configured. Every automatic LinkedIn adapter requires a reliable publication date and enforces `LINKEDIN_POST_MAX_AGE_HOURS` with a hard maximum of 120 hours.
 
 - `tg_vacancy_bot/access_control.py`
   - Parses operator allowlists and checks whether a sender may publish through the bot.
