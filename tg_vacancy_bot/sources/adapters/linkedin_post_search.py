@@ -9,6 +9,7 @@ from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.sources.base import SourceAdapter, source_session
 from tg_vacancy_bot.sources.dates import parse_source_datetime
+from tg_vacancy_bot.sources.freshness import filter_fresh_vacancies
 
 
 SERPAPI_SEARCH_URL = "https://serpapi.com/search.json"
@@ -52,6 +53,10 @@ RU_ROLE_PATTERN = re.compile(
 )
 
 
+def utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
 class LinkedInPostSearchAdapter(SourceAdapter):
     name = "LinkedIn Hiring Posts"
 
@@ -71,7 +76,6 @@ class LinkedInPostSearchAdapter(SourceAdapter):
                     "api_key": self.settings.serpapi_api_key,
                     "q": query,
                     "num": limit,
-                    "location": self.settings.linkedin_post_search_location,
                     "hl": "ru",
                 }
                 async with session.get(SERPAPI_SEARCH_URL, params=params) as response:
@@ -81,14 +85,14 @@ class LinkedInPostSearchAdapter(SourceAdapter):
                 for result in payload.get("organic_results", []):
                     if not isinstance(result, Mapping):
                         continue
-                    vacancy = _result_to_vacancy(result, self.settings.linkedin_post_search_location)
+                    vacancy = _result_to_vacancy(result)
                     if vacancy is None or not vacancy.url or vacancy.url in seen_urls:
                         continue
                     seen_urls.add(vacancy.url)
                     vacancies.append(vacancy)
                     if len(vacancies) >= limit:
                         break
-        return vacancies
+        return _filter_recent_linkedin_posts(vacancies, self.settings.linkedin_post_max_age_hours)
 
 
 class LinkedInPostSerperAdapter(SourceAdapter):
@@ -111,7 +115,6 @@ class LinkedInPostSerperAdapter(SourceAdapter):
                         "q": query,
                         "num": request_limit,
                         "hl": "ru",
-                        "location": self.settings.linkedin_post_search_location,
                     }
                     if page > 1:
                         payload["page"] = page
@@ -127,7 +130,6 @@ class LinkedInPostSerperAdapter(SourceAdapter):
                             continue
                         vacancy = _result_to_vacancy(
                             result,
-                            self.settings.linkedin_post_search_location,
                             source=LinkedInPostSerperAdapter.name,
                         )
                         if vacancy is None or not vacancy.url or vacancy.url in seen_urls:
@@ -139,12 +141,11 @@ class LinkedInPostSerperAdapter(SourceAdapter):
                     if len(results) < request_limit:
                         break
                     page += 1
-        return vacancies
+        return _filter_recent_linkedin_posts(vacancies, self.settings.linkedin_post_max_age_hours)
 
 
 def _result_to_vacancy(
     result: Mapping[str, Any],
-    location: str,
     *,
     source: str = LinkedInPostSearchAdapter.name,
 ) -> Vacancy | None:
@@ -160,10 +161,19 @@ def _result_to_vacancy(
         description=snippet,
         source=source,
         url=link,
-        location=location or None,
+        location=None,
         stack=_stack_from_text(f"{title} {snippet} {search_title}"),
         published_at=_parse_search_date(_text(result, "date")),
         raw_text=f"{title} {snippet}",
+    )
+
+
+def _filter_recent_linkedin_posts(vacancies: list[Vacancy], max_age_hours: int) -> list[Vacancy]:
+    return filter_fresh_vacancies(
+        vacancies,
+        max_age_hours=max_age_hours,
+        current_time=utcnow(),
+        require_published_at=True,
     )
 
 

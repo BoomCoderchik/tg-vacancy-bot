@@ -1,6 +1,8 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
+from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.sources.dates import parse_source_datetime
+from tg_vacancy_bot.sources.freshness import filter_fresh_vacancies
 
 
 def test_parse_source_datetime_accepts_iso_zulu_datetime() -> None:
@@ -25,3 +27,19 @@ def test_parse_source_datetime_returns_none_for_blank_or_unknown_values() -> Non
     assert parse_source_datetime("") is None
     assert parse_source_datetime(None) is None
     assert parse_source_datetime("not a date") is None
+
+
+def test_filter_fresh_vacancies_can_require_a_recent_publication_date() -> None:
+    now = datetime(2026, 7, 10, tzinfo=UTC)
+    vacancies = [
+        Vacancy(title="Recent", description="", source="LinkedIn", published_at=now - timedelta(hours=120)),
+        Vacancy(title="Old", description="", source="LinkedIn", published_at=now - timedelta(hours=120, seconds=1)),
+        Vacancy(title="Undated", description="", source="LinkedIn"),
+    ]
+
+    assert [vacancy.title for vacancy in filter_fresh_vacancies(
+        vacancies,
+        max_age_hours=120,
+        current_time=now,
+        require_published_at=True,
+    )] == ["Recent"]

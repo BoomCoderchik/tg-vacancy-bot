@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from urllib.parse import urlencode
 
 from bs4 import BeautifulSoup
@@ -17,6 +18,7 @@ from tg_vacancy_bot.sources.adapters.linkedin_post_search import (
     _search_queries,
     _stack_from_text,
 )
+from tg_vacancy_bot.sources.freshness import filter_fresh_vacancies
 
 
 BING_SEARCH_URL = "https://www.bing.com/search"
@@ -34,6 +36,10 @@ PROTECTION_MARKERS = (
     "two-factor",
     "2fa",
 )
+
+
+def utcnow() -> datetime:
+    return datetime.now(UTC)
 
 
 class LinkedInPostHeadlessAdapter(SourceAdapter):
@@ -59,7 +65,7 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
         vacancies: list[Vacancy] = []
         async with async_playwright() as playwright:
             browser = await playwright.chromium.launch(headless=True)
-            context = await browser.new_context(locale="ru-RU")
+            context = await browser.new_context(locale="en-US")
             try:
                 for url in urls:
                     vacancy = await self._read_public_post(context, url, timeout_ms)
@@ -68,13 +74,17 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
             finally:
                 await context.close()
                 await browser.close()
-        return vacancies
+        return filter_fresh_vacancies(
+            vacancies,
+            max_age_hours=self.settings.linkedin_post_max_age_hours,
+            current_time=utcnow(),
+            require_published_at=True,
+        )
 
     async def _discover_keyed_post_urls(self, limit: int) -> tuple[str, ...]:
         search_settings = self.settings.model_copy(
             update={
                 "linkedin_post_search_query": self.settings.linkedin_post_headless_query,
-                "linkedin_post_search_location": self.settings.linkedin_post_headless_location,
                 "linkedin_post_search_results_wanted": limit,
             }
         )
@@ -94,7 +104,7 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
         urls: list[str] = []
         async with async_playwright() as playwright:
             browser = await playwright.chromium.launch(headless=True)
-            context = await browser.new_context(locale="ru-RU")
+            context = await browser.new_context(locale="en-US")
             try:
                 search_page = await context.new_page()
                 search_page.set_default_timeout(timeout_ms)
@@ -129,7 +139,7 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
                 description=description,
                 source=self.name,
                 url=url,
-                location=self.settings.linkedin_post_headless_location or None,
+                location=None,
                 stack=_stack_from_text(f"{title} {description}"),
                 published_at=published_at,
                 raw_text=f"{title} {description}",
@@ -139,7 +149,7 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
 
 
 async def _search_public_post_urls(page, query: str) -> tuple[str, ...]:
-    search_url = f"{BING_SEARCH_URL}?{urlencode({'q': query, 'setlang': 'ru'})}"
+    search_url = f"{BING_SEARCH_URL}?{urlencode({'q': query, 'setlang': 'en'})}"
     await page.goto(search_url, wait_until="domcontentloaded")
     html = await page.content()
     if _requires_manual_access(html):
