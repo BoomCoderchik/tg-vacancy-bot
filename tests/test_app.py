@@ -26,6 +26,7 @@ def test_check_sources_reports_missing_linkedin_post_search_provider_key(capsys,
         TARGET_CHAT_ID="@target",
         ENABLE_REMOTIVE=False,
         ENABLE_ARBEITNOW=False,
+        ENABLE_WORKING_NOMADS=False,
         ENABLE_REMOTEOK=False,
         ENABLE_HN_WHO_IS_HIRING=False,
         ENABLE_JOBICY=False,
@@ -58,6 +59,7 @@ def test_check_sources_reports_registered_linkedin_post_search_without_exposing_
         TARGET_CHAT_ID="@target",
         ENABLE_REMOTIVE=False,
         ENABLE_ARBEITNOW=False,
+        ENABLE_WORKING_NOMADS=False,
         ENABLE_REMOTEOK=False,
         ENABLE_HN_WHO_IS_HIRING=False,
         ENABLE_JOBICY=False,
@@ -84,6 +86,7 @@ def test_preview_sources_prints_filtered_candidates_without_publishing(capsys, m
         TARGET_CHAT_ID="@target",
         ENABLE_REMOTIVE=False,
         ENABLE_ARBEITNOW=False,
+        ENABLE_WORKING_NOMADS=False,
         ENABLE_REMOTEOK=False,
         ENABLE_HN_WHO_IS_HIRING=False,
         ENABLE_JOBICY=False,
@@ -169,6 +172,7 @@ def test_preview_sources_shows_configuration_warning_when_adapter_is_missing(
         TARGET_CHAT_ID="@target",
         ENABLE_REMOTIVE=False,
         ENABLE_ARBEITNOW=False,
+        ENABLE_WORKING_NOMADS=False,
         ENABLE_REMOTEOK=False,
         ENABLE_HN_WHO_IS_HIRING=False,
         ENABLE_JOBICY=False,
@@ -200,6 +204,7 @@ def test_poll_once_respects_global_publish_limit(monkeypatch, tmp_path) -> None:
         LOCALIZE_DESCRIPTIONS="false",
     )
     published_batches = []
+    publisher_options = {}
 
     class FakeAdapter:
         name = "Fake"
@@ -211,8 +216,9 @@ def test_poll_once_respects_global_publish_limit(monkeypatch, tmp_path) -> None:
             ]
 
     class FakePublisher:
-        def __init__(self, settings, store) -> None:
-            pass
+        def __init__(self, settings, store, **kwargs) -> None:
+            publisher_options["localize_descriptions"] = settings.localize_descriptions
+            publisher_options.update(kwargs)
 
         async def publish_new(self, vacancies):
             published_batches.append(list(vacancies))
@@ -230,6 +236,10 @@ def test_poll_once_respects_global_publish_limit(monkeypatch, tmp_path) -> None:
     asyncio.run(poll_once())
 
     assert [len(batch) for batch in published_batches] == [1, 1]
+    assert publisher_options == {
+        "localize_descriptions": True,
+        "publish_original_when_localization_fails": True,
+    }
 
 
 def test_poll_once_skips_vacancy_when_localization_fails(monkeypatch, tmp_path) -> None:
@@ -253,7 +263,7 @@ def test_poll_once_skips_vacancy_when_localization_fails(monkeypatch, tmp_path) 
             ]
 
     class FakePublisher:
-        def __init__(self, settings, store) -> None:
+        def __init__(self, settings, store, **kwargs) -> None:
             pass
 
         async def publish_new(self, vacancies):
@@ -287,6 +297,7 @@ def test_poll_once_warns_when_linkedin_posts_enabled_without_search_provider_key
         DATABASE_PATH=str(tmp_path / "vacancies.sqlite3"),
         ENABLE_REMOTIVE=False,
         ENABLE_ARBEITNOW=False,
+        ENABLE_WORKING_NOMADS=False,
         ENABLE_REMOTEOK=False,
         ENABLE_HN_WHO_IS_HIRING=False,
         ENABLE_JOBICY=False,
@@ -301,7 +312,7 @@ def test_poll_once_warns_when_linkedin_posts_enabled_without_search_provider_key
     )
 
     class FakePublisher:
-        def __init__(self, settings, store) -> None:
+        def __init__(self, settings, store, **kwargs) -> None:
             pass
 
         async def publish_new(self, vacancies):

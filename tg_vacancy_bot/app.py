@@ -48,15 +48,20 @@ async def poll_once() -> None:
     settings.require_runtime()
     logging.basicConfig(level=logging.INFO)
     store = VacancyStore(settings.database_path)
-    publisher = TelegramPublisher(settings, store)
+    source_settings = settings.model_copy(update={"localize_descriptions": True})
+    publisher = TelegramPublisher(
+        source_settings,
+        store,
+        publish_original_when_localization_fails=True,
+    )
 
     try:
         total = 0
         published = 0
-        max_publish = settings.source_max_publish_per_poll
-        for warning in source_configuration_warnings(settings):
+        max_publish = source_settings.source_max_publish_per_poll
+        for warning in source_configuration_warnings(source_settings):
             logging.warning(warning)
-        for adapter in build_adapters(settings):
+        for adapter in build_adapters(source_settings):
             if max_publish > 0 and published >= max_publish:
                 logging.info("Source poll publish limit reached: %s", max_publish)
                 break
@@ -67,7 +72,7 @@ async def poll_once() -> None:
                 continue
             filtered = filter_fresh_vacancies(
                 filter_it_vacancies(vacancies),
-                max_age_hours=settings.source_max_age_hours,
+                max_age_hours=source_settings.source_max_age_hours,
                 current_time=datetime.now(UTC),
             )
             total += len(filtered)

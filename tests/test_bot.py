@@ -3,6 +3,7 @@ import asyncio
 from tg_vacancy_bot.bot import (
     build_status_text,
     format_whoami_text,
+    manual_application_link_text,
     needs_profile_onboarding,
     profile_onboarding_text,
     send_profile_onboarding_reminders,
@@ -30,6 +31,7 @@ def test_build_status_text_does_not_expose_bot_token() -> None:
     assert "Operator allowlist: off" in text
     assert "Description localization: on" in text
     assert "Arbeitnow=off" in text
+    assert "WorkingNomads=on" in text
     assert "LinkedInPosts=off" in text
     assert "LinkedInHeadless=off" in text
 
@@ -87,6 +89,13 @@ def test_format_whoami_text_returns_user_id() -> None:
 
 def test_format_whoami_text_handles_missing_user() -> None:
     assert "not available" in format_whoami_text(None)
+
+
+def test_manual_application_link_text_escapes_external_url() -> None:
+    text = manual_application_link_text("https://example.com/apply?role=backend&next=1")
+
+    assert "Открыть вакансию" in text
+    assert "&amp;" in text
 
 
 def test_profile_onboarding_text_lists_missing_application_data() -> None:

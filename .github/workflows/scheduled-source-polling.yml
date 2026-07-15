@@ -29,6 +29,7 @@ jobs:
       SOURCE_MAX_PUBLISH_PER_POLL: ${{ secrets.SOURCE_MAX_PUBLISH_PER_POLL || '20' }}
       SOURCE_MAX_AGE_HOURS: ${{ secrets.SOURCE_MAX_AGE_HOURS || '48' }}
       ENABLE_ARBEITNOW: "true"
+      ENABLE_WORKING_NOMADS: "true"
       ENABLE_LINKEDIN_POST_SEARCH: ${{ secrets.ENABLE_LINKEDIN_POST_SEARCH || 'false' }}
       SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
       SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
