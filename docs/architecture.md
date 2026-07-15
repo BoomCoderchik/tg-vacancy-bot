@@ -45,7 +45,7 @@
   - Requires `TELEGRAM_BOT_TOKEN` and `TARGET_CHAT_ID` for real publishing.
   - Supports optional `OPERATOR_USER_IDS` for publish access control.
   - Controls source polling with `SOURCE_POLL_INTERVAL_SECONDS`, `SOURCE_MAX_PUBLISH_PER_POLL`, and `SOURCE_MAX_AGE_HOURS`.
-  - Supports optional localization for explicit manual-message flows; source polling never calls a model.
+  - Supports localization for manual messages and requires it for every source vacancy before publication.
   - Supports optional OpenAI/OpenAI-compatible description localization with `LOCALIZE_DESCRIPTIONS`, `LOCALIZATION_PROVIDER`, `OPENAI_*`, and the built-in Groq mode (`GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_FALLBACK_MODELS`).
   - Supports opt-in, globally scoped LinkedIn hiring-post search with `ENABLE_LINKEDIN_POST_SEARCH`, `SERPAPI_API_KEY` or `SERPER_API_KEY`, `LINKEDIN_POST_SEARCH_QUERY`, and `LINKEDIN_POST_SEARCH_RESULTS_WANTED`.
   - Supports opt-in, globally scoped free LinkedIn hiring-post scraping with `ENABLE_LINKEDIN_POST_SCRAPER`, `LINKEDIN_POST_SCRAPER_QUERY`, `LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS`, and `LINKEDIN_POST_SCRAPER_RESULTS_WANTED`.
@@ -95,7 +95,7 @@
   - Shared background source polling and publishing loop.
   - Applies the per-poll source publishing limit.
   - Publishes only source vacancies that pass the unified vacancy filtering policy.
-  - Never calls a description-localization model.
+  - Always runs source descriptions through the localization boundary before publication; if the provider fails, logs the error and publishes the original description rather than losing the vacancy.
   - Filters dated source vacancies by `SOURCE_MAX_AGE_HOURS` before publishing while preserving undated vacancies for dedupe-based handling.
 
 - `tg_vacancy_bot/storage.py`

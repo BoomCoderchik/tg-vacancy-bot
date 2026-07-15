@@ -34,7 +34,11 @@ def test_poll_sources_workflow_defaults_optional_runtime_values() -> None:
     assert "SOURCE_MAX_PUBLISH_PER_POLL: ${{ secrets.SOURCE_MAX_PUBLISH_PER_POLL || '20' }}" in text
     assert "SOURCE_MAX_AGE_HOURS: ${{ secrets.SOURCE_MAX_AGE_HOURS || '48' }}" in text
     assert 'ENABLE_ARBEITNOW: "true"' in text
-    assert 'LOCALIZE_DESCRIPTIONS: "false"' in text
+    assert 'LOCALIZE_DESCRIPTIONS: "true"' in text
+    assert "LOCALIZATION_PROVIDER: ${{ secrets.LOCALIZATION_PROVIDER || 'openai' }}" in text
+    assert "OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}" in text
+    assert "GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}" in text
+    assert "Verify required localization configuration" not in text
     assert "ENABLE_LINKEDIN_POST_HEADLESS: ${{ secrets.ENABLE_LINKEDIN_POST_HEADLESS || 'false' }}" in text
     assert "ENABLE_LINKEDIN_POST_SCRAPER: ${{ secrets.ENABLE_LINKEDIN_POST_SCRAPER || 'true' }}" in text
     assert "SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}" in text

@@ -17,7 +17,7 @@ Automatic polling is deliberately limited to sources with a documented, no-regis
 
 LinkedIn is retained as an explicit opt-in discovery source. It may use SerpApi, Serper, public search-result scraping, or a public-page headless reader to find recent hiring posts. It never logs in to LinkedIn, creates an account, bypasses protection, or applies on the operator's behalf.
 
-The source polling loop does not call a translation model. `LOCALIZE_DESCRIPTIONS` remains available only for explicit manual-message publishing flows.
+Every source vacancy is passed to the real description-localization provider before publication. If translation fails, the bot logs the error and publishes the original description with the vacancy link, so an operator can still inspect and open it. Russian source text is recognized and retained without an unnecessary model call.
 
 ## Planned source pattern
 
