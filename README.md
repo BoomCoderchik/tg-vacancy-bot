@@ -85,7 +85,7 @@ LINKEDIN_POST_SCRAPER_RESULTS_WANTED=100
 This source scrapes public search-result HTML and keeps only real `linkedin.com/posts/...` and `linkedin.com/feed/update/...` links. It does not require an API key and does not create placeholder vacancies. Use `||` to separate fallback search queries. Because it depends on public search-result markup, it can be less stable than SerpApi and may return no rows when the search engine changes HTML or rate-limits requests.
 
 The scraper searches public, globally indexed results. It keeps only results with a reliable publication date (from the search result or the LinkedIn activity ID) and rejects posts older than `LINKEDIN_POST_MAX_AGE_HOURS` (maximum 120 hours) before they reach the common polling layer.
-The search depth is intentionally larger than the per-cycle publication budget: SQLite deduplication lets later polls publish the remaining fresh posts. Source polling never calls a translation model.
+The search depth is intentionally larger than the per-cycle publication budget: SQLite deduplication lets later polls publish the remaining fresh posts. Every source vacancy is localized to Russian before publication.
 
 ## Headless LinkedIn Hiring Post Parser
 
@@ -180,7 +180,7 @@ tg-vacancy-bot preview-sources --source "LinkedIn Hiring Posts" --limit 5
 ```
 
 When `SOURCE_POLL_INTERVAL_SECONDS` is greater than `0`, `tg-vacancy-bot run` also polls configured public sources in the background while it listens for forwarded messages.
-`SOURCE_MAX_PUBLISH_PER_POLL` limits how many source vacancies can be published in one polling cycle, which prevents first-run flooding. Source polling never calls a translation model; descriptions are published as provided by the supported source.
+`SOURCE_MAX_PUBLISH_PER_POLL` limits how many source vacancies can be published in one polling cycle, which prevents first-run flooding. Source polling always attempts to localize descriptions before publication; if the provider fails, it logs the failure and publishes the original description and vacancy link instead.
 
 For web-hosting deployment, use:
 
@@ -203,7 +203,7 @@ OPENAI_FALLBACK_MODELS=
 OPENAI_BASE_URL=
 ```
 
-This uses the real OpenAI API, or an OpenAI-compatible endpoint such as OpenRouter, for normalized cards from forwarded messages and `publish-message`. Source polling never invokes localization. If localization is enabled without the selected provider key, the explicit manual publishing flow stops with a clear configuration error instead of using fake or placeholder text.
+This uses the real OpenAI API, or an OpenAI-compatible endpoint such as OpenRouter, for normalized cards from forwarded messages, `publish-message`, and all source polling. Source polling forces a localization attempt even when `LOCALIZE_DESCRIPTIONS=false`; that switch only affects manual-message flows. If the provider fails or its key is absent, source polling logs the error and publishes the real vacancy with its original description and link rather than dropping it.
 
 ### Free Groq localization mode
 
