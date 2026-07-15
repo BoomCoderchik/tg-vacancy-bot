@@ -34,6 +34,7 @@ def test_poll_sources_workflow_defaults_optional_runtime_values() -> None:
     assert "SOURCE_MAX_PUBLISH_PER_POLL: ${{ secrets.SOURCE_MAX_PUBLISH_PER_POLL || '20' }}" in text
     assert "SOURCE_MAX_AGE_HOURS: ${{ secrets.SOURCE_MAX_AGE_HOURS || '48' }}" in text
     assert 'ENABLE_ARBEITNOW: "true"' in text
+    assert 'ENABLE_WORKING_NOMADS: "true"' in text
     assert 'LOCALIZE_DESCRIPTIONS: "true"' in text
     assert "LOCALIZATION_PROVIDER: ${{ secrets.LOCALIZATION_PROVIDER || 'openai' }}" in text
     assert "OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}" in text

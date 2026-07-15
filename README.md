@@ -13,7 +13,7 @@ The planned profile and controlled application automation feature is documented 
   - `copy`: copy the original message to the target channel after the same allowed-vacancy intake check.
 - Publishes only development/design/AI vacancies: backend, frontend, fullstack, design, LLM, AI, and clear software developer/engineer roles.
 - Stores message fingerprints in SQLite to avoid duplicates.
-- Includes the Arbeitnow source adapter and opt-in LinkedIn hiring-post discovery. Arbeitnow is the only automatic source with a supported no-registration application form.
+- Includes Arbeitnow, Working Nomads, and opt-in LinkedIn hiring-post discovery. Arbeitnow supports verified form preparation; Working Nomads provides public vacancies with a manual employer-application link.
 - Polls configured public sources in the background while the bot is running.
 
 ## Profile storage foundation
@@ -267,6 +267,20 @@ first and last name, email, and PDF/DOCX resume, then press `Откликнут�
 Arbeitnow card. The bot fills only the verified fields and uploads the local
 resume; it never clicks the final submit button. If the form changes, needs a
 login, or shows protection, the flow stops for manual action.
+
+## Working Nomads source
+
+Working Nomads is enabled by default through its public JSON feed:
+
+```dotenv
+ENABLE_WORKING_NOMADS=true
+```
+
+The source needs no API key or Working Nomads account. Its `Откликнуться` button
+stores the application attempt and sends the operator a link that redirects to
+the employer's actual form. The bot does not auto-fill or submit these varied
+external forms; a future adapter must be implemented and verified for each ATS
+or employer form separately.
 
 ## LinkedIn Boundary
 

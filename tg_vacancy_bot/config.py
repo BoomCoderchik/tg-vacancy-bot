@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     localize_descriptions: bool = Field(default=False, alias="LOCALIZE_DESCRIPTIONS")
 
     enable_arbeitnow: bool = Field(default=True, alias="ENABLE_ARBEITNOW")
+    enable_working_nomads: bool = Field(default=True, alias="ENABLE_WORKING_NOMADS")
     enable_linkedin_post_search: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SEARCH")
     enable_linkedin_post_scraper: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SCRAPER")
     enable_linkedin_post_headless: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_HEADLESS")

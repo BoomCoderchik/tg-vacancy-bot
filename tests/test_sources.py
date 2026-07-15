@@ -5,9 +5,10 @@ from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.sources import build_adapters, filter_it_vacancies
 from tg_vacancy_bot.sources.adapters.arbeitnow import ArbeitnowAdapter
+from tg_vacancy_bot.sources.adapters.working_nomads import WorkingNomadsAdapter
 
 
-def test_build_adapters_registers_only_arbeitnow_by_default() -> None:
+def test_build_adapters_registers_public_no_account_sources_by_default() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
@@ -16,7 +17,7 @@ def test_build_adapters_registers_only_arbeitnow_by_default() -> None:
         ENABLE_LINKEDIN_POST_HEADLESS=False,
     )
 
-    assert [adapter.name for adapter in build_adapters(settings)] == ["Arbeitnow"]
+    assert [adapter.name for adapter in build_adapters(settings)] == ["Arbeitnow", "Working Nomads"]
 
 
 def test_build_adapters_allows_disabling_arbeitnow() -> None:
@@ -24,6 +25,7 @@ def test_build_adapters_allows_disabling_arbeitnow() -> None:
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
         ENABLE_ARBEITNOW=False,
+        ENABLE_WORKING_NOMADS=False,
         ENABLE_LINKEDIN_POST_SEARCH=False,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
         ENABLE_LINKEDIN_POST_HEADLESS=False,
@@ -37,6 +39,7 @@ def test_build_adapters_keeps_opt_in_linkedin_scraper() -> None:
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
         ENABLE_ARBEITNOW=False,
+        ENABLE_WORKING_NOMADS=False,
         ENABLE_LINKEDIN_POST_SEARCH=False,
         ENABLE_LINKEDIN_POST_SCRAPER=True,
         ENABLE_LINKEDIN_POST_HEADLESS=False,
@@ -77,6 +80,41 @@ def test_arbeitnow_adapter_maps_public_api_response(monkeypatch) -> None:
             url="https://www.arbeitnow.com/view/example",
             stack=("Python", "Remote", "FastAPI"),
             published_at=datetime(2026, 7, 6, 16, 25, 2, tzinfo=UTC),
+            raw_text="Build Python APIs with FastAPI.",
+        )
+    ]
+
+
+def test_working_nomads_adapter_maps_public_api_response(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "tg_vacancy_bot.sources.adapters.working_nomads.source_session",
+        lambda: _FakeSession(
+            [
+                {
+                    "title": "Senior Python Developer",
+                    "company_name": "Example Co",
+                    "location": "Remote - Europe",
+                    "description": "<p>Build Python APIs with FastAPI.</p>",
+                    "tags": "python, backend",
+                    "url": "https://www.workingnomads.com/job/go/123/",
+                    "pub_date": "2026-07-10T09:24:39-04:00",
+                }
+            ]
+        ),
+    )
+
+    vacancies = asyncio.run(WorkingNomadsAdapter().fetch())
+
+    assert vacancies == [
+        Vacancy(
+            title="Senior Python Developer",
+            company="Example Co",
+            location="Remote - Europe",
+            description="Build Python APIs with FastAPI.",
+            source="Working Nomads",
+            url="https://www.workingnomads.com/job/go/123/",
+            stack=("python", "backend", "Python", "FastAPI"),
+            published_at=datetime(2026, 7, 10, 13, 24, 39, tzinfo=UTC),
             raw_text="Build Python APIs with FastAPI.",
         )
     ]

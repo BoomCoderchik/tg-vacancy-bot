@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from html import escape
 from io import BytesIO
 import logging
 
@@ -58,6 +59,7 @@ class ProfileForm(StatesGroup):
 def build_status_text(settings: Settings) -> str:
     source_states = [
         f"Arbeitnow={'on' if settings.enable_arbeitnow else 'off'}",
+        f"WorkingNomads={'on' if settings.enable_working_nomads else 'off'}",
         f"LinkedInPosts={_linkedin_post_search_state(settings)}",
         f"LinkedInPostScraper={'on' if settings.enable_linkedin_post_scraper else 'off'}",
         f"LinkedInHeadless={'on' if settings.enable_linkedin_post_headless else 'off'}",
@@ -87,6 +89,13 @@ def format_whoami_text(user_id: int | None) -> str:
     if user_id is None:
         return "Telegram user ID is not available for this message."
     return f"Your Telegram user ID: {user_id}"
+
+
+def manual_application_link_text(vacancy_url: str) -> str:
+    return (
+        "Автозаполнение для этой формы пока не поддерживается. "
+        f'<a href="{escape(vacancy_url, quote=True)}">Открыть вакансию и откликнуться вручную</a>.'
+    )
 
 
 def profile_onboarding_missing_fields(profile: OperatorProfile | None) -> tuple[str, ...]:
@@ -351,8 +360,21 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
                 await callback.answer(f"Заявка остановлена: заполните в /profile: {missing}.", show_alert=True)
                 return
             if inspection.status != "filled":
-                await callback.answer("Заявка остановлена: требуется ручное действие.", show_alert=True)
+                await callback.message.answer(
+                    manual_application_link_text(application.vacancy_url),
+                    parse_mode=ParseMode.HTML,
+                    disable_web_page_preview=True,
+                )
+                await callback.answer("Заявка остановлена: ссылка на вакансию отправлена.", show_alert=True)
                 return
+        if not created and application.vacancy_url and application.status in {"manual_required", "unsupported_site"}:
+            await callback.message.answer(
+                manual_application_link_text(application.vacancy_url),
+                parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True,
+            )
+            await callback.answer("Ссылка на вакансию отправлена.", show_alert=True)
+            return
         if created:
             await callback.answer(f"Заявка {application.application_id} заполнена. Отправка не выполнялась.", show_alert=True)
         else:

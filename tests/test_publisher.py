@@ -40,6 +40,7 @@ def build_publisher() -> TelegramPublisher:
     )
     publisher.store = FakeStore()
     publisher.bot = FakeBot()
+    publisher.publish_original_when_localization_fails = False
     return publisher
 
 
@@ -56,6 +57,20 @@ def test_publish_new_raises_when_localization_fails(monkeypatch) -> None:
         asyncio.run(publisher.publish_new([vacancy]))
     assert publisher.bot.sent_messages == []
     assert publisher.store.published == []
+
+
+def test_source_publisher_sends_original_when_localization_fails(monkeypatch) -> None:
+    publisher = build_publisher()
+    publisher.publish_original_when_localization_fails = True
+    vacancy = Vacancy(title="Python Engineer", description="Remote Python role", source="Fake")
+
+    async def fake_localize(vacancy, settings):
+        raise RuntimeError("Translation provider is unavailable.")
+
+    monkeypatch.setattr("tg_vacancy_bot.publisher.localize_vacancy_description", fake_localize)
+
+    assert asyncio.run(publisher.publish_new([vacancy])) == 1
+    assert "Remote Python role" in publisher.bot.sent_messages[0]
 
 
 def test_publish_new_retries_after_telegram_flood_control(monkeypatch) -> None:

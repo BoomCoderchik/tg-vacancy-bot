@@ -87,8 +87,8 @@
   - Extracts public `https://t.me/...` links from forwarded Telegram channel metadata.
 
 - `tg_vacancy_bot/sources/`
-  - Source adapter package for Arbeitnow and the explicit opt-in LinkedIn exception.
-  - Arbeitnow is the only automatic source with a supported no-registration application form.
+  - Source adapter package for Arbeitnow, Working Nomads, and the explicit opt-in LinkedIn exception.
+  - Arbeitnow has a supported no-registration application form. Working Nomads uses a public feed and routes the operator to varied employer forms, which remain manual until a verified dedicated adapter exists.
   - Parses publication dates when sources provide them and leaves `published_at=None` when they do not.
 
 - `tg_vacancy_bot/source_polling.py`
@@ -147,6 +147,7 @@ The bot depends on real Telegram access:
 Optional source credentials:
 
 - Arbeitnow is controlled by `ENABLE_ARBEITNOW` and needs no API key.
+- Working Nomads is controlled by `ENABLE_WORKING_NOMADS` and needs no API key or Working Nomads account.
 - LinkedIn hiring-post search is controlled by `ENABLE_LINKEDIN_POST_SEARCH=false` by default and requires `SERPAPI_API_KEY` or `SERPER_API_KEY`.
 - Free LinkedIn hiring-post scraping is controlled by `ENABLE_LINKEDIN_POST_SCRAPER=false` by default and does not require an API key. `LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS` defaults to `duckduckgo,bing` so the scraper can continue through another public HTML result provider when DuckDuckGo returns an anti-bot challenge.
 - Headless LinkedIn post parsing is controlled by `ENABLE_LINKEDIN_POST_HEADLESS=false` by default. It uses Playwright and does not use a LinkedIn account, proxy, or protection bypass. It uses `SERPAPI_API_KEY` or `SERPER_API_KEY` for reliable link discovery; without a key, Bing discovery is best effort.
