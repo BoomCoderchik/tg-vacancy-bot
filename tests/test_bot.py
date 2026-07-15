@@ -1,5 +1,14 @@
-from tg_vacancy_bot.bot import build_status_text, format_whoami_text
+import asyncio
+
+from tg_vacancy_bot.bot import (
+    build_status_text,
+    format_whoami_text,
+    needs_profile_onboarding,
+    profile_onboarding_text,
+    send_profile_onboarding_reminders,
+)
 from tg_vacancy_bot.config import Settings
+from tg_vacancy_bot.models import OperatorProfile
 
 
 def test_build_status_text_does_not_expose_bot_token() -> None:
@@ -83,3 +92,50 @@ def test_format_whoami_text_returns_user_id() -> None:
 
 def test_format_whoami_text_handles_missing_user() -> None:
     assert "not available" in format_whoami_text(None)
+
+
+def test_profile_onboarding_text_lists_missing_application_data() -> None:
+    text = profile_onboarding_text(None)
+
+    assert "имя и фамилия" in text
+    assert "email" in text
+    assert "резюме в PDF или DOCX" in text
+    assert "Заполнить поля" in text
+
+
+def test_profile_onboarding_is_not_needed_for_ready_profile() -> None:
+    profile = OperatorProfile(
+        operator_user_id=42,
+        full_name="Ada Lovelace",
+        email="ada@example.com",
+        resume_stored_name="42-private.pdf",
+    )
+
+    assert needs_profile_onboarding(profile) is False
+
+
+def test_startup_reminder_only_targets_operators_with_incomplete_profiles() -> None:
+    class FakeStore:
+        def get_operator_profile(self, user_id: int):
+            if user_id == 1:
+                return None
+            return OperatorProfile(
+                operator_user_id=user_id,
+                full_name="Ada Lovelace",
+                email="ada@example.com",
+                resume_stored_name="2-private.pdf",
+            )
+
+    class FakeBot:
+        def __init__(self) -> None:
+            self.sent_to: list[int] = []
+
+        async def send_message(self, **kwargs) -> None:
+            self.sent_to.append(kwargs["chat_id"])
+
+    settings = Settings(TELEGRAM_BOT_TOKEN="token", TARGET_CHAT_ID="@target", OPERATOR_USER_IDS="1,2")
+    bot = FakeBot()
+
+    asyncio.run(send_profile_onboarding_reminders(bot, settings, FakeStore()))
+
+    assert bot.sent_to == [1]

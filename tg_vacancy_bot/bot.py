@@ -94,6 +94,33 @@ def format_whoami_text(user_id: int | None) -> str:
     return f"Your Telegram user ID: {user_id}"
 
 
+def profile_onboarding_missing_fields(profile: OperatorProfile | None) -> tuple[str, ...]:
+    """Return the private data required by the currently supported application adapter."""
+    missing: list[str] = []
+    name_parts = (profile.full_name or "").strip().split() if profile else []
+    if len(name_parts) < 2:
+        missing.append("имя и фамилия")
+    if not profile or not profile.email:
+        missing.append("email")
+    if not profile or not profile.resume_stored_name:
+        missing.append("резюме в PDF или DOCX")
+    return tuple(missing)
+
+
+def profile_onboarding_text(profile: OperatorProfile | None) -> str:
+    missing = ", ".join(profile_onboarding_missing_fields(profile))
+    return (
+        "Чтобы подготовить отклики, загрузите резюме и заполните профиль.\n"
+        f"Сейчас нужны: {missing}.\n\n"
+        "Нажмите «Заполнить поля», затем «Загрузить резюме». "
+        "Без этих данных бот не будет пытаться заполнить форму вакансии."
+    )
+
+
+def needs_profile_onboarding(profile: OperatorProfile | None) -> bool:
+    return bool(profile_onboarding_missing_fields(profile))
+
+
 def profile_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -111,6 +138,23 @@ def profile_confirm_delete_menu() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="Отмена", callback_data="profile:delete:cancel")],
         ]
     )
+
+
+async def send_profile_onboarding_reminders(bot: Bot, settings: Settings, store: VacancyStore) -> None:
+    """Prompt known operators after a bot restart until their application profile is ready."""
+    for operator_user_id in settings.operator_user_ids:
+        profile = store.get_operator_profile(operator_user_id)
+        if not needs_profile_onboarding(profile):
+            continue
+        try:
+            await bot.send_message(
+                chat_id=operator_user_id,
+                text=profile_onboarding_text(profile),
+                reply_markup=profile_menu(),
+            )
+        except Exception:
+            # A bot cannot message an operator who has never opened a private chat with it.
+            logger.warning("Could not send profile onboarding reminder to configured operator.")
 
 
 def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
@@ -319,8 +363,20 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
         else:
             await callback.answer(f"Заявка {application.application_id} уже создана.", show_alert=True)
 
-    @dp.message(Command("start", "help"))
+    @dp.message(Command("start"))
     async def start(message: Message) -> None:
+        operator_user_id = profile_operator_from_message(message)
+        profile = store.get_operator_profile(operator_user_id) if operator_user_id is not None else None
+        if operator_user_id is not None and needs_profile_onboarding(profile):
+            await message.answer(profile_onboarding_text(profile), reply_markup=profile_menu())
+            return
+        await message.answer(
+            "Пришли или перешли мне вакансию. Я опубликую ее в целевой канал "
+            "как карточку или скопирую оригинал, в зависимости от FORWARDED_MODE."
+        )
+
+    @dp.message(Command("help"))
+    async def help_command(message: Message) -> None:
         await message.answer(
             "Пришли или перешли мне вакансию. Я опубликую ее в целевой канал "
             "как карточку или скопирую оригинал, в зависимости от FORWARDED_MODE."
@@ -440,6 +496,7 @@ async def run_bot(settings: Settings) -> None:
             default=DefaultBotProperties(parse_mode=ParseMode.HTML),
         )
         dp = create_dispatcher(settings, store)
+        await send_profile_onboarding_reminders(bot, settings, store)
         polling_task = asyncio.create_task(poll_sources_forever(bot, settings, store))
 
         try:

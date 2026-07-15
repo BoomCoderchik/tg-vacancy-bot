@@ -35,6 +35,13 @@ profile. This command requires an explicit `OPERATOR_USER_IDS` allowlist;
 unlisted users cannot read or change this private data. Extracting resume text
 is scheduled for the next task in the implementation plan.
 
+When the bot starts, it sends each configured operator whose profile is missing
+a full name, email, or resume a private onboarding prompt with buttons to fill
+in the fields and upload the resume. `/start` shows the same prompt until those
+required application details are complete. An operator must have opened a
+private chat with the bot first, because Telegram does not allow bots to start
+a new chat with a user.
+
 ## Near-Real-Time Parser Mode
 
 For an always-on vacancy parser, run the bot continuously with source polling enabled:
@@ -242,7 +249,8 @@ Messages that do not look like allowed development/design/AI vacancies are skipp
 
 ## Bot Commands
 
-- `/start` or `/help`: shows the forwarding instructions.
+- `/start`: for an incomplete operator profile, prompts to fill in fields and upload a resume; otherwise shows forwarding instructions.
+- `/help`: shows forwarding instructions.
 - `/whoami`: returns your Telegram user ID for `OPERATOR_USER_IDS`.
 - `/status`: shows the active forwarding mode, target chat, polling interval, and enabled sources without exposing secrets.
 - `/profile`: private operator profile: view/edit job preferences, upload or replace a resume, or delete the profile.
