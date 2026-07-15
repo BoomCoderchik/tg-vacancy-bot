@@ -2,7 +2,6 @@ name: Scheduled vacancy source polling
 
 on:
   schedule:
-    # Avoid the busiest GitHub Actions scheduler minutes (:00, :15, :30, :45).
     - cron: "7 * * * *"
     - cron: "22 * * * *"
     - cron: "37 * * * *"
@@ -29,48 +28,22 @@ jobs:
       SOURCE_POLL_INTERVAL_SECONDS: "0"
       SOURCE_MAX_PUBLISH_PER_POLL: ${{ secrets.SOURCE_MAX_PUBLISH_PER_POLL || '20' }}
       SOURCE_MAX_AGE_HOURS: ${{ secrets.SOURCE_MAX_AGE_HOURS || '48' }}
-      # LinkedIn adapters enforce this fixed five-day ceiling independently of
-      # the general source freshness setting above.
-      LINKEDIN_POST_MAX_AGE_HOURS: "120"
-      LOCALIZE_DESCRIPTIONS: ${{ secrets.LOCALIZE_DESCRIPTIONS || 'false' }}
-      LOCALIZATION_MAX_PER_POLL: ${{ secrets.LOCALIZATION_MAX_PER_POLL || '12' }}
-      LOCALIZATION_PROVIDER: ${{ secrets.LOCALIZATION_PROVIDER || 'openai' }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || 'gpt-4.1-mini' }}
-      OPENAI_FALLBACK_MODELS: ${{ secrets.OPENAI_FALLBACK_MODELS }}
-      OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
-      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-      GROQ_MODEL: ${{ secrets.GROQ_MODEL || 'llama-3.1-8b-instant' }}
-      GROQ_FALLBACK_MODELS: ${{ secrets.GROQ_FALLBACK_MODELS || 'openai/gpt-oss-20b' }}
-      ENABLE_REMOTIVE: ${{ secrets.ENABLE_REMOTIVE || 'true' }}
-      ENABLE_ARBEITNOW: ${{ secrets.ENABLE_ARBEITNOW || 'true' }}
-      ENABLE_REMOTEOK: ${{ secrets.ENABLE_REMOTEOK || 'true' }}
-      ENABLE_HN_WHO_IS_HIRING: ${{ secrets.ENABLE_HN_WHO_IS_HIRING || 'true' }}
-      ENABLE_JOBICY: ${{ secrets.ENABLE_JOBICY || 'true' }}
-      ENABLE_WE_WORK_REMOTELY: ${{ secrets.ENABLE_WE_WORK_REMOTELY || 'true' }}
-      ENABLE_HIMALAYAS: ${{ secrets.ENABLE_HIMALAYAS || 'true' }}
-      ENABLE_REAL_WORK_FROM_ANYWHERE: ${{ secrets.ENABLE_REAL_WORK_FROM_ANYWHERE || 'true' }}
-      ENABLE_JOBSCOLLIDER: ${{ secrets.ENABLE_JOBSCOLLIDER || 'true' }}
+      ENABLE_ARBEITNOW: "true"
       ENABLE_LINKEDIN_POST_SEARCH: ${{ secrets.ENABLE_LINKEDIN_POST_SEARCH || 'false' }}
       SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
       SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
-      LINKEDIN_POST_SEARCH_QUERY: ${{ secrets.LINKEDIN_POST_SEARCH_QUERY || '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("ищем" OR "ищет" OR "в команду" OR "we are hiring" OR hiring OR "join our team" OR "open position" OR "looking for") (frontend OR "front-end" OR backend OR fullstack OR "full-stack" OR mobile OR android OR ios OR react OR vue OR angular OR python OR java OR golang OR node.js OR typescript OR javascript OR designer OR "ui/ux" OR "AI engineer" OR "ML engineer" OR "LLM engineer" OR разработчик OR инженер OR программист)' }}
+      LINKEDIN_POST_SEARCH_QUERY: ${{ secrets.LINKEDIN_POST_SEARCH_QUERY || '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR hiring OR "ищем" OR "ищет") (frontend OR backend OR developer OR engineer OR react OR python OR разработчик OR инженер)' }}
       LINKEDIN_POST_SEARCH_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SEARCH_RESULTS_WANTED || '10' }}
       ENABLE_LINKEDIN_POST_SCRAPER: ${{ secrets.ENABLE_LINKEDIN_POST_SCRAPER || 'true' }}
-      LINKEDIN_POST_SCRAPER_QUERY: ${{ secrets.LINKEDIN_POST_SCRAPER_QUERY || 'site:linkedin.com/posts hiring developer || site:linkedin.com/posts "we are hiring" developer || site:linkedin.com/posts "join our team" developer || site:linkedin.com/posts "looking for" developer || site:linkedin.com/posts "ищем" разработчик || site:linkedin.com/posts "ищет" разработчик || site:linkedin.com/posts frontend || site:linkedin.com/posts backend || site:linkedin.com/feed/update hiring frontend || site:linkedin.com/feed/update hiring backend' }}
+      LINKEDIN_POST_SCRAPER_QUERY: ${{ secrets.LINKEDIN_POST_SCRAPER_QUERY || '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR hiring OR "ищем" OR "ищет") (frontend OR backend OR developer OR engineer OR react OR python OR разработчик OR инженер)' }}
+      LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS: ${{ secrets.LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS || 'duckduckgo,bing' }}
       LINKEDIN_POST_SCRAPER_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SCRAPER_RESULTS_WANTED || '100' }}
       ENABLE_LINKEDIN_POST_HEADLESS: ${{ secrets.ENABLE_LINKEDIN_POST_HEADLESS || 'false' }}
-      LINKEDIN_POST_HEADLESS_QUERY: ${{ secrets.LINKEDIN_POST_HEADLESS_QUERY || 'site:linkedin.com/posts hiring developer || site:linkedin.com/posts "we are hiring" developer || site:linkedin.com/posts "join our team" developer || site:linkedin.com/posts "looking for" developer || site:linkedin.com/posts "ищем" разработчик || site:linkedin.com/posts "ищет" разработчик || site:linkedin.com/feed/update hiring frontend || site:linkedin.com/feed/update hiring backend' }}
+      LINKEDIN_POST_HEADLESS_QUERY: ${{ secrets.LINKEDIN_POST_HEADLESS_QUERY || '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR hiring OR "ищем" OR "ищет") (frontend OR backend OR developer OR engineer OR react OR python OR разработчик OR инженер)' }}
       LINKEDIN_POST_HEADLESS_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_HEADLESS_RESULTS_WANTED || '10' }}
       LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS: ${{ secrets.LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS || '20' }}
-      ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
-      ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
-      ADZUNA_COUNTRY: ${{ secrets.ADZUNA_COUNTRY || 'us' }}
-      ADZUNA_QUERY: ${{ secrets.ADZUNA_QUERY || 'software developer' }}
-      ADZUNA_LOCATION: ${{ secrets.ADZUNA_LOCATION }}
-      JOOBLE_API_KEY: ${{ secrets.JOOBLE_API_KEY }}
-      JOOBLE_KEYWORDS: ${{ secrets.JOOBLE_KEYWORDS || 'software developer' }}
-      JOOBLE_LOCATION: ${{ secrets.JOOBLE_LOCATION }}
+      # Public-source polling never invokes a translation model.
+      LOCALIZE_DESCRIPTIONS: "false"
 
     steps:
       - uses: actions/checkout@v5
@@ -94,7 +67,6 @@ jobs:
         if: env.ENABLE_LINKEDIN_POST_HEADLESS == 'true'
         run: python -m playwright install --with-deps chromium
 
-      # Production posts must use the current compact card, not the old channel label.
       - name: Verify production card formatting
         run: |
           python - <<'PY'
@@ -111,23 +83,9 @@ jobs:
               )
           )
           assert "IT Job Board" not in card
-          assert "<b>Локация</b>" in card
-          assert "<b>Стек</b>" in card
+          assert "<b>\u041b\u043e\u043a\u0430\u0446\u0438\u044f</b>" in card
+          assert "<b>\u0421\u0442\u0435\u043a</b>" in card
           PY
-
-      # If translation is required, stop before Telegram publishing when its selected provider is unavailable.
-      - name: Verify localization configuration
-        run: |
-          if [ "${LOCALIZE_DESCRIPTIONS}" = "true" ]; then
-            if [ "${LOCALIZATION_PROVIDER}" = "groq" ] && [ -z "${GROQ_API_KEY}" ]; then
-              echo "LOCALIZATION_PROVIDER=groq but GROQ_API_KEY is not configured."
-              exit 1
-            fi
-            if [ "${LOCALIZATION_PROVIDER}" = "openai" ] && [ -z "${OPENAI_API_KEY}" ]; then
-              echo "LOCALIZATION_PROVIDER=openai but OPENAI_API_KEY is not configured."
-              exit 1
-            fi
-          fi
 
       - name: Poll and publish new vacancies
         run: tg-vacancy-bot poll-once

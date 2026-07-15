@@ -45,15 +45,7 @@ class Settings(BaseSettings):
     source_max_age_hours: int = Field(default=48, alias="SOURCE_MAX_AGE_HOURS")
     localize_descriptions: bool = Field(default=False, alias="LOCALIZE_DESCRIPTIONS")
 
-    enable_remotive: bool = Field(default=True, alias="ENABLE_REMOTIVE")
     enable_arbeitnow: bool = Field(default=True, alias="ENABLE_ARBEITNOW")
-    enable_remoteok: bool = Field(default=True, alias="ENABLE_REMOTEOK")
-    enable_hn_who_is_hiring: bool = Field(default=True, alias="ENABLE_HN_WHO_IS_HIRING")
-    enable_jobicy: bool = Field(default=True, alias="ENABLE_JOBICY")
-    enable_we_work_remotely: bool = Field(default=True, alias="ENABLE_WE_WORK_REMOTELY")
-    enable_himalayas: bool = Field(default=True, alias="ENABLE_HIMALAYAS")
-    enable_real_work_from_anywhere: bool = Field(default=True, alias="ENABLE_REAL_WORK_FROM_ANYWHERE")
-    enable_jobscollider: bool = Field(default=True, alias="ENABLE_JOBSCOLLIDER")
     enable_linkedin_post_search: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SEARCH")
     enable_linkedin_post_scraper: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SCRAPER")
     enable_linkedin_post_headless: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_HEADLESS")
@@ -96,16 +88,6 @@ class Settings(BaseSettings):
         gt=0,
     )
     localization_max_per_poll: int = Field(default=12, alias="LOCALIZATION_MAX_PER_POLL")
-    adzuna_app_id: str = Field(default="", alias="ADZUNA_APP_ID")
-    adzuna_app_key: str = Field(default="", alias="ADZUNA_APP_KEY")
-    adzuna_country: str = Field(default="us", alias="ADZUNA_COUNTRY")
-    adzuna_query: str = Field(default="software developer", alias="ADZUNA_QUERY")
-    adzuna_location: str = Field(default="", alias="ADZUNA_LOCATION")
-
-    jooble_api_key: str = Field(default="", alias="JOOBLE_API_KEY")
-    jooble_keywords: str = Field(default="software developer", alias="JOOBLE_KEYWORDS")
-    jooble_location: str = Field(default="", alias="JOOBLE_LOCATION")
-
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4.1-mini", alias="OPENAI_MODEL")
     openai_fallback_models_raw: str = Field(default="", alias="OPENAI_FALLBACK_MODELS")
