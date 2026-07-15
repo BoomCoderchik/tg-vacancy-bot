@@ -13,7 +13,7 @@ The planned profile and controlled application automation feature is documented 
   - `copy`: copy the original message to the target channel after the same allowed-vacancy intake check.
 - Publishes only development/design/AI vacancies: backend, frontend, fullstack, design, LLM, AI, and clear software developer/engineer roles.
 - Stores message fingerprints in SQLite to avoid duplicates.
-- Includes source adapters for Remotive, Arbeitnow, RemoteOK, Hacker News "Who is Hiring", Jobicy, We Work Remotely, Himalayas, Real Work From Anywhere, JobsCollider, Adzuna, Jooble, opt-in LinkedIn hiring-post search, free LinkedIn hiring-post scraping, and opt-in headless parsing of publicly available LinkedIn posts.
+- Includes the Arbeitnow source adapter and opt-in LinkedIn hiring-post discovery. Arbeitnow is the only automatic source with a supported no-registration application form.
 - Polls configured public sources in the background while the bot is running.
 
 ## Profile storage foundation
@@ -85,7 +85,7 @@ LINKEDIN_POST_SCRAPER_RESULTS_WANTED=100
 This source scrapes public search-result HTML and keeps only real `linkedin.com/posts/...` and `linkedin.com/feed/update/...` links. It does not require an API key and does not create placeholder vacancies. Use `||` to separate fallback search queries. Because it depends on public search-result markup, it can be less stable than SerpApi and may return no rows when the search engine changes HTML or rate-limits requests.
 
 The scraper searches public, globally indexed results. It keeps only results with a reliable publication date (from the search result or the LinkedIn activity ID) and rejects posts older than `LINKEDIN_POST_MAX_AGE_HOURS` (maximum 120 hours) before they reach the common polling layer.
-The search depth is intentionally larger than the per-cycle publication budget: SQLite deduplication lets later polls publish the remaining fresh posts. `LOCALIZATION_MAX_PER_POLL=12` caps localization attempts per poll when localization is enabled; lower it further if the provider is rate-limited.
+The search depth is intentionally larger than the per-cycle publication budget: SQLite deduplication lets later polls publish the remaining fresh posts. Source polling never calls a translation model.
 
 ## Headless LinkedIn Hiring Post Parser
 
@@ -157,9 +157,8 @@ use:
 - `TARGET_CHAT_ID`
 - One localization key when `LOCALIZE_DESCRIPTIONS=true`: `OPENAI_API_KEY` for the default mode, or `GROQ_API_KEY` when `LOCALIZATION_PROVIDER=groq`.
 
-Optional source API keys and toggles such as `ADZUNA_APP_ID`,
-`ADZUNA_APP_KEY`, `JOOBLE_API_KEY`, `SERPAPI_API_KEY`, `SERPER_API_KEY`, and `ENABLE_*` can also
-be configured as GitHub secrets. The workflow keeps `DATABASE_PATH` under
+Optional LinkedIn keys and toggles such as `SERPAPI_API_KEY`, `SERPER_API_KEY`, and
+`ENABLE_LINKEDIN_POST_*` can also be configured as GitHub secrets. The workflow keeps `DATABASE_PATH` under
 `data/` and restores it with the GitHub Actions cache so source deduplication is
 preserved between scheduled runs.
 
@@ -181,7 +180,7 @@ tg-vacancy-bot preview-sources --source "LinkedIn Hiring Posts" --limit 5
 ```
 
 When `SOURCE_POLL_INTERVAL_SECONDS` is greater than `0`, `tg-vacancy-bot run` also polls configured public sources in the background while it listens for forwarded messages.
-`SOURCE_MAX_PUBLISH_PER_POLL` limits how many source vacancies can be published in one polling cycle, which prevents first-run flooding. When localization is enabled, `LOCALIZATION_MAX_PER_POLL` separately limits model calls; unlocalized posts remain available for a later poll through deduplication.
+`SOURCE_MAX_PUBLISH_PER_POLL` limits how many source vacancies can be published in one polling cycle, which prevents first-run flooding. Source polling never calls a translation model; descriptions are published as provided by the supported source.
 
 For web-hosting deployment, use:
 
@@ -204,7 +203,7 @@ OPENAI_FALLBACK_MODELS=
 OPENAI_BASE_URL=
 ```
 
-This uses the real OpenAI API, or an OpenAI-compatible endpoint such as OpenRouter, for normalized cards from forwarded messages, `publish-message`, and public source polling. If localization is enabled without the selected provider key, publishing stops with a clear configuration error instead of using fake or placeholder text.
+This uses the real OpenAI API, or an OpenAI-compatible endpoint such as OpenRouter, for normalized cards from forwarded messages and `publish-message`. Source polling never invokes localization. If localization is enabled without the selected provider key, the explicit manual publishing flow stops with a clear configuration error instead of using fake or placeholder text.
 
 ### Free Groq localization mode
 

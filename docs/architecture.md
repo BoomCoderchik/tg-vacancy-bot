@@ -45,7 +45,7 @@
   - Requires `TELEGRAM_BOT_TOKEN` and `TARGET_CHAT_ID` for real publishing.
   - Supports optional `OPERATOR_USER_IDS` for publish access control.
   - Controls source polling with `SOURCE_POLL_INTERVAL_SECONDS`, `SOURCE_MAX_PUBLISH_PER_POLL`, and `SOURCE_MAX_AGE_HOURS`.
-  - Controls localization load with `LOCALIZATION_MAX_PER_POLL`; already-Russian descriptions bypass the model.
+  - Supports optional localization for explicit manual-message flows; source polling never calls a model.
   - Supports optional OpenAI/OpenAI-compatible description localization with `LOCALIZE_DESCRIPTIONS`, `LOCALIZATION_PROVIDER`, `OPENAI_*`, and the built-in Groq mode (`GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_FALLBACK_MODELS`).
   - Supports opt-in, globally scoped LinkedIn hiring-post search with `ENABLE_LINKEDIN_POST_SEARCH`, `SERPAPI_API_KEY` or `SERPER_API_KEY`, `LINKEDIN_POST_SEARCH_QUERY`, and `LINKEDIN_POST_SEARCH_RESULTS_WANTED`.
   - Supports opt-in, globally scoped free LinkedIn hiring-post scraping with `ENABLE_LINKEDIN_POST_SCRAPER`, `LINKEDIN_POST_SCRAPER_QUERY`, `LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS`, and `LINKEDIN_POST_SCRAPER_RESULTS_WANTED`.
@@ -87,16 +87,15 @@
   - Extracts public `https://t.me/...` links from forwarded Telegram channel metadata.
 
 - `tg_vacancy_bot/sources/`
-  - Source adapter package for real job APIs and public feeds.
-  - Keyed APIs are enabled only when credentials exist.
+  - Source adapter package for Arbeitnow and the explicit opt-in LinkedIn exception.
+  - Arbeitnow is the only automatic source with a supported no-registration application form.
   - Parses publication dates when sources provide them and leaves `published_at=None` when they do not.
 
 - `tg_vacancy_bot/source_polling.py`
   - Shared background source polling and publishing loop.
   - Applies the per-poll source publishing limit.
-  - Applies the separate per-poll localization-attempt limit and stops before another localization request when that budget is exhausted.
   - Publishes only source vacancies that pass the unified vacancy filtering policy.
-  - Skips publishing a vacancy when required description localization fails, so English originals do not leak into localized channel posts.
+  - Never calls a description-localization model.
   - Filters dated source vacancies by `SOURCE_MAX_AGE_HOURS` before publishing while preserving undated vacancies for dedupe-based handling.
 
 - `tg_vacancy_bot/storage.py`
@@ -147,12 +146,10 @@ The bot depends on real Telegram access:
 
 Optional source credentials:
 
-- No-key sources are controlled by `ENABLE_REMOTIVE`, `ENABLE_ARBEITNOW`, `ENABLE_REMOTEOK`, `ENABLE_HN_WHO_IS_HIRING`, `ENABLE_JOBICY`, `ENABLE_WE_WORK_REMOTELY`, `ENABLE_HIMALAYAS`, `ENABLE_REAL_WORK_FROM_ANYWHERE`, and `ENABLE_JOBSCOLLIDER`.
+- Arbeitnow is controlled by `ENABLE_ARBEITNOW` and needs no API key.
 - LinkedIn hiring-post search is controlled by `ENABLE_LINKEDIN_POST_SEARCH=false` by default and requires `SERPAPI_API_KEY` or `SERPER_API_KEY`.
 - Free LinkedIn hiring-post scraping is controlled by `ENABLE_LINKEDIN_POST_SCRAPER=false` by default and does not require an API key. `LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS` defaults to `duckduckgo,bing` so the scraper can continue through another public HTML result provider when DuckDuckGo returns an anti-bot challenge.
 - Headless LinkedIn post parsing is controlled by `ENABLE_LINKEDIN_POST_HEADLESS=false` by default. It uses Playwright and does not use a LinkedIn account, proxy, or protection bypass. It uses `SERPAPI_API_KEY` or `SERPER_API_KEY` for reliable link discovery; without a key, Bing discovery is best effort.
-- `ADZUNA_APP_ID` and `ADZUNA_APP_KEY`.
-- `JOOBLE_API_KEY`.
 
 Optional OpenAI localization:
 

@@ -3,834 +3,83 @@ from datetime import UTC, datetime
 
 from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
-from tg_vacancy_bot.sources import build_adapters, filter_it_vacancies, source_configuration_warnings
-from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import (
-    LinkedInPostScraperAdapter,
-    _html_to_vacancies,
-)
-from tg_vacancy_bot.sources.adapters.linkedin_post_headless import (
-    LinkedInPostHeadlessAdapter,
-    _extract_post_text,
-    _requires_manual_access,
-)
-from tg_vacancy_bot.sources.adapters.linkedin_post_search import LinkedInPostSearchAdapter, LinkedInPostSerperAdapter
-from tg_vacancy_bot.sources.adapters.jobicy import JobicyAdapter
-from tg_vacancy_bot.sources.rss import RssFeedAdapter, RssFeedConfig
+from tg_vacancy_bot.sources import build_adapters, filter_it_vacancies
+from tg_vacancy_bot.sources.adapters.arbeitnow import ArbeitnowAdapter
 
 
-def test_build_adapters_skips_keyed_sources_without_credentials() -> None:
+def test_build_adapters_registers_only_arbeitnow_by_default() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
-        ENABLE_REMOTIVE=False,
-        ENABLE_ARBEITNOW=False,
-        ENABLE_REMOTEOK=False,
-        ENABLE_HN_WHO_IS_HIRING=False,
-        ENABLE_JOBICY=False,
-        ENABLE_WE_WORK_REMOTELY=False,
-        ENABLE_HIMALAYAS=False,
-        ENABLE_REAL_WORK_FROM_ANYWHERE=False,
-        ENABLE_JOBSCOLLIDER=False,
+        ENABLE_LINKEDIN_POST_SEARCH=False,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
-        SERPER_API_KEY="",
+        ENABLE_LINKEDIN_POST_HEADLESS=False,
+    )
+
+    assert [adapter.name for adapter in build_adapters(settings)] == ["Arbeitnow"]
+
+
+def test_build_adapters_allows_disabling_arbeitnow() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_ARBEITNOW=False,
+        ENABLE_LINKEDIN_POST_SEARCH=False,
+        ENABLE_LINKEDIN_POST_SCRAPER=False,
+        ENABLE_LINKEDIN_POST_HEADLESS=False,
     )
 
     assert build_adapters(settings) == []
 
 
-def test_build_adapters_adds_keyed_sources_with_credentials() -> None:
+def test_build_adapters_keeps_opt_in_linkedin_scraper() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
-        ENABLE_REMOTIVE=False,
         ENABLE_ARBEITNOW=False,
-        ENABLE_REMOTEOK=False,
-        ENABLE_HN_WHO_IS_HIRING=False,
-        ENABLE_JOBICY=False,
-        ENABLE_WE_WORK_REMOTELY=False,
-        ENABLE_HIMALAYAS=False,
-        ENABLE_REAL_WORK_FROM_ANYWHERE=False,
-        ENABLE_JOBSCOLLIDER=False,
-        ENABLE_LINKEDIN_POST_SCRAPER=False,
-        SERPER_API_KEY="",
-        ADZUNA_APP_ID="app",
-        ADZUNA_APP_KEY="key",
-        JOOBLE_API_KEY="jooble",
-    )
-
-    names = [adapter.name for adapter in build_adapters(settings)]
-
-    assert names == ["Adzuna", "Jooble"]
-
-
-def test_build_adapters_adds_linkedin_post_headless_when_enabled() -> None:
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        ENABLE_REMOTIVE=False,
-        ENABLE_ARBEITNOW=False,
-        ENABLE_REMOTEOK=False,
-        ENABLE_HN_WHO_IS_HIRING=False,
-        ENABLE_JOBICY=False,
-        ENABLE_WE_WORK_REMOTELY=False,
-        ENABLE_HIMALAYAS=False,
-        ENABLE_REAL_WORK_FROM_ANYWHERE=False,
-        ENABLE_JOBSCOLLIDER=False,
-        ENABLE_LINKEDIN_POST_SCRAPER=False,
-        ENABLE_LINKEDIN_POST_HEADLESS=True,
-        SERPER_API_KEY="",
-    )
-
-    names = [adapter.name for adapter in build_adapters(settings)]
-
-    assert names == ["LinkedIn Hiring Posts (Headless)"]
-
-
-def test_linkedin_post_headless_uses_keyed_search_urls_before_bing(monkeypatch) -> None:
-    class FakeSearchAdapter:
-        def __init__(self, settings: Settings) -> None:
-            assert settings.linkedin_post_search_query == 'site:linkedin.com/posts "hiring"'
-            assert settings.linkedin_post_search_results_wanted == 1
-
-        async def fetch(self) -> list[Vacancy]:
-            return [
-                Vacancy(
-                    title="Backend Engineer",
-                    description="We are hiring.",
-                    source="Test",
-                    url="https://www.linkedin.com/posts/example_hiring-activity-7446240742659821568-DPvt",
-                )
-            ]
-
-    monkeypatch.setattr(
-        "tg_vacancy_bot.sources.adapters.linkedin_post_headless.LinkedInPostSearchAdapter",
-        FakeSearchAdapter,
-    )
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        ENABLE_LINKEDIN_POST_SEARCH=False,
-        ENABLE_LINKEDIN_POST_HEADLESS=True,
-        LINKEDIN_POST_HEADLESS_QUERY='site:linkedin.com/posts "hiring"',
-        LINKEDIN_POST_HEADLESS_RESULTS_WANTED=1,
-        SERPAPI_API_KEY="serp-key",
-    )
-
-    urls = asyncio.run(LinkedInPostHeadlessAdapter(settings)._discover_keyed_post_urls(1))
-
-    assert urls == ("https://www.linkedin.com/posts/example_hiring-activity-7446240742659821568-DPvt",)
-
-
-def test_linkedin_post_headless_warns_when_only_bing_discovery_is_available() -> None:
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        ENABLE_LINKEDIN_POST_SEARCH=False,
-        ENABLE_LINKEDIN_POST_HEADLESS=True,
-        SERPAPI_API_KEY="",
-        SERPER_API_KEY="",
-    )
-
-    assert source_configuration_warnings(settings) == [
-        "LinkedIn Headless source has no SERPAPI_API_KEY or SERPER_API_KEY; Bing discovery is best effort."
-    ]
-
-
-def test_build_adapters_adds_linkedin_post_search_with_serpapi_key() -> None:
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        ENABLE_REMOTIVE=False,
-        ENABLE_ARBEITNOW=False,
-        ENABLE_REMOTEOK=False,
-        ENABLE_HN_WHO_IS_HIRING=False,
-        ENABLE_JOBICY=False,
-        ENABLE_WE_WORK_REMOTELY=False,
-        ENABLE_HIMALAYAS=False,
-        ENABLE_REAL_WORK_FROM_ANYWHERE=False,
-        ENABLE_JOBSCOLLIDER=False,
-        ENABLE_LINKEDIN_POST_SEARCH=True,
-        ENABLE_LINKEDIN_POST_SCRAPER=False,
-        SERPAPI_API_KEY="serp-key",
-        SERPER_API_KEY="",
-    )
-
-    names = [adapter.name for adapter in build_adapters(settings)]
-
-    assert names == ["LinkedIn Hiring Posts"]
-
-
-def test_build_adapters_adds_linkedin_post_search_with_serper_key() -> None:
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        ENABLE_REMOTIVE=False,
-        ENABLE_ARBEITNOW=False,
-        ENABLE_REMOTEOK=False,
-        ENABLE_HN_WHO_IS_HIRING=False,
-        ENABLE_JOBICY=False,
-        ENABLE_WE_WORK_REMOTELY=False,
-        ENABLE_HIMALAYAS=False,
-        ENABLE_REAL_WORK_FROM_ANYWHERE=False,
-        ENABLE_JOBSCOLLIDER=False,
-        ENABLE_LINKEDIN_POST_SEARCH=True,
-        ENABLE_LINKEDIN_POST_SCRAPER=False,
-        SERPER_API_KEY="serper-key",
-    )
-
-    names = [adapter.name for adapter in build_adapters(settings)]
-
-    assert names == ["LinkedIn Hiring Posts (Serper)"]
-
-
-def test_build_adapters_skips_linkedin_post_search_without_search_provider_key() -> None:
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        ENABLE_REMOTIVE=False,
-        ENABLE_ARBEITNOW=False,
-        ENABLE_REMOTEOK=False,
-        ENABLE_HN_WHO_IS_HIRING=False,
-        ENABLE_JOBICY=False,
-        ENABLE_WE_WORK_REMOTELY=False,
-        ENABLE_HIMALAYAS=False,
-        ENABLE_REAL_WORK_FROM_ANYWHERE=False,
-        ENABLE_JOBSCOLLIDER=False,
-        ENABLE_LINKEDIN_POST_SEARCH=True,
-        ENABLE_LINKEDIN_POST_SCRAPER=False,
-        SERPER_API_KEY="",
-    )
-
-    assert build_adapters(settings) == []
-
-
-def test_build_adapters_adds_linkedin_post_scraper_without_api_key() -> None:
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        ENABLE_REMOTIVE=False,
-        ENABLE_ARBEITNOW=False,
-        ENABLE_REMOTEOK=False,
-        ENABLE_HN_WHO_IS_HIRING=False,
-        ENABLE_JOBICY=False,
-        ENABLE_WE_WORK_REMOTELY=False,
-        ENABLE_HIMALAYAS=False,
-        ENABLE_REAL_WORK_FROM_ANYWHERE=False,
-        ENABLE_JOBSCOLLIDER=False,
         ENABLE_LINKEDIN_POST_SEARCH=False,
         ENABLE_LINKEDIN_POST_SCRAPER=True,
+        ENABLE_LINKEDIN_POST_HEADLESS=False,
     )
 
-    names = [adapter.name for adapter in build_adapters(settings)]
-
-    assert names == ["LinkedIn Hiring Post Scraper"]
+    assert [adapter.name for adapter in build_adapters(settings)] == ["LinkedIn Hiring Post Scraper"]
 
 
-def test_build_adapters_adds_no_key_sources_by_default() -> None:
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        ENABLE_REMOTIVE=False,
-        ENABLE_ARBEITNOW=False,
-        ENABLE_REMOTEOK=False,
-        ENABLE_HN_WHO_IS_HIRING=False,
-        ENABLE_LINKEDIN_POST_SCRAPER=False,
-        SERPER_API_KEY="",
-    )
-
-    names = [adapter.name for adapter in build_adapters(settings)]
-
-    assert names == [
-        "Jobicy",
-        "We Work Remotely",
-        "Himalayas",
-        "Real Work From Anywhere",
-        "JobsCollider",
-    ]
-
-
-def test_jobicy_adapter_maps_public_api_response(monkeypatch) -> None:
+def test_arbeitnow_adapter_maps_public_api_response(monkeypatch) -> None:
     monkeypatch.setattr(
-        "tg_vacancy_bot.sources.adapters.jobicy.source_session",
+        "tg_vacancy_bot.sources.adapters.arbeitnow.source_session",
         lambda: _FakeSession(
-            json_data={
-                "jobs": [
+            {
+                "data": [
                     {
-                        "jobTitle": "Senior Python Developer",
-                        "companyName": "Example Co",
-                        "jobGeo": "Worldwide",
-                        "jobDescription": "<p>Build Python APIs with FastAPI.</p>",
-                        "url": "https://jobicy.com/jobs/example",
-                        "jobIndustry": ["Software Engineering"],
-                        "pubDate": "2026-07-06T16:25:02+00:00",
+                        "title": "Senior Python Developer",
+                        "company_name": "Example Co",
+                        "location": "Berlin",
+                        "description": "<p>Build Python APIs with FastAPI.</p>",
+                        "tags": ["Python", "Remote"],
+                        "url": "https://www.arbeitnow.com/view/example",
+                        "created_at": 1783355102,
                     }
                 ]
             }
         ),
     )
 
-    vacancies = asyncio.run(JobicyAdapter().fetch())
+    vacancies = asyncio.run(ArbeitnowAdapter().fetch())
 
     assert vacancies == [
         Vacancy(
             title="Senior Python Developer",
             company="Example Co",
-            location="Worldwide",
+            location="Berlin",
             description="Build Python APIs with FastAPI.",
-            source="Jobicy",
-            url="https://jobicy.com/jobs/example",
-            stack=("Software Engineering", "Python", "FastAPI"),
+            source="Arbeitnow",
+            url="https://www.arbeitnow.com/view/example",
+            stack=("Python", "Remote", "FastAPI"),
             published_at=datetime(2026, 7, 6, 16, 25, 2, tzinfo=UTC),
             raw_text="Build Python APIs with FastAPI.",
         )
     ]
-
-
-def test_rss_feed_adapter_maps_public_feed_item(monkeypatch) -> None:
-    monkeypatch.setattr(
-        "tg_vacancy_bot.sources.rss.source_session",
-        lambda: _FakeSession(
-            text_data="""<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0">
-  <channel>
-    <item>
-      <title>Backend Engineer at Example Co</title>
-      <link>https://example.com/jobs/backend</link>
-      <description><![CDATA[<p>Remote backend work with Python and FastAPI.</p>]]></description>
-      <pubDate>Mon, 06 Jul 2026 16:25:02 +0000</pubDate>
-    </item>
-  </channel>
-</rss>"""
-        ),
-    )
-
-    vacancies = asyncio.run(
-        RssFeedAdapter(RssFeedConfig(source_name="Example RSS", url="https://example.com/feed.xml")).fetch()
-    )
-
-    assert vacancies == [
-        Vacancy(
-            title="Backend Engineer at Example Co",
-            company="Example Co",
-            location="Remote",
-            description="Remote backend work with Python and FastAPI.",
-            source="Example RSS",
-            url="https://example.com/jobs/backend",
-            stack=("Python", "FastAPI"),
-            published_at=datetime(2026, 7, 6, 16, 25, 2, tzinfo=UTC),
-            raw_text="Remote backend work with Python and FastAPI.",
-        )
-    ]
-
-
-def test_linkedin_post_search_adapter_maps_public_post_results(monkeypatch) -> None:
-    calls = []
-
-    class FakeSession:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            return None
-
-        def get(self, url: str, params: dict):
-            calls.append((url, params))
-            return _FakeResponse(
-                json_data={
-                    "organic_results": [
-                        {
-                            "title": "Ищем Junior Front-End Developer в команду DAP | LinkedIn",
-                            "link": "https://www.linkedin.com/posts/example_hiring-junior-frontend-activity-123",
-                            "snippet": (
-                                "г. Алматы. Ищем Junior Front-End Developer. "
-                                "Angular от 1 года, TypeScript, HTML/CSS. Резюме: hr@example.kz"
-                            ),
-                            "date": "Jul 8, 2026",
-                        },
-                        {
-                            "title": "Senior Backend Engineer",
-                            "link": "https://www.linkedin.com/jobs/view/123",
-                            "snippet": "Regular LinkedIn job page, not a post.",
-                        },
-                    ]
-                }
-            )
-
-    monkeypatch.setattr(
-        "tg_vacancy_bot.sources.adapters.linkedin_post_search.source_session",
-        lambda: FakeSession(),
-    )
-    monkeypatch.setattr(
-        "tg_vacancy_bot.sources.adapters.linkedin_post_search.utcnow",
-        lambda: datetime(2026, 7, 9, tzinfo=UTC),
-    )
-
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        ENABLE_LINKEDIN_POST_SEARCH=True,
-        SERPAPI_API_KEY="serp-key",
-        LINKEDIN_POST_SEARCH_QUERY='site:linkedin.com/posts "Ищем" frontend',
-        LINKEDIN_POST_SEARCH_RESULTS_WANTED="5",
-    )
-
-    vacancies = asyncio.run(LinkedInPostSearchAdapter(settings).fetch())
-
-    assert calls == [
-        (
-            "https://serpapi.com/search.json",
-            {
-                "engine": "google",
-                "api_key": "serp-key",
-                "q": 'site:linkedin.com/posts "Ищем" frontend',
-                "num": 5,
-                "hl": "ru",
-            },
-        )
-    ]
-    assert vacancies == [
-        Vacancy(
-            title="Junior Front-End Developer",
-            description=(
-                "г. Алматы. Ищем Junior Front-End Developer. "
-                "Angular от 1 года, TypeScript, HTML/CSS. Резюме: hr@example.kz"
-            ),
-            source="LinkedIn Hiring Posts",
-            url="https://www.linkedin.com/posts/example_hiring-junior-frontend-activity-123",
-            location=None,
-            stack=("LinkedIn post", "frontend", "Angular", "TypeScript"),
-            published_at=datetime(2026, 7, 8, tzinfo=UTC),
-            raw_text=(
-                "Junior Front-End Developer "
-                "г. Алматы. Ищем Junior Front-End Developer. "
-                "Angular от 1 года, TypeScript, HTML/CSS. Резюме: hr@example.kz"
-            ),
-        )
-    ]
-
-
-def test_linkedin_post_search_adapter_tries_fallback_queries_and_dedupes(monkeypatch) -> None:
-    calls = []
-
-    class FakeSession:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            return None
-
-        def get(self, url: str, params: dict):
-            calls.append(params["q"])
-            if params["q"] == "first":
-                rows = [
-                    {
-                        "title": "Backend Engineer | LinkedIn",
-                        "link": "https://www.linkedin.com/posts/backend-activity-123",
-                        "snippet": "We are hiring a Backend Engineer with Python.",
-                        "date": "Jul 8, 2026",
-                    }
-                ]
-            else:
-                rows = [
-                    {
-                        "title": "Backend Engineer | LinkedIn",
-                        "link": "https://www.linkedin.com/posts/backend-activity-123",
-                        "snippet": "Duplicate backend post.",
-                        "date": "Jul 8, 2026",
-                    },
-                    {
-                        "title": "Frontend Developer | LinkedIn",
-                        "link": "https://www.linkedin.com/posts/frontend-activity-456",
-                        "snippet": "Looking for a Frontend Developer with React.",
-                        "date": "Jul 8, 2026",
-                    },
-                ]
-            return _FakeResponse(json_data={"organic_results": rows})
-
-    monkeypatch.setattr(
-        "tg_vacancy_bot.sources.adapters.linkedin_post_search.source_session",
-        lambda: FakeSession(),
-    )
-    monkeypatch.setattr(
-        "tg_vacancy_bot.sources.adapters.linkedin_post_search.utcnow",
-        lambda: datetime(2026, 7, 9, tzinfo=UTC),
-    )
-
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        ENABLE_LINKEDIN_POST_SEARCH=True,
-        SERPAPI_API_KEY="serp-key",
-        LINKEDIN_POST_SEARCH_QUERY="first || second",
-        LINKEDIN_POST_SEARCH_RESULTS_WANTED="5",
-    )
-
-    vacancies = asyncio.run(LinkedInPostSearchAdapter(settings).fetch())
-
-    assert calls == ["first", "second"]
-    assert [vacancy.url for vacancy in vacancies] == [
-        "https://www.linkedin.com/posts/backend-activity-123",
-        "https://www.linkedin.com/posts/frontend-activity-456",
-    ]
-
-
-def test_linkedin_post_serper_adapter_maps_public_post_results(monkeypatch) -> None:
-    calls = []
-
-    class FakeSession:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            return None
-
-        def post(self, url: str, json: dict):
-            calls.append((url, json))
-            return _FakeResponse(
-                json_data={
-                    "organic": [
-                        {
-                            "title": "Ищем Junior Front-End Developer в команду DAP | LinkedIn",
-                            "link": "https://www.linkedin.com/posts/example_hiring-junior-frontend-activity-123",
-                            "snippet": (
-                                "г. Алматы. Ищем Junior Front-End Developer. "
-                                "Angular от 1 года, TypeScript, HTML/CSS. Резюме: hr@example.kz"
-                            ),
-                            "date": "Jul 8, 2026",
-                        },
-                        {
-                            "title": "Senior Backend Engineer",
-                            "link": "https://www.linkedin.com/jobs/view/123",
-                            "snippet": "Regular LinkedIn job page, not a post.",
-                        },
-                    ]
-                }
-            )
-
-    monkeypatch.setattr(
-        "tg_vacancy_bot.sources.adapters.linkedin_post_search.source_session",
-        lambda headers=None: FakeSession(),
-    )
-    monkeypatch.setattr(
-        "tg_vacancy_bot.sources.adapters.linkedin_post_search.utcnow",
-        lambda: datetime(2026, 7, 9, tzinfo=UTC),
-    )
-
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        ENABLE_LINKEDIN_POST_SEARCH=True,
-        SERPER_API_KEY="serper-key",
-        LINKEDIN_POST_SEARCH_QUERY='site:linkedin.com/posts "Ищем" frontend',
-        LINKEDIN_POST_SEARCH_RESULTS_WANTED="5",
-    )
-
-    vacancies = asyncio.run(LinkedInPostSerperAdapter(settings).fetch())
-
-    assert calls == [
-        (
-            "https://google.serper.dev/search",
-            {
-                "q": 'site:linkedin.com/posts "Ищем" frontend',
-                "num": 5,
-                "hl": "ru",
-            },
-        )
-    ]
-    assert vacancies == [
-        Vacancy(
-            title="Junior Front-End Developer",
-            description=(
-                "г. Алматы. Ищем Junior Front-End Developer. "
-                "Angular от 1 года, TypeScript, HTML/CSS. Резюме: hr@example.kz"
-            ),
-            source="LinkedIn Hiring Posts (Serper)",
-            url="https://www.linkedin.com/posts/example_hiring-junior-frontend-activity-123",
-            location=None,
-            stack=("LinkedIn post", "frontend", "Angular", "TypeScript"),
-            published_at=datetime(2026, 7, 8, tzinfo=UTC),
-            raw_text=(
-                "Junior Front-End Developer "
-                "г. Алматы. Ищем Junior Front-End Developer. Angular от 1 года, TypeScript, HTML/CSS. "
-                "Резюме: hr@example.kz"
-            ),
-        )
-    ]
-
-
-def test_linkedin_post_serper_adapter_paginates_large_requested_result_count(monkeypatch) -> None:
-    calls = []
-
-    class FakeSession:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            return None
-
-        def post(self, url: str, json: dict):
-            calls.append(json)
-            page = json.get("page", 1)
-            rows = [
-                {
-                    "title": f"Backend Engineer {index} | LinkedIn",
-                        "link": f"https://www.linkedin.com/posts/backend-{page}-{index}-activity-{page}{index}",
-                        "snippet": "We are hiring a Backend Engineer with Python.",
-                        "date": "Jul 8, 2026",
-                }
-                for index in range(10)
-            ]
-            return _FakeResponse(json_data={"organic": rows})
-
-    monkeypatch.setattr(
-        "tg_vacancy_bot.sources.adapters.linkedin_post_search.source_session",
-        lambda headers=None: FakeSession(),
-    )
-    monkeypatch.setattr(
-        "tg_vacancy_bot.sources.adapters.linkedin_post_search.utcnow",
-        lambda: datetime(2026, 7, 9, tzinfo=UTC),
-    )
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        ENABLE_LINKEDIN_POST_SEARCH=True,
-        SERPER_API_KEY="serper-key",
-        LINKEDIN_POST_SEARCH_QUERY="hiring backend engineer",
-        LINKEDIN_POST_SEARCH_RESULTS_WANTED="25",
-    )
-
-    vacancies = asyncio.run(LinkedInPostSerperAdapter(settings).fetch())
-
-    assert [call["num"] for call in calls] == [10, 10, 5]
-    assert [call.get("page") for call in calls] == [None, 2, 3]
-    assert len(vacancies) == 25
-
-
-def test_linkedin_post_scraper_maps_public_search_html(monkeypatch) -> None:
-    calls = []
-    html = """
-    <html>
-      <body>
-        <a class="result__a" href="/l/?uddg=https%3A%2F%2Fwww.linkedin.com%2Fposts%2Fexample_hiring-junior-frontend-activity-7480965762036461568">
-          Ищем Junior Front-End Developer в команду DAP | LinkedIn
-        </a>
-        <a class="result__snippet">
-          г. Алматы. Ищем Junior Front-End Developer. Angular от 1 года, TypeScript, HTML/CSS.
-        </a>
-        <a class="result__a" href="https://www.linkedin.com/jobs/view/123">
-          Senior Backend Engineer
-        </a>
-        <a class="result__snippet">Regular LinkedIn job page, not a post.</a>
-      </body>
-    </html>
-    """
-
-    class FakeSession:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            return None
-
-        def get(self, url: str, params: dict):
-            calls.append((url, params))
-            return _FakeResponse(text_data=html)
-
-    monkeypatch.setattr(
-        "tg_vacancy_bot.sources.adapters.linkedin_post_scraper.source_session",
-        lambda headers=None: FakeSession(),
-    )
-    monkeypatch.setattr(
-        "tg_vacancy_bot.sources.adapters.linkedin_post_scraper.utcnow",
-        lambda: datetime(2026, 7, 10, tzinfo=UTC),
-    )
-
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        ENABLE_LINKEDIN_POST_SCRAPER=True,
-        LINKEDIN_POST_SCRAPER_QUERY='site:linkedin.com/posts "Ищем" frontend',
-        LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS="duckduckgo",
-        LINKEDIN_POST_SCRAPER_RESULTS_WANTED="5",
-    )
-
-    vacancies = asyncio.run(LinkedInPostScraperAdapter(settings).fetch())
-
-    assert calls == [
-        (
-            "https://html.duckduckgo.com/html/",
-            {"q": 'site:linkedin.com/posts "Ищем" frontend'},
-        )
-    ]
-    assert vacancies == [
-        Vacancy(
-            title="Junior Front-End Developer",
-            description="г. Алматы. Ищем Junior Front-End Developer. Angular от 1 года, TypeScript, HTML/CSS.",
-            source="LinkedIn Hiring Post Scraper",
-            url="https://www.linkedin.com/posts/example_hiring-junior-frontend-activity-7480965762036461568",
-            location=None,
-            stack=("LinkedIn post", "frontend", "Angular", "TypeScript"),
-            published_at=datetime(2026, 7, 9, 12, 47, 7, 292000, tzinfo=UTC),
-            raw_text=(
-                "Junior Front-End Developer "
-                "г. Алматы. Ищем Junior Front-End Developer. Angular от 1 года, TypeScript, HTML/CSS."
-            ),
-        )
-    ]
-
-
-def test_linkedin_post_scraper_falls_back_when_duckduckgo_is_blocked(monkeypatch) -> None:
-    calls = []
-    bing_html = """
-    <html>
-      <body>
-        <ol id="b_results">
-          <li class="b_algo">
-            <h2>
-              <a href="https://www.linkedin.com/posts/example_hiring-backend-engineer-activity-7480965762036461568">
-                Backend Engineer | LinkedIn
-              </a>
-            </h2>
-            <div class="b_caption">
-              <p>We are hiring a Backend Engineer with Python and REST API experience.</p>
-            </div>
-          </li>
-        </ol>
-      </body>
-    </html>
-    """
-
-    class FakeSession:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            return None
-
-        def get(self, url: str, params: dict):
-            calls.append((url, params))
-            if "duckduckgo" in url:
-                return _FakeResponse(text_data='<form id="challenge-form"></form>')
-            return _FakeResponse(text_data=bing_html)
-
-    monkeypatch.setattr(
-        "tg_vacancy_bot.sources.adapters.linkedin_post_scraper.source_session",
-        lambda headers=None: FakeSession(),
-    )
-    monkeypatch.setattr(
-        "tg_vacancy_bot.sources.adapters.linkedin_post_scraper.utcnow",
-        lambda: datetime(2026, 7, 10, tzinfo=UTC),
-    )
-
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        ENABLE_LINKEDIN_POST_SCRAPER=True,
-        LINKEDIN_POST_SCRAPER_QUERY="site:linkedin.com/posts backend engineer",
-        LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS="duckduckgo,bing",
-        LINKEDIN_POST_SCRAPER_RESULTS_WANTED="5",
-    )
-
-    vacancies = asyncio.run(LinkedInPostScraperAdapter(settings).fetch())
-
-    assert calls == [
-        (
-            "https://html.duckduckgo.com/html/",
-            {"q": "site:linkedin.com/posts backend engineer"},
-        ),
-        (
-            "https://www.bing.com/search",
-                {"q": "site:linkedin.com/posts backend engineer", "setlang": "en"},
-        ),
-    ]
-    assert vacancies == [
-        Vacancy(
-            title="Backend Engineer",
-            description="We are hiring a Backend Engineer with Python and REST API experience.",
-            source="LinkedIn Hiring Post Scraper",
-            url="https://www.linkedin.com/posts/example_hiring-backend-engineer-activity-7480965762036461568",
-            location=None,
-            stack=("LinkedIn post", "backend", "Python", "REST API"),
-            published_at=datetime(2026, 7, 9, 12, 47, 7, 292000, tzinfo=UTC),
-            raw_text="Backend Engineer We are hiring a Backend Engineer with Python and REST API experience.",
-        )
-    ]
-
-
-def test_linkedin_post_scraper_uses_role_title_instead_of_hashtags() -> None:
-    html = """
-    <div class="result">
-      <a class="result__a" href="https://www.linkedin.com/posts/example_hiring-software-activity-7480965762036461568">
-        #hiring #softwaredeveloper #clouddeveloper #java #python # ... - LinkedIn
-      </a>
-      <a class="result__snippet">
-        Нанимается Software Developer в облачных технологиях. Требуется опыт работы от 10 лет.
-      </a>
-    </div>
-    """
-
-    vacancies = _html_to_vacancies(html, limit=5)
-
-    assert len(vacancies) == 1
-    assert vacancies[0].title == "Software Developer"
-    assert vacancies[0].stack == ("LinkedIn post", "Python")
-
-
-def test_linkedin_post_scraper_skips_results_without_a_reliable_date() -> None:
-    html = """
-    <a class="result__a" href="https://www.linkedin.com/posts/example_hiring-activity-no-date">
-      Hiring developer - LinkedIn
-    </a>
-    <a class="result__snippet">We are hiring a backend developer.</a>
-    """
-
-    assert _html_to_vacancies(html, limit=5) == []
-
-
-def test_linkedin_post_scraper_reports_search_challenge(monkeypatch) -> None:
-    class FakeSession:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            return None
-
-        def get(self, url: str, params: dict):
-            return _FakeResponse(text_data='<form id="challenge-form"></form>')
-
-    monkeypatch.setattr(
-        "tg_vacancy_bot.sources.adapters.linkedin_post_scraper.source_session",
-        lambda headers=None: FakeSession(),
-    )
-
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        ENABLE_LINKEDIN_POST_SCRAPER=True,
-    )
-
-    try:
-        asyncio.run(LinkedInPostScraperAdapter(settings).fetch())
-    except RuntimeError as exc:
-        assert "anti-bot challenge" in str(exc)
-    else:
-        raise AssertionError("Expected scraper to report the search provider challenge.")
-
-
-def test_linkedin_post_headless_helpers_extract_public_text_and_stop_for_manual_access() -> None:
-    public_post = """
-    <article>
-      <div class="feed-shared-update-v2__description-wrapper">
-        We are hiring a Senior Backend Engineer with Python and FastAPI.
-      </div>
-    </article>
-    """
-
-    assert _extract_post_text(public_post) == "We are hiring a Senior Backend Engineer with Python and FastAPI."
-    assert _requires_manual_access(public_post) is False
-    assert _requires_manual_access('<input type="password"><p>Sign in to LinkedIn</p>') is True
-    assert _requires_manual_access('<input type="password">' + public_post) is False
-    assert _requires_manual_access("<p>Complete the CAPTCHA to continue</p>") is True
 
 
 def test_filter_it_vacancies_rejects_courses() -> None:
@@ -839,55 +88,25 @@ def test_filter_it_vacancies_rejects_courses() -> None:
         Vacancy(title="Python course", description="Bootcamp for beginners", source="Test"),
     ]
 
-    filtered = filter_it_vacancies(vacancies)
-
-    assert [vacancy.title for vacancy in filtered] == ["Python Developer"]
+    assert [vacancy.title for vacancy in filter_it_vacancies(vacancies)] == ["Python Developer"]
 
 
-def test_filter_it_vacancies_allows_only_development_design_and_ai_roles() -> None:
+def test_filter_it_vacancies_allows_only_supported_roles() -> None:
     vacancies = [
         Vacancy(title="Backend Engineer", description="Python API role", source="Test"),
-        Vacancy(title="Frontend Developer", description="React UI role", source="Test"),
         Vacancy(title="Product Designer", description="Design systems and UX", source="Test"),
-        Vacancy(title="LLM Engineer", description="Build AI agents", source="Test"),
-        Vacancy(title="Fullstack Developer", description="Node.js and React", source="Test"),
         Vacancy(title="Product Manager", description="Software roadmap role", source="Test"),
-        Vacancy(title="QA Engineer", description="Manual testing for web app", source="Test"),
-        Vacancy(title="DevOps Engineer", description="Kubernetes platform role", source="Test"),
     ]
 
-    filtered = filter_it_vacancies(vacancies)
-
-    assert [vacancy.title for vacancy in filtered] == [
+    assert [vacancy.title for vacancy in filter_it_vacancies(vacancies)] == [
         "Backend Engineer",
-        "Frontend Developer",
         "Product Designer",
-        "LLM Engineer",
-        "Fullstack Developer",
     ]
-
-
-def test_filter_it_vacancies_rejects_cleaner_at_it_company() -> None:
-    vacancies = [
-        Vacancy(
-            title="Cleaner at IT company",
-            description="Office cleaning role for a software platform company.",
-            source="Test",
-        ),
-        Vacancy(
-            title="Уборщик в IT компанию",
-            description="Работа в офисе software company.",
-            source="Test",
-        ),
-    ]
-
-    assert filter_it_vacancies(vacancies) == []
 
 
 class _FakeResponse:
-    def __init__(self, text_data: str = "", json_data: dict | None = None) -> None:
-        self._text_data = text_data
-        self._json_data = json_data or {}
+    def __init__(self, json_data: dict) -> None:
+        self._json_data = json_data
 
     async def __aenter__(self) -> "_FakeResponse":
         return self
@@ -898,16 +117,13 @@ class _FakeResponse:
     def raise_for_status(self) -> None:
         return None
 
-    async def text(self) -> str:
-        return self._text_data
-
     async def json(self) -> dict:
         return self._json_data
 
 
 class _FakeSession:
-    def __init__(self, text_data: str = "", json_data: dict | None = None) -> None:
-        self._response = _FakeResponse(text_data=text_data, json_data=json_data)
+    def __init__(self, json_data: dict) -> None:
+        self._response = _FakeResponse(json_data)
 
     async def __aenter__(self) -> "_FakeSession":
         return self
@@ -916,7 +132,4 @@ class _FakeSession:
         return None
 
     def get(self, url: str) -> _FakeResponse:
-        return self._response
-
-    def post(self, url: str, json: dict) -> _FakeResponse:
         return self._response

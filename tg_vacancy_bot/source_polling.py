@@ -9,7 +9,6 @@ from aiogram.enums import ParseMode
 
 from .application_buttons import application_button
 from .config import Settings
-from .description_localization import localize_vacancy_description
 from .formatting import format_vacancy_card
 from .sources import build_adapters, filter_it_vacancies, source_configuration_warnings
 from .sources.freshness import filter_fresh_vacancies
@@ -24,9 +23,7 @@ def utcnow() -> datetime:
 
 async def poll_sources_once(bot: Bot, settings: Settings, store: VacancyStore) -> int:
     published = 0
-    localized = 0
     max_publish = settings.source_max_publish_per_poll
-    max_localizations = settings.localization_max_per_poll
     for warning in source_configuration_warnings(settings):
         logger.warning(warning)
     for adapter in build_adapters(settings):
@@ -47,25 +44,9 @@ async def poll_sources_once(bot: Bot, settings: Settings, store: VacancyStore) -
                 return published
             if store.seen(vacancy):
                 continue
-            if settings.localize_descriptions and max_localizations > 0 and localized >= max_localizations:
-                logger.info("Localization per-poll limit reached: %s", max_localizations)
-                return published
-            try:
-                if settings.localize_descriptions:
-                    localized += 1
-                public_vacancy = await localize_vacancy_description(vacancy, settings)
-            except Exception as exc:
-                # Keep scheduled source posts Russian-only when localization is enabled.
-                logger.warning(
-                    "%s: description localization failed for %r; skipping publication: %s",
-                    adapter.name,
-                    vacancy.title,
-                    exc,
-                )
-                continue
             await bot.send_message(
                 chat_id=settings.target_chat_id,
-                text=format_vacancy_card(public_vacancy),
+                text=format_vacancy_card(vacancy),
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True,
                 reply_markup=application_button(vacancy),
