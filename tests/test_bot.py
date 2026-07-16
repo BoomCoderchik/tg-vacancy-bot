@@ -8,6 +8,7 @@ from tg_vacancy_bot.bot import (
     manual_application_link_text,
     needs_profile_onboarding,
     profile_onboarding_text,
+    queue_resume_id_text,
     send_profile_onboarding_reminders,
     send_application_result_notification,
 )
@@ -92,6 +93,14 @@ def test_format_whoami_text_returns_user_id() -> None:
 
 def test_format_whoami_text_handles_missing_user() -> None:
     assert "not available" in format_whoami_text(None)
+
+
+def test_queue_resume_id_text_only_returns_saved_telegram_file_id() -> None:
+    profile = OperatorProfile(operator_user_id=42, resume_telegram_file_id="telegram-file-id")
+
+    assert "APPLICATION_QUEUE_RESUME_FILE_ID" in queue_resume_id_text(profile)
+    assert "telegram-file-id" in queue_resume_id_text(profile)
+    assert "/profile" in queue_resume_id_text(None)
 
 
 def test_manual_application_link_text_escapes_external_url() -> None:

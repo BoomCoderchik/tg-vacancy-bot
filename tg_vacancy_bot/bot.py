@@ -7,7 +7,7 @@ import logging
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ParseMode
+from aiogram.enums import ChatType, ParseMode
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -89,6 +89,15 @@ def format_whoami_text(user_id: int | None) -> str:
     if user_id is None:
         return "Telegram user ID is not available for this message."
     return f"Your Telegram user ID: {user_id}"
+
+
+def queue_resume_id_text(profile: OperatorProfile | None) -> str:
+    if not profile or not profile.resume_telegram_file_id:
+        return "Сначала загрузите резюме через /profile при запущенном локальном боте."
+    return (
+        "Скопируйте значение в GitHub secret APPLICATION_QUEUE_RESUME_FILE_ID:\n\n"
+        f"<code>{escape(profile.resume_telegram_file_id)}</code>"
+    )
 
 
 def manual_application_link_text(vacancy_url: str) -> str:
@@ -261,6 +270,14 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
         await state.clear()
         await message.answer(format_profile_summary(store.get_operator_profile(operator_user_id)), reply_markup=profile_menu())
 
+    @dp.message(Command("queue_resume_id"))
+    async def queue_resume_id_command(message: Message) -> None:
+        operator_user_id = profile_operator_from_message(message)
+        if operator_user_id is None or message.chat.type != ChatType.PRIVATE:
+            await deny_profile_message(message)
+            return
+        await message.answer(queue_resume_id_text(store.get_operator_profile(operator_user_id)))
+
     @dp.callback_query(F.data == "profile:edit")
     async def profile_edit(callback: CallbackQuery, state: FSMContext) -> None:
         operator_user_id = profile_operator_from_callback(callback)
@@ -346,7 +363,12 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
         content = BytesIO()
         try:
             await bot.download(document, destination=content)
-            profile_service.save_resume(operator_user_id, document.file_name or "", content.getvalue())
+            profile_service.save_resume(
+                operator_user_id,
+                document.file_name or "",
+                content.getvalue(),
+                telegram_file_id=document.file_id,
+            )
         except ValueError as exc:
             await message.answer(str(exc))
             return
@@ -532,7 +554,7 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             text=card,
             parse_mode=ParseMode.HTML,
             disable_web_page_preview=True,
-            reply_markup=application_button(vacancy),
+            reply_markup=application_button(vacancy, queued=settings.application_queue_enabled),
         )
         store.mark_published(vacancy)
         await message.reply("Опубликовал вакансию в канал.")

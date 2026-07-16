@@ -14,9 +14,10 @@ def application_callback_data(vacancy: Vacancy) -> str:
     return f"{APPLICATION_CALLBACK_PREFIX}{VacancyStore.fingerprint(vacancy)}"
 
 
-def application_button(vacancy: Vacancy) -> InlineKeyboardMarkup:
+def application_button(vacancy: Vacancy, *, queued: bool = False) -> InlineKeyboardMarkup:
+    text = "Откликнуться (очередь)" if queued else "Откликнуться"
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Откликнуться", callback_data=application_callback_data(vacancy))]
+            [InlineKeyboardButton(text=text, callback_data=application_callback_data(vacancy))]
         ]
     )

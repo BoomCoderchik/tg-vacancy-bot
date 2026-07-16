@@ -14,7 +14,13 @@ class ProfileService:
         self.store = store
         self.resume_storage = resume_storage
 
-    def save_resume(self, operator_user_id: int, original_name: str, content: bytes) -> OperatorProfile:
+    def save_resume(
+        self,
+        operator_user_id: int,
+        original_name: str,
+        content: bytes,
+        telegram_file_id: str | None = None,
+    ) -> OperatorProfile:
         saved_resume = self.resume_storage.save(operator_user_id, original_name, content)
         profile = self.store.get_operator_profile(operator_user_id) or OperatorProfile(
             operator_user_id=operator_user_id
@@ -23,6 +29,7 @@ class ProfileService:
             profile,
             resume_original_name=saved_resume.original_name,
             resume_stored_name=saved_resume.stored_name,
+            resume_telegram_file_id=telegram_file_id,
             resume_text=None,
         )
         try:

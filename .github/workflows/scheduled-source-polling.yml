@@ -25,6 +25,17 @@ jobs:
       OPERATOR_USER_IDS: ${{ secrets.OPERATOR_USER_IDS }}
       FORWARDED_MODE: normalize
       DATABASE_PATH: data/vacancies.sqlite3
+      APPLICATION_QUEUE_ENABLED: ${{ secrets.APPLICATION_QUEUE_ENABLED || 'false' }}
+      APPLICATION_AUTO_SUBMIT: ${{ secrets.APPLICATION_AUTO_SUBMIT || 'false' }}
+      APPLICATION_ALLOWED_DOMAINS: ${{ secrets.APPLICATION_ALLOWED_DOMAINS || 'arbeitnow.com' }}
+      APPLICATION_QUEUE_PROFILE_FULL_NAME: ${{ secrets.APPLICATION_QUEUE_PROFILE_FULL_NAME }}
+      APPLICATION_QUEUE_PROFILE_EMAIL: ${{ secrets.APPLICATION_QUEUE_PROFILE_EMAIL }}
+      APPLICATION_QUEUE_PROFILE_PHONE: ${{ secrets.APPLICATION_QUEUE_PROFILE_PHONE }}
+      APPLICATION_QUEUE_PROFILE_PERSONAL_URL: ${{ secrets.APPLICATION_QUEUE_PROFILE_PERSONAL_URL }}
+      APPLICATION_QUEUE_PROFILE_COVER_LETTER: ${{ secrets.APPLICATION_QUEUE_PROFILE_COVER_LETTER }}
+      # Optional bootstrap fallback; normal updates arrive as /queue_resume documents.
+      APPLICATION_QUEUE_RESUME_FILE_ID: ${{ secrets.APPLICATION_QUEUE_RESUME_FILE_ID }}
+      APPLICATION_QUEUE_RESUME_FILE_NAME: ${{ secrets.APPLICATION_QUEUE_RESUME_FILE_NAME || 'resume.pdf' }}
       SOURCE_POLL_INTERVAL_SECONDS: "0"
       SOURCE_MAX_PUBLISH_PER_POLL: ${{ secrets.SOURCE_MAX_PUBLISH_PER_POLL || '20' }}
       SOURCE_MAX_AGE_HOURS: ${{ secrets.SOURCE_MAX_AGE_HOURS || '48' }}
@@ -73,8 +84,8 @@ jobs:
       - name: Install bot
         run: pip install .
 
-      - name: Install Chromium for optional LinkedIn headless source
-        if: env.ENABLE_LINKEDIN_POST_HEADLESS == 'true'
+      - name: Install Chromium for browser-backed sources or applications
+        if: env.ENABLE_LINKEDIN_POST_HEADLESS == 'true' || env.APPLICATION_QUEUE_ENABLED == 'true'
         run: python -m playwright install --with-deps chromium
 
       - name: Verify production card formatting
@@ -99,3 +110,7 @@ jobs:
 
       - name: Poll and publish new vacancies
         run: tg-vacancy-bot poll-once
+
+      - name: Process queued application clicks
+        if: ${{ always() && env.APPLICATION_QUEUE_ENABLED == 'true' }}
+        run: tg-vacancy-bot process-applications-once

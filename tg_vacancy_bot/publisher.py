@@ -58,7 +58,7 @@ class TelegramPublisher:
                     text=format_vacancy_card(public_vacancy),
                     parse_mode=ParseMode.HTML,
                     disable_web_page_preview=True,
-                    reply_markup=application_button(vacancy),
+                    reply_markup=application_button(vacancy, queued=self.settings.application_queue_enabled),
                 )
             except TelegramRetryAfter as exc:
                 retry_after = int(getattr(exc, "retry_after", 1))
@@ -69,7 +69,7 @@ class TelegramPublisher:
                     text=format_vacancy_card(public_vacancy),
                     parse_mode=ParseMode.HTML,
                     disable_web_page_preview=True,
-                    reply_markup=application_button(vacancy),
+                    reply_markup=application_button(vacancy, queued=self.settings.application_queue_enabled),
                 )
             if self.store.mark_published(vacancy):
                 published += 1

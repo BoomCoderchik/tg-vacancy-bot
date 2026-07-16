@@ -60,7 +60,7 @@ async def poll_sources_once(bot: Bot, settings: Settings, store: VacancyStore) -
                 text=format_vacancy_card(localized_vacancy),
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True,
-                reply_markup=application_button(localized_vacancy),
+                reply_markup=application_button(localized_vacancy, queued=settings.application_queue_enabled),
             )
             if store.mark_published(vacancy):
                 published += 1

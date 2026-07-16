@@ -14,6 +14,7 @@ def test_poll_sources_workflow_runs_every_15_minutes() -> None:
     assert 'cron: "37 * * * *"' in text
     assert 'cron: "52 * * * *"' in text
     assert "tg-vacancy-bot poll-once" in text
+    assert "tg-vacancy-bot process-applications-once" in text
     assert "SOURCE_POLL_INTERVAL_SECONDS: \"0\"" in text
     assert "concurrency:" in text
 
@@ -46,3 +47,7 @@ def test_poll_sources_workflow_defaults_optional_runtime_values() -> None:
     assert "LINKEDIN_POST_SEARCH_QUERY: ${{ secrets.LINKEDIN_POST_SEARCH_QUERY ||" in text
     assert "LINKEDIN_POST_SCRAPER_QUERY: ${{ secrets.LINKEDIN_POST_SCRAPER_QUERY ||" in text
     assert "python -m playwright install --with-deps chromium" in text
+    assert "APPLICATION_QUEUE_ENABLED: ${{ secrets.APPLICATION_QUEUE_ENABLED || 'false' }}" in text
+    assert "APPLICATION_AUTO_SUBMIT: ${{ secrets.APPLICATION_AUTO_SUBMIT || 'false' }}" in text
+    assert "APPLICATION_QUEUE_RESUME_FILE_ID: ${{ secrets.APPLICATION_QUEUE_RESUME_FILE_ID }}" in text
+    assert "always() && env.APPLICATION_QUEUE_ENABLED == 'true'" in text

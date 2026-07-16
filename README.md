@@ -167,6 +167,16 @@ server against the same Telegram channel at the same time unless they share the
 same deduplication database. Otherwise, both schedulers can publish the same new
 vacancy before either one sees the other's SQLite state.
 
+The same workflow can process delayed `Откликнуться` callbacks without an
+always-on server. Telegram keeps the callback until a scheduled runner invokes
+`tg-vacancy-bot process-applications-once`; the runner downloads the configured
+resume by Telegram `file_id`, handles the application, sends a private result,
+and exits. Send a PDF/DOCX to the bot with the `/queue_resume` caption once to
+register or replace the queue resume without copying its `file_id` into GitHub.
+This mode is opt-in and requires additional GitHub secrets. See
+[`docs/application-queue.md`](docs/application-queue.md) for setup, usage,
+privacy boundaries, expected delay, and the current JOIN/CAPTCHA limitation.
+
 To check which sources are configured without publishing anything:
 
 ```powershell
@@ -253,6 +263,8 @@ Messages that do not look like allowed development/design/AI vacancies are skipp
 - `/whoami`: returns your Telegram user ID for `OPERATOR_USER_IDS`.
 - `/status`: shows the active forwarding mode, target chat, polling interval, and enabled sources without exposing secrets.
 - `/profile`: private operator profile: view/edit job preferences, upload or replace a resume, or delete the profile.
+- `/queue_resume`: attach this caption to a PDF/DOCX sent privately while queue mode is active; the next GitHub Actions run registers or replaces the queue resume.
+- `/queue_resume_id`: legacy private operator-only command that shows the saved Telegram `file_id`; it is no longer needed for normal queue setup.
 
 Every normalized vacancy card now includes an `Откликнуться` button. It keeps
 only a short vacancy ID in Telegram and resolves the original URL from SQLite;
@@ -269,9 +281,12 @@ chat first so Telegram can deliver this notification.
 The first supported form is Arbeitnow's public application page. Put
 `APPLICATION_ALLOWED_DOMAINS=arbeitnow.com` in `.env`, complete `/profile` with a
 first and last name, email, and PDF/DOCX resume, then press `Откликнуться` on an
-Arbeitnow card. The bot fills only the verified fields and uploads the local
-resume; it never clicks the final submit button. If the form changes, needs a
-login, or shows protection, the flow stops for manual action.
+Arbeitnow card. The always-on bot fills only the verified fields and uploads the
+local resume, then stops before final submit. The opt-in GitHub Actions queue can
+submit only a verified direct Arbeitnow form and reports success only after a
+recognized success page. Current Arbeitnow vacancies commonly redirect to JOIN,
+which requires email authentication and reCAPTCHA; that path stops for manual
+action and is never reported as submitted.
 
 ## Working Nomads source
 
