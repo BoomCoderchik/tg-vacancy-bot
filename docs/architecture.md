@@ -24,9 +24,10 @@
 
 - `tg-vacancy-bot process-applications-once`
   - Returns immediately when `APPLICATION_QUEUE_ENABLED=false`.
-  - Uses Telegram `getUpdates` to drain queued application callbacks in batches.
+  - Uses Telegram `getUpdates` to drain queued application callbacks and private queue-resume messages in batches.
   - Requires one allowlisted operator and a queue profile configured through private environment variables.
-  - Downloads the resume by Telegram `file_id` into a temporary directory.
+  - Persists only the latest `/queue_resume` document `file_id` and safe filename in SQLite; the document bytes remain in Telegram.
+  - Downloads the selected resume by Telegram `file_id` into a temporary directory.
   - Runs the allowlisted browser adapter, persists the factual application status in SQLite, sends a private result, and exits.
   - Never retries a callback that reached `submitting`, because the external form may already have accepted it.
 

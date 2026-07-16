@@ -45,6 +45,22 @@ def test_settings_validates_application_queue_configuration() -> None:
     settings.require_application_queue()
 
 
+def test_settings_allows_queue_resume_to_be_registered_through_telegram() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        OPERATOR_USER_IDS="42",
+        APPLICATION_ALLOWED_DOMAINS="arbeitnow.com",
+        APPLICATION_QUEUE_ENABLED="true",
+        APPLICATION_AUTO_SUBMIT="true",
+        APPLICATION_QUEUE_PROFILE_FULL_NAME="Ada Lovelace",
+        APPLICATION_QUEUE_PROFILE_EMAIL="ada@example.com",
+        APPLICATION_QUEUE_RESUME_FILE_ID="",
+    )
+
+    settings.require_application_queue()
+
+
 def test_settings_rejects_incomplete_application_queue_configuration() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",

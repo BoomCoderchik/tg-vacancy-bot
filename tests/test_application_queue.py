@@ -42,9 +42,37 @@ def application_update(update_id: int, vacancy: Vacancy, user_id: int = 42) -> U
     )
 
 
+def resume_update(
+    update_id: int,
+    *,
+    user_id: int = 42,
+    file_id: str = "new-telegram-resume-id",
+    file_name: str = "new-resume.pdf",
+) -> Update:
+    return Update.model_validate(
+        {
+            "update_id": update_id,
+            "message": {
+                "message_id": update_id,
+                "date": 1_700_000_000,
+                "chat": {"id": user_id, "type": "private", "first_name": "Ada"},
+                "from": {"id": user_id, "is_bot": False, "first_name": "Ada"},
+                "caption": "/queue_resume",
+                "document": {
+                    "file_id": file_id,
+                    "file_unique_id": f"unique-{update_id}",
+                    "file_name": file_name,
+                    "file_size": 6,
+                },
+            },
+        }
+    )
+
+
 class FakeBot:
-    def __init__(self, updates) -> None:
+    def __init__(self, updates, expected_resume_file_id="telegram-resume-id") -> None:
         self.updates = list(updates)
+        self.expected_resume_file_id = expected_resume_file_id
         self.messages = []
         self.answers = []
         self.get_updates_calls = []
@@ -62,7 +90,7 @@ class FakeBot:
         self.messages.append(kwargs)
 
     async def get_file(self, file_id):
-        assert file_id == "telegram-resume-id"
+        assert file_id == self.expected_resume_file_id
         return File(file_id=file_id, file_unique_id="unique", file_size=6, file_path="documents/resume.pdf")
 
     async def download_file(self, file_path, destination):
@@ -142,6 +170,97 @@ def test_queue_profile_maps_secret_fields_without_storing_resume_bytes(tmp_path)
     }
     assert profile.resume_telegram_file_id == "telegram-resume-id"
     assert profile.resume_stored_name is None
+
+
+def test_queue_resume_document_replaces_manual_file_id_secret(tmp_path) -> None:
+    settings = queue_settings(tmp_path).model_copy(
+        update={"application_queue_resume_file_id": ""}
+    )
+    store = VacancyStore(settings.database_path)
+    vacancy = Vacancy(
+        title="Python Engineer",
+        description="Backend",
+        source="Arbeitnow",
+        url="https://www.arbeitnow.com/jobs/example",
+    )
+    store.mark_published(vacancy)
+    bot = FakeBot(
+        [resume_update(1), application_update(2, vacancy)],
+        expected_resume_file_id="new-telegram-resume-id",
+    )
+    worker = SubmittedWorker()
+
+    result = asyncio.run(
+        process_application_queue_once(settings, bot=bot, store=store, browser_worker=worker)
+    )
+
+    assert result.resumes_updated == 1
+    assert result.submitted == 1
+    assert worker.calls[0][2] == b"resume"
+    stored_profile = store.get_operator_profile(42)
+    assert stored_profile is not None
+    assert stored_profile.resume_telegram_file_id == "new-telegram-resume-id"
+    assert stored_profile.resume_original_name == "new-resume.pdf"
+    assert bot.messages[0]["chat_id"] == 42
+    assert "сохранено" in bot.messages[0]["text"]
+    assert bot.get_updates_calls[0].allowed_updates == ["callback_query", "message"]
+
+
+def test_queue_without_resume_explains_how_to_upload_it(tmp_path) -> None:
+    settings = queue_settings(tmp_path).model_copy(
+        update={"application_queue_resume_file_id": ""}
+    )
+    store = VacancyStore(settings.database_path)
+    vacancy = Vacancy(
+        title="Python Engineer",
+        description="Backend",
+        source="Arbeitnow",
+        url="https://www.arbeitnow.com/jobs/example",
+    )
+    store.mark_published(vacancy)
+    bot = FakeBot([application_update(1, vacancy)])
+    worker = SubmittedWorker()
+
+    result = asyncio.run(
+        process_application_queue_once(settings, bot=bot, store=store, browser_worker=worker)
+    )
+
+    assert result.failed == 1
+    assert worker.calls == []
+    assert "/queue_resume" in bot.messages[-1]["text"]
+    application, created = store.create_application(42, store.fingerprint(vacancy))
+    assert created is False
+    assert application.status == "profile_missing"
+
+
+def test_queue_resume_rejects_unauthorized_operator(tmp_path) -> None:
+    settings = queue_settings(tmp_path).model_copy(
+        update={"application_queue_resume_file_id": ""}
+    )
+    store = VacancyStore(settings.database_path)
+    bot = FakeBot([resume_update(1, user_id=99)])
+
+    result = asyncio.run(process_application_queue_once(settings, bot=bot, store=store))
+
+    assert result.skipped == 1
+    assert result.resumes_updated == 0
+    assert store.get_operator_profile(99) is None
+    assert bot.messages == []
+
+
+def test_queue_resume_rejects_unsupported_document_type(tmp_path) -> None:
+    settings = queue_settings(tmp_path).model_copy(
+        update={"application_queue_resume_file_id": ""}
+    )
+    store = VacancyStore(settings.database_path)
+    bot = FakeBot([resume_update(1, file_name="resume.txt")])
+
+    result = asyncio.run(process_application_queue_once(settings, bot=bot, store=store))
+
+    assert result.skipped == 1
+    assert result.resumes_updated == 0
+    assert store.get_operator_profile(42) is None
+    assert "PDF или DOCX" in bot.messages[0]["text"]
 
 
 def test_disabled_queue_does_not_fetch_telegram_updates(tmp_path) -> None:

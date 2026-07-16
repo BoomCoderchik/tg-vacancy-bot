@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from aiogram import Bot
 from aiogram.methods import GetUpdates
-from aiogram.types import CallbackQuery, Update
+from aiogram.types import CallbackQuery, Message, Update
 
 from .application_buttons import APPLICATION_CALLBACK_PREFIX
 from .bot import send_application_result_notification
@@ -18,7 +18,9 @@ from .storage import VacancyStore
 
 
 logger = logging.getLogger(__name__)
-RETRYABLE_PRE_SUBMIT_STATUSES = frozenset({"created", "queued", "loading"})
+RETRYABLE_PRE_SUBMIT_STATUSES = frozenset({"created", "queued", "loading", "profile_missing"})
+QUEUE_RESUME_COMMAND = "/queue_resume"
+ALLOWED_RESUME_SUFFIXES = frozenset({".pdf", ".docx"})
 
 
 @dataclass(frozen=True)
@@ -30,6 +32,7 @@ class ApplicationQueueResult:
     manual_required: int = 0
     failed: int = 0
     skipped: int = 0
+    resumes_updated: int = 0
 
 
 def format_application_queue_result(result: ApplicationQueueResult) -> str:
@@ -40,10 +43,15 @@ def format_application_queue_result(result: ApplicationQueueResult) -> str:
         f"updates={result.updates_seen} processed={result.applications_processed} "
         f"submitted={result.submitted} manual={result.manual_required} "
         f"failed={result.failed} skipped={result.skipped}"
+        f" resumes_updated={result.resumes_updated}"
     )
 
 
-def queue_operator_profile(settings: Settings, operator_user_id: int) -> OperatorProfile:
+def queue_operator_profile(
+    settings: Settings,
+    operator_user_id: int,
+    stored_profile: OperatorProfile | None = None,
+) -> OperatorProfile:
     extra_fields = {}
     if settings.application_queue_profile_personal_url.strip():
         extra_fields["personal_url"] = settings.application_queue_profile_personal_url.strip()
@@ -55,8 +63,16 @@ def queue_operator_profile(settings: Settings, operator_user_id: int) -> Operato
         email=settings.application_queue_profile_email.strip(),
         phone=settings.application_queue_profile_phone.strip() or None,
         extra_fields=extra_fields,
-        resume_original_name=settings.application_queue_resume_file_name,
-        resume_telegram_file_id=settings.application_queue_resume_file_id.strip(),
+        resume_original_name=(
+            stored_profile.resume_original_name
+            if stored_profile and stored_profile.resume_telegram_file_id
+            else settings.application_queue_resume_file_name
+        ),
+        resume_telegram_file_id=(
+            stored_profile.resume_telegram_file_id
+            if stored_profile and stored_profile.resume_telegram_file_id
+            else settings.application_queue_resume_file_id.strip() or None
+        ),
     )
 
 
@@ -84,7 +100,7 @@ async def process_application_queue_once(
                     offset=offset,
                     limit=100,
                     timeout=0,
-                    allowed_updates=["callback_query"],
+                    allowed_updates=["callback_query", "message"],
                 )
             )
             if not updates:
@@ -106,6 +122,10 @@ async def _process_update(
     result: ApplicationQueueResult,
 ) -> ApplicationQueueResult:
     values = result.__dict__ | {"updates_seen": result.updates_seen + 1}
+    message = update.message
+    if message is not None and _is_queue_resume_command(message):
+        return await _save_queued_resume(message, settings, bot, store, values)
+
     callback = update.callback_query
     if callback is None or not (callback.data or "").startswith(APPLICATION_CALLBACK_PREFIX):
         values["skipped"] += 1
@@ -145,14 +165,34 @@ async def _process_update(
 
     values["applications_processed"] += 1
     store.update_application_status(application.application_id, "queued")
+    profile = queue_operator_profile(settings, operator_user_id, store.get_operator_profile(operator_user_id))
+    if not profile.resume_telegram_file_id or not profile.resume_original_name:
+        store.update_application_status(
+            application.application_id,
+            "profile_missing",
+            "Queue resume is not configured.",
+        )
+        await bot.send_message(
+            chat_id=operator_user_id,
+            text=(
+                "Резюме для очереди ещё не сохранено. Отправьте этому боту PDF или DOCX "
+                "с подписью /queue_resume, дождитесь подтверждения и нажмите кнопку отклика снова."
+            ),
+        )
+        values["failed"] += 1
+        return ApplicationQueueResult(**values)
     submit_started = False
     try:
         with TemporaryDirectory(prefix="tg-vacancy-application-") as temporary_dir:
             temporary_path = Path(temporary_dir)
-            resume_path = temporary_path / settings.application_queue_resume_file_name
-            await _download_resume(bot, settings, resume_path)
+            resume_path = temporary_path / profile.resume_original_name
+            await _download_resume(
+                bot,
+                profile.resume_telegram_file_id,
+                resume_path,
+                settings.resume_max_size_bytes,
+            )
             store.update_application_status(application.application_id, "loading")
-            profile = queue_operator_profile(settings, operator_user_id)
             worker = browser_worker or BrowserWorker(
                 str(temporary_path / "browser-profile"),
                 settings.application_allowed_domains,
@@ -200,9 +240,82 @@ async def _process_update(
         return ApplicationQueueResult(**values)
 
 
-async def _download_resume(bot: Bot, settings: Settings, destination: Path) -> None:
-    telegram_file = await bot.get_file(settings.application_queue_resume_file_id.strip())
-    if telegram_file.file_size and telegram_file.file_size > settings.resume_max_size_bytes:
+def _is_queue_resume_command(message: Message) -> bool:
+    command_text = (message.caption or message.text or "").strip().split(maxsplit=1)[0].lower()
+    return command_text.split("@", maxsplit=1)[0] == QUEUE_RESUME_COMMAND
+
+
+async def _save_queued_resume(
+    message: Message,
+    settings: Settings,
+    bot: Bot,
+    store: VacancyStore,
+    values: dict,
+) -> ApplicationQueueResult:
+    operator_user_id = message.from_user.id if message.from_user else None
+    if operator_user_id not in settings.operator_user_ids:
+        values["skipped"] += 1
+        return ApplicationQueueResult(**values)
+    if message.chat.type != "private":
+        await bot.send_message(
+            chat_id=operator_user_id,
+            text="Резюме для очереди можно обновлять только в личном чате с ботом.",
+        )
+        values["skipped"] += 1
+        return ApplicationQueueResult(**values)
+    document = message.document
+    if document is None or not document.file_name:
+        await bot.send_message(
+            chat_id=operator_user_id,
+            text="Отправьте PDF или DOCX как документ с подписью /queue_resume.",
+        )
+        values["skipped"] += 1
+        return ApplicationQueueResult(**values)
+    file_name = Path(document.file_name).name
+    if file_name != document.file_name or Path(file_name).suffix.lower() not in ALLOWED_RESUME_SUFFIXES:
+        await bot.send_message(
+            chat_id=operator_user_id,
+            text="Для очереди принимаются только файлы PDF или DOCX с безопасным именем.",
+        )
+        values["skipped"] += 1
+        return ApplicationQueueResult(**values)
+    if document.file_size and document.file_size > settings.resume_max_size_bytes:
+        await bot.send_message(
+            chat_id=operator_user_id,
+            text=f"Файл слишком большой. Максимум: {settings.resume_max_size_bytes // (1024 * 1024)} МБ.",
+        )
+        values["skipped"] += 1
+        return ApplicationQueueResult(**values)
+
+    stored_profile = store.get_operator_profile(operator_user_id) or OperatorProfile(
+        operator_user_id=operator_user_id
+    )
+    store.save_operator_profile(
+        replace(
+            stored_profile,
+            resume_original_name=file_name,
+            resume_telegram_file_id=document.file_id,
+        )
+    )
+    await bot.send_message(
+        chat_id=operator_user_id,
+        text=(
+            f"Резюме «{file_name}» сохранено для очереди откликов. "
+            "GitHub secret с file_id больше не требуется."
+        ),
+    )
+    values["resumes_updated"] += 1
+    return ApplicationQueueResult(**values)
+
+
+async def _download_resume(
+    bot: Bot,
+    file_id: str,
+    destination: Path,
+    max_size_bytes: int,
+) -> None:
+    telegram_file = await bot.get_file(file_id)
+    if telegram_file.file_size and telegram_file.file_size > max_size_bytes:
         raise RuntimeError("Telegram resume exceeds RESUME_MAX_SIZE_BYTES.")
     if not telegram_file.file_path:
         raise RuntimeError("Telegram did not return a resume file path.")

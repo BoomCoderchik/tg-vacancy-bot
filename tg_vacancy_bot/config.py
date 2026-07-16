@@ -201,8 +201,6 @@ class Settings(BaseSettings):
             missing.append("APPLICATION_QUEUE_PROFILE_FULL_NAME")
         if not self.application_queue_profile_email.strip():
             missing.append("APPLICATION_QUEUE_PROFILE_EMAIL")
-        if not self.application_queue_resume_file_id.strip():
-            missing.append("APPLICATION_QUEUE_RESUME_FILE_ID")
         resume_name = Path(self.application_queue_resume_file_name).name
         if (
             resume_name != self.application_queue_resume_file_name

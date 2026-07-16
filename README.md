@@ -171,7 +171,9 @@ The same workflow can process delayed `Откликнуться` callbacks witho
 always-on server. Telegram keeps the callback until a scheduled runner invokes
 `tg-vacancy-bot process-applications-once`; the runner downloads the configured
 resume by Telegram `file_id`, handles the application, sends a private result,
-and exits. This mode is opt-in and requires additional GitHub secrets. See
+and exits. Send a PDF/DOCX to the bot with the `/queue_resume` caption once to
+register or replace the queue resume without copying its `file_id` into GitHub.
+This mode is opt-in and requires additional GitHub secrets. See
 [`docs/application-queue.md`](docs/application-queue.md) for setup, usage,
 privacy boundaries, expected delay, and the current JOIN/CAPTCHA limitation.
 
@@ -261,7 +263,8 @@ Messages that do not look like allowed development/design/AI vacancies are skipp
 - `/whoami`: returns your Telegram user ID for `OPERATOR_USER_IDS`.
 - `/status`: shows the active forwarding mode, target chat, polling interval, and enabled sources without exposing secrets.
 - `/profile`: private operator profile: view/edit job preferences, upload or replace a resume, or delete the profile.
-- `/queue_resume_id`: private operator-only command that returns the saved Telegram `file_id` needed by the GitHub Actions application queue.
+- `/queue_resume`: attach this caption to a PDF/DOCX sent privately while queue mode is active; the next GitHub Actions run registers or replaces the queue resume.
+- `/queue_resume_id`: legacy private operator-only command that shows the saved Telegram `file_id`; it is no longer needed for normal queue setup.
 
 Every normalized vacancy card now includes an `Откликнуться` button. It keeps
 only a short vacancy ID in Telegram and resolves the original URL from SQLite;
