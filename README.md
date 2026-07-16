@@ -13,7 +13,7 @@ The planned profile and controlled application automation feature is documented 
   - `copy`: copy the original message to the target channel after the same allowed-vacancy intake check.
 - Publishes only development/design/AI vacancies: backend, frontend, fullstack, design, LLM, AI, and clear software developer/engineer roles.
 - Stores message fingerprints in SQLite to avoid duplicates.
-- Includes source adapters for Remotive, Arbeitnow, RemoteOK, Hacker News "Who is Hiring", Jobicy, We Work Remotely, Himalayas, Real Work From Anywhere, JobsCollider, Adzuna, Jooble, opt-in LinkedIn hiring-post search, free LinkedIn hiring-post scraping, and opt-in headless parsing of publicly available LinkedIn posts.
+- Includes Arbeitnow, Working Nomads, and opt-in LinkedIn hiring-post discovery. Arbeitnow supports verified form preparation; Working Nomads provides public vacancies with a manual employer-application link.
 - Polls configured public sources in the background while the bot is running.
 
 ## Profile storage foundation
@@ -85,7 +85,7 @@ LINKEDIN_POST_SCRAPER_RESULTS_WANTED=100
 This source scrapes public search-result HTML and keeps only real `linkedin.com/posts/...` and `linkedin.com/feed/update/...` links. It does not require an API key and does not create placeholder vacancies. Use `||` to separate fallback search queries. Because it depends on public search-result markup, it can be less stable than SerpApi and may return no rows when the search engine changes HTML or rate-limits requests.
 
 The scraper searches public, globally indexed results. It keeps only results with a reliable publication date (from the search result or the LinkedIn activity ID) and rejects posts older than `LINKEDIN_POST_MAX_AGE_HOURS` (maximum 120 hours) before they reach the common polling layer.
-The search depth is intentionally larger than the per-cycle publication budget: SQLite deduplication lets later polls publish the remaining fresh posts. `LOCALIZATION_MAX_PER_POLL=12` caps localization attempts per poll when localization is enabled; lower it further if the provider is rate-limited.
+The search depth is intentionally larger than the per-cycle publication budget: SQLite deduplication lets later polls publish the remaining fresh posts. Every source vacancy is localized to Russian before publication.
 
 ## Headless LinkedIn Hiring Post Parser
 
@@ -157,9 +157,8 @@ use:
 - `TARGET_CHAT_ID`
 - One localization key when `LOCALIZE_DESCRIPTIONS=true`: `OPENAI_API_KEY` for the default mode, or `GROQ_API_KEY` when `LOCALIZATION_PROVIDER=groq`.
 
-Optional source API keys and toggles such as `ADZUNA_APP_ID`,
-`ADZUNA_APP_KEY`, `JOOBLE_API_KEY`, `SERPAPI_API_KEY`, `SERPER_API_KEY`, and `ENABLE_*` can also
-be configured as GitHub secrets. The workflow keeps `DATABASE_PATH` under
+Optional LinkedIn keys and toggles such as `SERPAPI_API_KEY`, `SERPER_API_KEY`, and
+`ENABLE_LINKEDIN_POST_*` can also be configured as GitHub secrets. The workflow keeps `DATABASE_PATH` under
 `data/` and restores it with the GitHub Actions cache so source deduplication is
 preserved between scheduled runs.
 
@@ -167,6 +166,16 @@ Do not run the 15-minute GitHub Actions scheduler and a production always-on
 server against the same Telegram channel at the same time unless they share the
 same deduplication database. Otherwise, both schedulers can publish the same new
 vacancy before either one sees the other's SQLite state.
+
+The same workflow can process delayed `Откликнуться` callbacks without an
+always-on server. Telegram keeps the callback until a scheduled runner invokes
+`tg-vacancy-bot process-applications-once`; the runner downloads the configured
+resume by Telegram `file_id`, handles the application, sends a private result,
+and exits. Send a PDF/DOCX to the bot with the `/queue_resume` caption once to
+register or replace the queue resume without copying its `file_id` into GitHub.
+This mode is opt-in and requires additional GitHub secrets. See
+[`docs/application-queue.md`](docs/application-queue.md) for setup, usage,
+privacy boundaries, expected delay, and the current JOIN/CAPTCHA limitation.
 
 To check which sources are configured without publishing anything:
 
@@ -181,7 +190,7 @@ tg-vacancy-bot preview-sources --source "LinkedIn Hiring Posts" --limit 5
 ```
 
 When `SOURCE_POLL_INTERVAL_SECONDS` is greater than `0`, `tg-vacancy-bot run` also polls configured public sources in the background while it listens for forwarded messages.
-`SOURCE_MAX_PUBLISH_PER_POLL` limits how many source vacancies can be published in one polling cycle, which prevents first-run flooding. When localization is enabled, `LOCALIZATION_MAX_PER_POLL` separately limits model calls; unlocalized posts remain available for a later poll through deduplication.
+`SOURCE_MAX_PUBLISH_PER_POLL` limits how many source vacancies can be published in one polling cycle, which prevents first-run flooding. Source polling always attempts to localize descriptions before publication; if the provider fails, it logs the failure and publishes the original description and vacancy link instead.
 
 For web-hosting deployment, use:
 
@@ -204,7 +213,7 @@ OPENAI_FALLBACK_MODELS=
 OPENAI_BASE_URL=
 ```
 
-This uses the real OpenAI API, or an OpenAI-compatible endpoint such as OpenRouter, for normalized cards from forwarded messages, `publish-message`, and public source polling. If localization is enabled without the selected provider key, publishing stops with a clear configuration error instead of using fake or placeholder text.
+This uses the real OpenAI API, or an OpenAI-compatible endpoint such as OpenRouter, for normalized cards from forwarded messages, `publish-message`, and all source polling. Source polling forces a localization attempt even when `LOCALIZE_DESCRIPTIONS=false`; that switch only affects manual-message flows. If the provider fails or its key is absent, source polling logs the error and publishes the real vacancy with its original description and link rather than dropping it.
 
 ### Free Groq localization mode
 
@@ -254,20 +263,44 @@ Messages that do not look like allowed development/design/AI vacancies are skipp
 - `/whoami`: returns your Telegram user ID for `OPERATOR_USER_IDS`.
 - `/status`: shows the active forwarding mode, target chat, polling interval, and enabled sources without exposing secrets.
 - `/profile`: private operator profile: view/edit job preferences, upload or replace a resume, or delete the profile.
+- `/queue_resume`: attach this caption to a PDF/DOCX sent privately while queue mode is active; the next GitHub Actions run registers or replaces the queue resume.
+- `/queue_resume_id`: legacy private operator-only command that shows the saved Telegram `file_id`; it is no longer needed for normal queue setup.
 
 Every normalized vacancy card now includes an `Откликнуться` button. It keeps
 only a short vacancy ID in Telegram and resolves the original URL from SQLite;
 the button is intentionally unavailable for `FORWARDED_MODE=copy`, because a
 copied third-party message cannot safely receive the normalized card markup.
+After the button is processed, the bot sends the operator a persistent private
+result message. It says `Отклик отправлен` only for a confirmed `submitted`
+status; prepared, manual, incomplete-profile, cancelled, and failed attempts are
+explicitly reported as not sent. The operator must have opened the bot's private
+chat first so Telegram can deliver this notification.
 
 ## Arbeitnow application form
 
 The first supported form is Arbeitnow's public application page. Put
 `APPLICATION_ALLOWED_DOMAINS=arbeitnow.com` in `.env`, complete `/profile` with a
 first and last name, email, and PDF/DOCX resume, then press `Откликнуться` on an
-Arbeitnow card. The bot fills only the verified fields and uploads the local
-resume; it never clicks the final submit button. If the form changes, needs a
-login, or shows protection, the flow stops for manual action.
+Arbeitnow card. The always-on bot fills only the verified fields and uploads the
+local resume, then stops before final submit. The opt-in GitHub Actions queue can
+submit only a verified direct Arbeitnow form and reports success only after a
+recognized success page. Current Arbeitnow vacancies commonly redirect to JOIN,
+which requires email authentication and reCAPTCHA; that path stops for manual
+action and is never reported as submitted.
+
+## Working Nomads source
+
+Working Nomads is enabled by default through its public JSON feed:
+
+```dotenv
+ENABLE_WORKING_NOMADS=true
+```
+
+The source needs no API key or Working Nomads account. Its `Откликнуться` button
+stores the application attempt and sends the operator a link that redirects to
+the employer's actual form. The bot does not auto-fill or submit these varied
+external forms; a future adapter must be implemented and verified for each ATS
+or employer form separately.
 
 ## LinkedIn Boundary
 

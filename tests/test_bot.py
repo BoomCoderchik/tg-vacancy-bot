@@ -1,11 +1,16 @@
 import asyncio
 
 from tg_vacancy_bot.bot import (
+    application_result_markup,
+    application_result_text,
     build_status_text,
     format_whoami_text,
+    manual_application_link_text,
     needs_profile_onboarding,
     profile_onboarding_text,
+    queue_resume_id_text,
     send_profile_onboarding_reminders,
+    send_application_result_notification,
 )
 from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import OperatorProfile
@@ -15,14 +20,11 @@ def test_build_status_text_does_not_expose_bot_token() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="secret-token",
         TARGET_CHAT_ID="@target",
-        ENABLE_REMOTIVE=True,
         ENABLE_ARBEITNOW=False,
         OPERATOR_USER_IDS="",
         LOCALIZE_DESCRIPTIONS="true",
         ENABLE_LINKEDIN_POST_SEARCH=False,
         ENABLE_LINKEDIN_POST_HEADLESS=False,
-        ADZUNA_APP_ID="app",
-        ADZUNA_APP_KEY="key",
     )
 
     text = build_status_text(settings)
@@ -32,9 +34,8 @@ def test_build_status_text_does_not_expose_bot_token() -> None:
     assert "Forwarded mode: normalize" in text
     assert "Operator allowlist: off" in text
     assert "Description localization: on" in text
-    assert "Remotive=on" in text
     assert "Arbeitnow=off" in text
-    assert "Adzuna=on" in text
+    assert "WorkingNomads=on" in text
     assert "LinkedInPosts=off" in text
     assert "LinkedInHeadless=off" in text
 
@@ -92,6 +93,86 @@ def test_format_whoami_text_returns_user_id() -> None:
 
 def test_format_whoami_text_handles_missing_user() -> None:
     assert "not available" in format_whoami_text(None)
+
+
+def test_queue_resume_id_text_only_returns_saved_telegram_file_id() -> None:
+    profile = OperatorProfile(operator_user_id=42, resume_telegram_file_id="telegram-file-id")
+
+    assert "APPLICATION_QUEUE_RESUME_FILE_ID" in queue_resume_id_text(profile)
+    assert "telegram-file-id" in queue_resume_id_text(profile)
+    assert "/profile" in queue_resume_id_text(None)
+
+
+def test_manual_application_link_text_escapes_external_url() -> None:
+    text = manual_application_link_text("https://example.com/apply?role=backend&next=1")
+
+    assert "Открыть вакансию" in text
+    assert "&amp;" in text
+
+
+def test_application_result_text_only_confirms_real_submission() -> None:
+    assert application_result_text("submitted") == "✅ Отклик отправлен."
+    assert "ещё не отправлен" in application_result_text("filled")
+    assert "Не удалось отправить" in application_result_text("failed")
+
+
+def test_application_result_text_lists_missing_profile_fields() -> None:
+    text = application_result_text("profile_missing", missing_fields=("email", "резюме"))
+
+    assert "Отклик не отправлен" in text
+    assert "email, резюме" in text
+    assert "/profile" in text
+
+
+def test_application_result_markup_links_to_vacancy() -> None:
+    markup = application_result_markup("https://example.com/jobs/1")
+
+    assert markup is not None
+    assert markup.inline_keyboard[0][0].text == "Открыть вакансию"
+    assert markup.inline_keyboard[0][0].url == "https://example.com/jobs/1"
+    assert application_result_markup(None) is None
+
+
+def test_application_result_notification_is_sent_privately() -> None:
+    class FakeBot:
+        def __init__(self) -> None:
+            self.messages: list[dict] = []
+
+        async def send_message(self, **kwargs) -> None:
+            self.messages.append(kwargs)
+
+    bot = FakeBot()
+
+    sent = asyncio.run(
+        send_application_result_notification(
+            bot,
+            42,
+            "filled",
+            "https://example.com/jobs/1",
+        )
+    )
+
+    assert sent is True
+    assert bot.messages[0]["chat_id"] == 42
+    assert "ещё не отправлен" in bot.messages[0]["text"]
+    assert bot.messages[0]["reply_markup"].inline_keyboard[0][0].url == "https://example.com/jobs/1"
+
+
+def test_application_result_notification_reports_unavailable_private_chat() -> None:
+    class RejectingBot:
+        async def send_message(self, **kwargs) -> None:
+            raise RuntimeError("private chat is unavailable")
+
+    sent = asyncio.run(
+        send_application_result_notification(
+            RejectingBot(),
+            42,
+            "failed",
+            None,
+        )
+    )
+
+    assert sent is False
 
 
 def test_profile_onboarding_text_lists_missing_application_data() -> None:

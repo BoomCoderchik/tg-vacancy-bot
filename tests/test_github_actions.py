@@ -14,6 +14,7 @@ def test_poll_sources_workflow_runs_every_15_minutes() -> None:
     assert 'cron: "37 * * * *"' in text
     assert 'cron: "52 * * * *"' in text
     assert "tg-vacancy-bot poll-once" in text
+    assert "tg-vacancy-bot process-applications-once" in text
     assert "SOURCE_POLL_INTERVAL_SECONDS: \"0\"" in text
     assert "concurrency:" in text
 
@@ -33,13 +34,20 @@ def test_poll_sources_workflow_defaults_optional_runtime_values() -> None:
 
     assert "SOURCE_MAX_PUBLISH_PER_POLL: ${{ secrets.SOURCE_MAX_PUBLISH_PER_POLL || '20' }}" in text
     assert "SOURCE_MAX_AGE_HOURS: ${{ secrets.SOURCE_MAX_AGE_HOURS || '48' }}" in text
-    assert 'LINKEDIN_POST_MAX_AGE_HOURS: "120"' in text
-    assert "LOCALIZE_DESCRIPTIONS: ${{ secrets.LOCALIZE_DESCRIPTIONS || 'false' }}" in text
-    assert "LOCALIZATION_MAX_PER_POLL: ${{ secrets.LOCALIZATION_MAX_PER_POLL || '12' }}" in text
-    assert "ENABLE_JOBICY: ${{ secrets.ENABLE_JOBICY || 'true' }}" in text
+    assert 'ENABLE_ARBEITNOW: "true"' in text
+    assert 'ENABLE_WORKING_NOMADS: "true"' in text
+    assert 'LOCALIZE_DESCRIPTIONS: "true"' in text
+    assert "LOCALIZATION_PROVIDER: ${{ secrets.LOCALIZATION_PROVIDER || 'openai' }}" in text
+    assert "OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}" in text
+    assert "GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}" in text
+    assert "Verify required localization configuration" not in text
     assert "ENABLE_LINKEDIN_POST_HEADLESS: ${{ secrets.ENABLE_LINKEDIN_POST_HEADLESS || 'false' }}" in text
     assert "ENABLE_LINKEDIN_POST_SCRAPER: ${{ secrets.ENABLE_LINKEDIN_POST_SCRAPER || 'true' }}" in text
     assert "SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}" in text
     assert "LINKEDIN_POST_SEARCH_QUERY: ${{ secrets.LINKEDIN_POST_SEARCH_QUERY ||" in text
     assert "LINKEDIN_POST_SCRAPER_QUERY: ${{ secrets.LINKEDIN_POST_SCRAPER_QUERY ||" in text
     assert "python -m playwright install --with-deps chromium" in text
+    assert "APPLICATION_QUEUE_ENABLED: ${{ secrets.APPLICATION_QUEUE_ENABLED || 'false' }}" in text
+    assert "APPLICATION_AUTO_SUBMIT: ${{ secrets.APPLICATION_AUTO_SUBMIT || 'false' }}" in text
+    assert "APPLICATION_QUEUE_RESUME_FILE_ID: ${{ secrets.APPLICATION_QUEUE_RESUME_FILE_ID }}" in text
+    assert "always() && env.APPLICATION_QUEUE_ENABLED == 'true'" in text

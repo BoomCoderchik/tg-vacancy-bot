@@ -19,10 +19,17 @@ logger = logging.getLogger(__name__)
 
 
 class TelegramPublisher:
-    def __init__(self, settings: Settings, store: VacancyStore) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        store: VacancyStore,
+        *,
+        publish_original_when_localization_fails: bool = False,
+    ) -> None:
         settings.require_runtime()
         self.settings = settings
         self.store = store
+        self.publish_original_when_localization_fails = publish_original_when_localization_fails
         self.bot = Bot(
             token=settings.telegram_bot_token,
             default=DefaultBotProperties(parse_mode=ParseMode.HTML),
@@ -37,19 +44,21 @@ class TelegramPublisher:
                 public_vacancy = await localize_vacancy_description(vacancy, self.settings)
             except Exception as exc:
                 logger.warning(
-                    "Description localization failed for %r; skipping publication: %s",
+                    "Description localization failed for %r: %s",
                     vacancy.title,
                     exc,
                 )
-                # Fail command-style publishing so CI exposes broken localization.
-                raise
+                if not getattr(self, "publish_original_when_localization_fails", False):
+                    # Explicit manual publishing must report a broken localization setup.
+                    raise
+                public_vacancy = vacancy
             try:
                 await self.bot.send_message(
                     chat_id=self.settings.target_chat_id,
                     text=format_vacancy_card(public_vacancy),
                     parse_mode=ParseMode.HTML,
                     disable_web_page_preview=True,
-                    reply_markup=application_button(vacancy),
+                    reply_markup=application_button(vacancy, queued=self.settings.application_queue_enabled),
                 )
             except TelegramRetryAfter as exc:
                 retry_after = int(getattr(exc, "retry_after", 1))
@@ -60,7 +69,7 @@ class TelegramPublisher:
                     text=format_vacancy_card(public_vacancy),
                     parse_mode=ParseMode.HTML,
                     disable_web_page_preview=True,
-                    reply_markup=application_button(vacancy),
+                    reply_markup=application_button(vacancy, queued=self.settings.application_queue_enabled),
                 )
             if self.store.mark_published(vacancy):
                 published += 1

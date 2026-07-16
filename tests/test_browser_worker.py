@@ -1,6 +1,6 @@
 import asyncio
 
-from tg_vacancy_bot.browser_worker import BrowserWorker
+from tg_vacancy_bot.browser_worker import BrowserWorker, verified_submission_success
 from tg_vacancy_bot.models import OperatorProfile
 
 
@@ -29,3 +29,9 @@ def test_browser_worker_requires_profile_data_before_opening_arbeitnow(tmp_path)
 
     assert result.status == "profile_missing"
     assert result.missing_fields == ("full_name", "email", "resume")
+
+
+def test_browser_worker_requires_proof_before_reporting_submission() -> None:
+    assert verified_submission_success("Thank you for your application", form_visible=False) is True
+    assert verified_submission_success("Thank you for your application", form_visible=True) is False
+    assert verified_submission_success("The form was accepted", form_visible=False) is False

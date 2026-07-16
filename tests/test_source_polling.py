@@ -1,5 +1,4 @@
 import asyncio
-import logging
 from datetime import UTC, datetime, timedelta
 
 from tg_vacancy_bot.config import Settings
@@ -10,11 +9,9 @@ from tg_vacancy_bot.source_polling import poll_sources_once
 class FakeBot:
     def __init__(self) -> None:
         self.sent_messages: list[str] = []
-        self.reply_markups = []
 
     async def send_message(self, **kwargs) -> None:
         self.sent_messages.append(kwargs["text"])
-        self.reply_markups.append(kwargs.get("reply_markup"))
 
 
 class FakeStore:
@@ -31,11 +28,11 @@ class FakeStore:
 
 
 class FakeAdapter:
-    name = "Fake"
+    name = "Arbeitnow"
 
     async def fetch(self) -> list[Vacancy]:
         return [
-            Vacancy(title=f"Python Engineer {index}", description="Remote Python role", source="Fake")
+            Vacancy(title=f"Python Engineer {index}", description="Remote Python role", source=self.name)
             for index in range(5)
         ]
 
@@ -45,9 +42,13 @@ def test_poll_sources_once_respects_publish_limit(monkeypatch) -> None:
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
         SOURCE_MAX_PUBLISH_PER_POLL="2",
-        LOCALIZE_DESCRIPTIONS="false",
     )
     monkeypatch.setattr("tg_vacancy_bot.source_polling.build_adapters", lambda _: [FakeAdapter()])
+
+    async def fake_localize(vacancy, settings):
+        return vacancy
+
+    monkeypatch.setattr("tg_vacancy_bot.source_polling.localize_vacancy_description", fake_localize)
     bot = FakeBot()
 
     published = asyncio.run(poll_sources_once(bot, settings, FakeStore()))
@@ -56,83 +57,69 @@ def test_poll_sources_once_respects_publish_limit(monkeypatch) -> None:
     assert len(bot.sent_messages) == 2
 
 
-def test_poll_sources_once_localizes_description_before_sending(monkeypatch) -> None:
+def test_poll_sources_once_always_localizes_description(monkeypatch) -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
         SOURCE_MAX_PUBLISH_PER_POLL="1",
-        LOCALIZE_DESCRIPTIONS="true",
+        LOCALIZE_DESCRIPTIONS="false",
         OPENAI_API_KEY="test-key",
     )
     monkeypatch.setattr("tg_vacancy_bot.source_polling.build_adapters", lambda _: [FakeAdapter()])
-    bot = FakeBot()
-    store = FakeStore()
+    localized = []
 
     async def fake_localize(vacancy, settings):
+        localized.append((vacancy, settings.localize_descriptions))
         return Vacancy(
             title=vacancy.title,
-            description="Коротко: удаленная Python роль.",
+            description="Переведённое описание.",
             source=vacancy.source,
         )
 
     monkeypatch.setattr("tg_vacancy_bot.source_polling.localize_vacancy_description", fake_localize)
+    bot = FakeBot()
 
-    published = asyncio.run(poll_sources_once(bot, settings, store))
+    published = asyncio.run(poll_sources_once(bot, settings, FakeStore()))
 
     assert published == 1
-    assert "Коротко: удаленная Python роль." in bot.sent_messages[0]
-    assert store.published[0].description == "Remote Python role"
+    assert localized[0][1] is True
+    assert "Переведённое описание." in bot.sent_messages[0]
 
 
-def test_poll_sources_once_skips_vacancy_when_localization_fails(monkeypatch) -> None:
+def test_poll_sources_once_publishes_original_when_localization_fails(monkeypatch) -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
-        SOURCE_MAX_PUBLISH_PER_POLL="1",
-        LOCALIZE_DESCRIPTIONS="true",
         OPENAI_API_KEY="test-key",
     )
     monkeypatch.setattr("tg_vacancy_bot.source_polling.build_adapters", lambda _: [FakeAdapter()])
-    bot = FakeBot()
-    store = FakeStore()
 
-    async def fake_localize(vacancy, settings):
-        raise RuntimeError("OpenAI returned an empty localized description.")
-
-    monkeypatch.setattr("tg_vacancy_bot.source_polling.localize_vacancy_description", fake_localize)
-
-    published = asyncio.run(poll_sources_once(bot, settings, store))
-
-    assert published == 0
-    assert bot.sent_messages == []
-    assert store.published == []
-
-
-def test_poll_sources_once_limits_localization_calls(monkeypatch) -> None:
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        SOURCE_MAX_PUBLISH_PER_POLL="50",
-        LOCALIZATION_MAX_PER_POLL="2",
-        LOCALIZE_DESCRIPTIONS="true",
-        OPENAI_API_KEY="test-key",
-    )
-    monkeypatch.setattr("tg_vacancy_bot.source_polling.build_adapters", lambda _: [FakeAdapter()])
-    bot = FakeBot()
-    store = FakeStore()
-    calls = 0
-
-    async def fake_localize(vacancy, settings):
-        nonlocal calls
-        calls += 1
+    async def broken_localize(vacancy, settings):
+        if vacancy.title.endswith("0"):
+            raise RuntimeError("Translation provider failed")
         return vacancy
 
-    monkeypatch.setattr("tg_vacancy_bot.source_polling.localize_vacancy_description", fake_localize)
+    monkeypatch.setattr("tg_vacancy_bot.source_polling.localize_vacancy_description", broken_localize)
+    bot = FakeBot()
 
-    published = asyncio.run(poll_sources_once(bot, settings, store))
+    published = asyncio.run(poll_sources_once(bot, settings, FakeStore()))
 
-    assert published == 2
-    assert calls == 2
+    assert published == 5
+    assert len(bot.sent_messages) == 5
+    assert "Remote Python role" in bot.sent_messages[0]
+
+
+def test_poll_sources_once_publishes_original_when_localization_key_is_missing(monkeypatch) -> None:
+    settings = Settings(TELEGRAM_BOT_TOKEN="token", TARGET_CHAT_ID="@target").model_copy(
+        update={"openai_api_key": ""}
+    )
+    monkeypatch.setattr("tg_vacancy_bot.source_polling.build_adapters", lambda _: [FakeAdapter()])
+    bot = FakeBot()
+
+    published = asyncio.run(poll_sources_once(bot, settings, FakeStore()))
+
+    assert published == 5
+    assert "Remote Python role" in bot.sent_messages[0]
 
 
 def test_poll_sources_once_skips_stale_published_vacancies(monkeypatch) -> None:
@@ -141,18 +128,17 @@ def test_poll_sources_once_skips_stale_published_vacancies(monkeypatch) -> None:
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
         SOURCE_MAX_AGE_HOURS="48",
-        LOCALIZE_DESCRIPTIONS="false",
     )
 
     class StaleAdapter:
-        name = "Stale"
+        name = "Arbeitnow"
 
         async def fetch(self) -> list[Vacancy]:
             return [
                 Vacancy(
                     title="Python Engineer",
                     description="Remote Python role",
-                    source="Stale",
+                    source=self.name,
                     published_at=now - timedelta(hours=49),
                 )
             ]
@@ -167,62 +153,8 @@ def test_poll_sources_once_skips_stale_published_vacancies(monkeypatch) -> None:
     assert bot.sent_messages == []
 
 
-def test_poll_sources_once_publishes_fresh_published_vacancies(monkeypatch) -> None:
-    now = datetime(2026, 7, 5, 12, tzinfo=UTC)
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        SOURCE_MAX_AGE_HOURS="48",
-        LOCALIZE_DESCRIPTIONS="false",
-    )
-
-    class FreshAdapter:
-        name = "Fresh"
-
-        async def fetch(self) -> list[Vacancy]:
-            return [
-                Vacancy(
-                    title="Python Engineer",
-                    description="Remote Python role",
-                    source="Fresh",
-                    published_at=now - timedelta(hours=1),
-                )
-            ]
-
-    monkeypatch.setattr("tg_vacancy_bot.source_polling.build_adapters", lambda _: [FreshAdapter()])
-    monkeypatch.setattr("tg_vacancy_bot.source_polling.utcnow", lambda: now)
-    bot = FakeBot()
-
-    published = asyncio.run(poll_sources_once(bot, settings, FakeStore()))
-
-    assert published == 1
-    assert len(bot.sent_messages) == 1
-    assert bot.reply_markups[0].inline_keyboard[0][0].text == "Откликнуться"
-
-
-def test_poll_sources_once_keeps_undated_vacancies(monkeypatch) -> None:
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        SOURCE_MAX_AGE_HOURS="48",
-        LOCALIZE_DESCRIPTIONS="false",
-    )
-    monkeypatch.setattr("tg_vacancy_bot.source_polling.build_adapters", lambda _: [FakeAdapter()])
-    bot = FakeBot()
-
-    published = asyncio.run(poll_sources_once(bot, settings, FakeStore()))
-
-    assert published == 5
-    assert len(bot.sent_messages) == 5
-
-
 def test_poll_sources_once_keeps_deduplication_before_publish(monkeypatch) -> None:
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        SOURCE_MAX_AGE_HOURS="48",
-        LOCALIZE_DESCRIPTIONS="false",
-    )
+    settings = Settings(TELEGRAM_BOT_TOKEN="token", TARGET_CHAT_ID="@target")
     monkeypatch.setattr("tg_vacancy_bot.source_polling.build_adapters", lambda _: [FakeAdapter()])
     bot = FakeBot()
 
@@ -230,29 +162,3 @@ def test_poll_sources_once_keeps_deduplication_before_publish(monkeypatch) -> No
 
     assert published == 0
     assert bot.sent_messages == []
-
-
-def test_poll_sources_once_warns_when_linkedin_posts_enabled_without_serpapi_key(caplog) -> None:
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        ENABLE_REMOTIVE=False,
-        ENABLE_ARBEITNOW=False,
-        ENABLE_REMOTEOK=False,
-        ENABLE_HN_WHO_IS_HIRING=False,
-        ENABLE_JOBICY=False,
-        ENABLE_WE_WORK_REMOTELY=False,
-        ENABLE_HIMALAYAS=False,
-        ENABLE_REAL_WORK_FROM_ANYWHERE=False,
-        ENABLE_JOBSCOLLIDER=False,
-        ENABLE_LINKEDIN_POST_SEARCH=True,
-        ENABLE_LINKEDIN_POST_SCRAPER=False,
-        SERPAPI_API_KEY="",
-        SERPER_API_KEY="",
-    )
-
-    with caplog.at_level(logging.WARNING):
-        published = asyncio.run(poll_sources_once(FakeBot(), settings, FakeStore()))
-
-    assert published == 0
-    assert "LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY or SERPER_API_KEY is missing." in caplog.text

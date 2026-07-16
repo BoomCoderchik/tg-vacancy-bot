@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 
 from .bot import run_bot_sync
+from .application_queue import format_application_queue_result, process_application_queue_once
 from .console import write_stdout
 from .config import get_settings
 from .deployment import run_web_service_sync
@@ -28,6 +29,10 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("run-web", help="Run Telegram bot polling with an HTTP health endpoint.")
     subparsers.add_parser("init-env", help="Create .env from .env.example without overwriting an existing file.")
     subparsers.add_parser("poll-once", help="Poll public sources once and publish new vacancies.")
+    subparsers.add_parser(
+        "process-applications-once",
+        help="Process queued Telegram application callbacks once and exit.",
+    )
     subparsers.add_parser("check-sources", help="Check source adapter configuration without publishing.")
     preview_sources_parser = subparsers.add_parser(
         "preview-sources",
@@ -48,15 +53,20 @@ async def poll_once() -> None:
     settings.require_runtime()
     logging.basicConfig(level=logging.INFO)
     store = VacancyStore(settings.database_path)
-    publisher = TelegramPublisher(settings, store)
+    source_settings = settings.model_copy(update={"localize_descriptions": True})
+    publisher = TelegramPublisher(
+        source_settings,
+        store,
+        publish_original_when_localization_fails=True,
+    )
 
     try:
         total = 0
         published = 0
-        max_publish = settings.source_max_publish_per_poll
-        for warning in source_configuration_warnings(settings):
+        max_publish = source_settings.source_max_publish_per_poll
+        for warning in source_configuration_warnings(source_settings):
             logging.warning(warning)
-        for adapter in build_adapters(settings):
+        for adapter in build_adapters(source_settings):
             if max_publish > 0 and published >= max_publish:
                 logging.info("Source poll publish limit reached: %s", max_publish)
                 break
@@ -67,7 +77,7 @@ async def poll_once() -> None:
                 continue
             filtered = filter_fresh_vacancies(
                 filter_it_vacancies(vacancies),
-                max_age_hours=settings.source_max_age_hours,
+                max_age_hours=source_settings.source_max_age_hours,
                 current_time=datetime.now(UTC),
             )
             total += len(filtered)
@@ -120,6 +130,11 @@ def main(argv: Sequence[str] | None = None) -> None:
 
         if args.command == "poll-once":
             asyncio.run(poll_once())
+            return
+
+        if args.command == "process-applications-once":
+            result = asyncio.run(process_application_queue_once(settings))
+            write_stdout(format_application_queue_result(result))
             return
 
         if args.command == "check-sources":

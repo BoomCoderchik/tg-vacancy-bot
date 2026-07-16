@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
@@ -40,20 +41,22 @@ class Settings(BaseSettings):
     browser_headless: bool = Field(default=True, alias="BROWSER_HEADLESS")
     browser_timeout_seconds: int = Field(default=30, alias="BROWSER_TIMEOUT_SECONDS", gt=0)
     application_allowed_domains_raw: str = Field(default="", alias="APPLICATION_ALLOWED_DOMAINS")
+    application_queue_enabled: bool = Field(default=False, alias="APPLICATION_QUEUE_ENABLED")
+    application_auto_submit: bool = Field(default=False, alias="APPLICATION_AUTO_SUBMIT")
+    application_queue_profile_full_name: str = Field(default="", alias="APPLICATION_QUEUE_PROFILE_FULL_NAME")
+    application_queue_profile_email: str = Field(default="", alias="APPLICATION_QUEUE_PROFILE_EMAIL")
+    application_queue_profile_phone: str = Field(default="", alias="APPLICATION_QUEUE_PROFILE_PHONE")
+    application_queue_profile_personal_url: str = Field(default="", alias="APPLICATION_QUEUE_PROFILE_PERSONAL_URL")
+    application_queue_profile_cover_letter: str = Field(default="", alias="APPLICATION_QUEUE_PROFILE_COVER_LETTER")
+    application_queue_resume_file_id: str = Field(default="", alias="APPLICATION_QUEUE_RESUME_FILE_ID")
+    application_queue_resume_file_name: str = Field(default="resume.pdf", alias="APPLICATION_QUEUE_RESUME_FILE_NAME")
     source_poll_interval_seconds: int = Field(default=900, alias="SOURCE_POLL_INTERVAL_SECONDS")
     source_max_publish_per_poll: int = Field(default=20, alias="SOURCE_MAX_PUBLISH_PER_POLL")
     source_max_age_hours: int = Field(default=48, alias="SOURCE_MAX_AGE_HOURS")
     localize_descriptions: bool = Field(default=False, alias="LOCALIZE_DESCRIPTIONS")
 
-    enable_remotive: bool = Field(default=True, alias="ENABLE_REMOTIVE")
     enable_arbeitnow: bool = Field(default=True, alias="ENABLE_ARBEITNOW")
-    enable_remoteok: bool = Field(default=True, alias="ENABLE_REMOTEOK")
-    enable_hn_who_is_hiring: bool = Field(default=True, alias="ENABLE_HN_WHO_IS_HIRING")
-    enable_jobicy: bool = Field(default=True, alias="ENABLE_JOBICY")
-    enable_we_work_remotely: bool = Field(default=True, alias="ENABLE_WE_WORK_REMOTELY")
-    enable_himalayas: bool = Field(default=True, alias="ENABLE_HIMALAYAS")
-    enable_real_work_from_anywhere: bool = Field(default=True, alias="ENABLE_REAL_WORK_FROM_ANYWHERE")
-    enable_jobscollider: bool = Field(default=True, alias="ENABLE_JOBSCOLLIDER")
+    enable_working_nomads: bool = Field(default=True, alias="ENABLE_WORKING_NOMADS")
     enable_linkedin_post_search: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SEARCH")
     enable_linkedin_post_scraper: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SCRAPER")
     enable_linkedin_post_headless: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_HEADLESS")
@@ -96,16 +99,6 @@ class Settings(BaseSettings):
         gt=0,
     )
     localization_max_per_poll: int = Field(default=12, alias="LOCALIZATION_MAX_PER_POLL")
-    adzuna_app_id: str = Field(default="", alias="ADZUNA_APP_ID")
-    adzuna_app_key: str = Field(default="", alias="ADZUNA_APP_KEY")
-    adzuna_country: str = Field(default="us", alias="ADZUNA_COUNTRY")
-    adzuna_query: str = Field(default="software developer", alias="ADZUNA_QUERY")
-    adzuna_location: str = Field(default="", alias="ADZUNA_LOCATION")
-
-    jooble_api_key: str = Field(default="", alias="JOOBLE_API_KEY")
-    jooble_keywords: str = Field(default="software developer", alias="JOOBLE_KEYWORDS")
-    jooble_location: str = Field(default="", alias="JOOBLE_LOCATION")
-
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4.1-mini", alias="OPENAI_MODEL")
     openai_fallback_models_raw: str = Field(default="", alias="OPENAI_FALLBACK_MODELS")
@@ -194,6 +187,30 @@ class Settings(BaseSettings):
         if missing:
             joined = ", ".join(missing)
             raise RuntimeError(f"Missing required environment variables: {joined}")
+
+    def require_application_queue(self) -> None:
+        self.require_runtime()
+        missing = []
+        if len(self.operator_user_ids) != 1:
+            missing.append("exactly one OPERATOR_USER_IDS value")
+        if not self.application_auto_submit:
+            missing.append("APPLICATION_AUTO_SUBMIT=true")
+        if "arbeitnow.com" not in self.application_allowed_domains:
+            missing.append("APPLICATION_ALLOWED_DOMAINS=arbeitnow.com")
+        if len(self.application_queue_profile_full_name.strip().split()) < 2:
+            missing.append("APPLICATION_QUEUE_PROFILE_FULL_NAME")
+        if not self.application_queue_profile_email.strip():
+            missing.append("APPLICATION_QUEUE_PROFILE_EMAIL")
+        resume_name = Path(self.application_queue_resume_file_name).name
+        if (
+            resume_name != self.application_queue_resume_file_name
+            or Path(resume_name).suffix.lower() not in {".pdf", ".docx"}
+        ):
+            missing.append("APPLICATION_QUEUE_RESUME_FILE_NAME (.pdf or .docx)")
+        if self.resume_max_size_bytes > 20 * 1024 * 1024:
+            missing.append("RESUME_MAX_SIZE_BYTES no greater than Telegram's 20 MB download limit")
+        if missing:
+            raise RuntimeError("Application queue configuration is incomplete: " + ", ".join(missing))
 
 
 @lru_cache

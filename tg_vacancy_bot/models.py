@@ -5,7 +5,7 @@ from typing import Literal
 
 ResultType = Literal["vacancy"]
 ApplicationStatus = Literal[
-    "created", "loading", "parsed", "profile_missing", "unsupported_site", "filled",
+    "created", "queued", "loading", "submitting", "parsed", "profile_missing", "unsupported_site", "filled",
     "manual_required", "awaiting_confirmation", "submitted", "failed", "cancelled",
 ]
 
@@ -49,6 +49,7 @@ class OperatorProfile:
     extra_fields: dict[str, str] = field(default_factory=dict)
     resume_original_name: str | None = None
     resume_stored_name: str | None = None
+    resume_telegram_file_id: str | None = None
     resume_text: str | None = None
 
 

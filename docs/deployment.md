@@ -167,18 +167,16 @@ Required GitHub repository secrets:
 - `TELEGRAM_BOT_TOKEN`
 - `TARGET_CHAT_ID`
 
-Set these only if the matching feature is enabled:
+Set these only if the matching LinkedIn feature is enabled:
 
-- `OPENAI_API_KEY` when `LOCALIZE_DESCRIPTIONS=true`
 - `SERPAPI_API_KEY` or `SERPER_API_KEY` when `ENABLE_LINKEDIN_POST_SEARCH=true`
-- `ADZUNA_APP_ID` and `ADZUNA_APP_KEY` for Adzuna
-- `JOOBLE_API_KEY` for Jooble
 
 Optional secrets can override defaults, including `SOURCE_MAX_PUBLISH_PER_POLL`,
-`SOURCE_MAX_AGE_HOURS`, `LOCALIZE_DESCRIPTIONS`, `OPENAI_MODEL`,
-`OPENAI_BASE_URL`, and source toggles such as `ENABLE_REMOTIVE`,
-`ENABLE_JOBICY`, `ENABLE_LINKEDIN_POST_SCRAPER`, and
-`ENABLE_LINKEDIN_POST_HEADLESS`. When the headless source is enabled, the
+`SOURCE_MAX_AGE_HOURS`, `ENABLE_LINKEDIN_POST_SCRAPER`, and
+`ENABLE_LINKEDIN_POST_HEADLESS`, `LOCALIZATION_PROVIDER`, and
+`LOCALIZATION_MAX_PER_POLL`. Set `OPENAI_API_KEY` for the default provider or
+`GROQ_API_KEY` when `LOCALIZATION_PROVIDER=groq` to enable actual translation.
+The workflow still publishes a real vacancy with its original description if the selected provider is unavailable. When the headless source is enabled, the
 scheduled workflow installs Chromium before polling.
 
 The workflow stores the SQLite deduplication database in `data/` and restores it

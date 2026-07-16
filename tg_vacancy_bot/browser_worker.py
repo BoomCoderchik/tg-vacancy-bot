@@ -1,13 +1,30 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright
 
 from .arbeitnow_application import build_arbeitnow_application_plan, is_arbeitnow_url
 from .models import OperatorProfile
+
+
+SUBMISSION_SUCCESS_MARKERS = (
+    "application submitted",
+    "application has been sent",
+    "thank you for applying",
+    "thank you for your application",
+    "vielen dank für deine bewerbung",
+    "vielen dank für ihre bewerbung",
+)
+
+
+def verified_submission_success(body_text: str, form_visible: bool) -> bool:
+    body = body_text.lower()
+    return not form_visible and any(marker in body for marker in SUBMISSION_SUCCESS_MARKERS)
 
 
 @dataclass(frozen=True)
@@ -19,7 +36,7 @@ class BrowserInspection:
 
 
 class BrowserWorker:
-    """Safely inspects and prepares allowlisted forms; it never logs in or submits them."""
+    """Safely handles allowlisted forms without login or protection bypasses."""
 
     def __init__(self, profile_dir: str, allowed_domains: tuple[str, ...], headless: bool, timeout_seconds: int) -> None:
         self.profile_dir = Path(profile_dir)
@@ -54,6 +71,33 @@ class BrowserWorker:
         self, vacancy_url: str, profile: OperatorProfile | None, resume_path: Path | None,
     ) -> BrowserInspection:
         """Fill the supported Arbeitnow form and stop before the final submit action."""
+        return await self._run_arbeitnow_application(vacancy_url, profile, resume_path, submit=False)
+
+    async def submit_application(
+        self,
+        vacancy_url: str,
+        profile: OperatorProfile | None,
+        resume_path: Path | None,
+        before_submit: Callable[[], None] | None = None,
+    ) -> BrowserInspection:
+        """Submit only a verified direct Arbeitnow form and prove the success state."""
+        return await self._run_arbeitnow_application(
+            vacancy_url,
+            profile,
+            resume_path,
+            submit=True,
+            before_submit=before_submit,
+        )
+
+    async def _run_arbeitnow_application(
+        self,
+        vacancy_url: str,
+        profile: OperatorProfile | None,
+        resume_path: Path | None,
+        *,
+        submit: bool,
+        before_submit: Callable[[], None] | None = None,
+    ) -> BrowserInspection:
         if not is_arbeitnow_url(vacancy_url):
             return BrowserInspection(status="unsupported_site", error="No application adapter is registered for this site.")
         plan = build_arbeitnow_application_plan(vacancy_url, profile, resume_path)
@@ -76,6 +120,11 @@ class BrowserWorker:
                     page = await context.new_page()
                     page.set_default_timeout(self.timeout_ms)
                     await page.goto(plan.application_url, wait_until="domcontentloaded", timeout=self.timeout_ms)
+                    if not is_arbeitnow_url(page.url):
+                        return BrowserInspection(
+                            status="manual_required",
+                            error="Arbeitnow redirected the application to an unsupported external site.",
+                        )
                     safety_stop = await self._safety_stop(page)
                     if safety_stop:
                         return safety_stop
@@ -93,7 +142,31 @@ class BrowserWorker:
                         await page.locator("#cover_letter").fill(plan.cover_letter)
                     await page.locator("#cv").set_input_files(str(plan.resume_path))
                     await page.locator("#terms_of_service").check()
-                    return BrowserInspection(status="filled", title=await page.title())
+                    if not submit:
+                        return BrowserInspection(status="filled", title=await page.title())
+
+                    form = page.locator("#terms_of_service").locator("xpath=ancestor::form[1]")
+                    if await form.count() != 1:
+                        return BrowserInspection(status="manual_required", error="Arbeitnow application form is ambiguous.")
+                    submit_button = form.locator('button[type="submit"], input[type="submit"]')
+                    if await submit_button.count() != 1 or not await submit_button.is_enabled():
+                        return BrowserInspection(status="manual_required", error="Arbeitnow submit control has changed.")
+                    if before_submit:
+                        before_submit()
+                    await submit_button.click()
+                    try:
+                        await page.wait_for_load_state("networkidle", timeout=self.timeout_ms)
+                    except PlaywrightTimeoutError:
+                        pass
+                    body = (await page.locator("body").inner_text(timeout=self.timeout_ms)).lower()
+                    terms = page.locator("#terms_of_service")
+                    form_visible = await terms.is_visible() if await terms.count() else False
+                    if verified_submission_success(body, form_visible):
+                        return BrowserInspection(status="submitted", title=await page.title())
+                    return BrowserInspection(
+                        status="manual_required",
+                        error="The form may have been sent, but the success state could not be verified. Do not retry automatically.",
+                    )
                 finally:
                     await context.close()
         except Exception as exc:
