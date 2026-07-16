@@ -1,6 +1,8 @@
 import asyncio
 from datetime import UTC, datetime
 
+import pytest
+
 from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.sources import build_adapters, filter_it_vacancies
@@ -132,14 +134,42 @@ def test_filter_it_vacancies_rejects_courses() -> None:
 def test_filter_it_vacancies_allows_only_supported_roles() -> None:
     vacancies = [
         Vacancy(title="Backend Engineer", description="Python API role", source="Test"),
+        Vacancy(title="Trainee Frontend Developer", description="Build React UI", source="Test"),
+        Vacancy(title="Automation QA Engineer", description="Automate tests with Playwright", source="Test"),
+        Vacancy(title="DevSecOps Engineer", description="Build secure CI checks", source="Test"),
         Vacancy(title="Product Designer", description="Design systems and UX", source="Test"),
         Vacancy(title="Product Manager", description="Software roadmap role", source="Test"),
     ]
 
     assert [vacancy.title for vacancy in filter_it_vacancies(vacancies)] == [
         "Backend Engineer",
-        "Product Designer",
+        "Trainee Frontend Developer",
+        "Automation QA Engineer",
+        "DevSecOps Engineer",
     ]
+
+
+@pytest.mark.parametrize(
+    ("title", "description"),
+    [
+        ("Embedded Software Engineer", "Develop firmware for robotics devices"),
+        ("Solution Architect", "Design software systems for developer teams"),
+        ("Engineering Manager", "Lead backend engineers"),
+        ("Technical PM", "Coordinate Python developer roadmap"),
+        ("Technical Product Manager", "Own API products for developers"),
+        ("Technical Project Manager", "Run JavaScript delivery projects"),
+        ("SDET", "Build test automation for web services"),
+        ("AppSec Engineer", "Secure application code"),
+        ("Technical Support Engineer", "Write scripts and support integrations"),
+        ("Technical Writer", "Document APIs and write integration scripts"),
+        ("Implementation Engineer", "Configure integrations and write scripts"),
+        ("Solutions Consultant", "Help customers integrate developer APIs"),
+    ],
+)
+def test_filter_it_vacancies_rejects_policy_excluded_roles(title: str, description: str) -> None:
+    vacancies = [Vacancy(title=title, description=description, source="Test")]
+
+    assert filter_it_vacancies(vacancies) == []
 
 
 class _FakeResponse:

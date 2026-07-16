@@ -131,14 +131,15 @@ Update that document first when the channel's vacancy policy changes, then
 reflect the stabilized behavior here.
 
 The publication policy is development-first. Backend, frontend, fullstack,
-mobile, GameDev, ML/LLM/AI, blockchain/Web3, UI/UX, technical PM, engineering
-leadership, and explicitly coding-focused enterprise or technical-adjacent
-roles may be published. Embedded/IoT is limited to software work, QA is
-limited to automation/SDET, and security is limited to AppSec/DevSecOps.
+mobile, GameDev, ML/LLM/AI, blockchain/Web3, UI/UX, Software Architect,
+Technical Lead, DevSecOps, Automation QA, and explicitly developer/programmer
+enterprise roles may be published.
 
 DevOps/SRE/Cloud, database administration, network/sysadmin/support, manual QA,
-Data Analyst/BI, ordinary product/project roles, general design, and
-non-coding consulting or implementation roles are excluded.
+SDET, AppSec, Embedded/firmware/IoT/robotics, Data Analyst/BI, ordinary and
+technical product/project roles, Solution Architect, Engineering Manager,
+general design, Technical Writer, Implementation Engineer, Solutions
+Consultant, and consulting or implementation roles are excluded.
 
 The same policy applies to source adapters, forwarded messages, `copy` mode,
 background polling, and preview commands. Role evidence must come from the

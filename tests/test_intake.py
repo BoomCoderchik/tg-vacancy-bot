@@ -1,3 +1,5 @@
+import pytest
+
 from tg_vacancy_bot.intake import looks_like_vacancy_message
 
 
@@ -16,6 +18,19 @@ def test_linkedin_job_like_message_is_accepted() -> None:
 def test_non_development_it_role_is_rejected() -> None:
     text = "We are hiring a Product Manager for a software platform. Remote role."
 
+    assert looks_like_vacancy_message(text) is False
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "We are hiring an Engineering Manager to lead backend developers.",
+        "Open role: Technical PM for a Python developer platform.",
+        "Vacancy: SDET for automated browser testing.",
+        "Looking for an Implementation Engineer to write scripts and integrations.",
+    ],
+)
+def test_policy_excluded_roles_are_rejected_from_manual_intake(text: str) -> None:
     assert looks_like_vacancy_message(text) is False
 
 
