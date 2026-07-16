@@ -22,7 +22,7 @@ from .formatting import format_vacancy_card
 from .intake import looks_like_vacancy_message
 from .preview import parse_publishable_message
 from .runtime_lock import SingleInstanceLock, bot_run_lock_path
-from .models import OperatorProfile
+from .models import ApplicationStatus, OperatorProfile
 from .profile_flow import (
     CANCEL_TEXT,
     DONE_TEXT,
@@ -96,6 +96,72 @@ def manual_application_link_text(vacancy_url: str) -> str:
         "Автозаполнение для этой формы пока не поддерживается. "
         f'<a href="{escape(vacancy_url, quote=True)}">Открыть вакансию и откликнуться вручную</a>.'
     )
+
+
+def application_result_text(
+    status: ApplicationStatus,
+    *,
+    missing_fields: tuple[str, ...] = (),
+) -> str:
+    """Describe the real application state without implying a submission that did not happen."""
+    if status == "submitted":
+        return "✅ Отклик отправлен."
+    if status == "filled":
+        return (
+            "🟡 Отклик ещё не отправлен.\n\n"
+            "Форма заполнена, но финальная отправка не выполнялась. "
+            "Откройте вакансию и подтвердите отправку вручную."
+        )
+    if status == "profile_missing":
+        missing = ", ".join(missing_fields) or "обязательные данные"
+        return (
+            "❌ Отклик не отправлен.\n\n"
+            f"Не хватает данных профиля: {missing}. Заполните их через /profile и попробуйте снова."
+        )
+    if status in {"manual_required", "unsupported_site"}:
+        return (
+            "⚠️ Отклик не отправлен автоматически.\n\n"
+            "Для этой вакансии требуется открыть форму и завершить отклик вручную."
+        )
+    if status == "awaiting_confirmation":
+        return (
+            "🟡 Отклик ещё не отправлен.\n\n"
+            "Форма ожидает вашего подтверждения перед отправкой."
+        )
+    if status == "failed":
+        return "❌ Не удалось отправить отклик. Попробуйте ещё раз или откройте вакансию вручную."
+    if status == "cancelled":
+        return "Отклик отменён и не отправлен."
+    return "⏳ Отклик обрабатывается. Бот сообщит результат отдельным сообщением."
+
+
+def application_result_markup(vacancy_url: str | None) -> InlineKeyboardMarkup | None:
+    if not vacancy_url:
+        return None
+    return InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text="Открыть вакансию", url=vacancy_url)]]
+    )
+
+
+async def send_application_result_notification(
+    bot: Bot,
+    operator_user_id: int,
+    status: ApplicationStatus,
+    vacancy_url: str | None,
+    *,
+    missing_fields: tuple[str, ...] = (),
+) -> bool:
+    """Send a durable private result message; return False when Telegram rejects the DM."""
+    try:
+        await bot.send_message(
+            chat_id=operator_user_id,
+            text=application_result_text(status, missing_fields=missing_fields),
+            reply_markup=application_result_markup(vacancy_url),
+        )
+    except Exception:
+        logger.warning("Could not send private application result notification.")
+        return False
+    return True
 
 
 def profile_onboarding_missing_fields(profile: OperatorProfile | None) -> tuple[str, ...]:
@@ -333,7 +399,7 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
         await callback.message.answer("Профиль удалён.", reply_markup=profile_menu())
 
     @dp.callback_query(F.data.startswith(APPLICATION_CALLBACK_PREFIX))
-    async def application_button_pending(callback: CallbackQuery) -> None:
+    async def application_button_pending(callback: CallbackQuery, bot: Bot) -> None:
         if not is_profile_operator(callback.from_user.id if callback.from_user else None, settings.operator_user_ids):
             await callback.answer("Отклик доступен только оператору.", show_alert=True)
             return
@@ -344,7 +410,18 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             return
         application, created = result
         if application.status == "failed":
-            await callback.answer("У вакансии нет внешней ссылки для отклика.", show_alert=True)
+            notified = await send_application_result_notification(
+                bot,
+                callback.from_user.id,
+                application.status,
+                application.vacancy_url,
+            )
+            message = (
+                "Результат отправлен вам в личный чат."
+                if notified
+                else "Не удалось отправить результат. Откройте личный чат с ботом и нажмите Start."
+            )
+            await callback.answer(message, show_alert=True)
             return
         if created and application.vacancy_url:
             profile = store.get_operator_profile(callback.from_user.id)
@@ -355,30 +432,32 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             )
             inspection = await browser_worker.prepare_application(application.vacancy_url, profile, resume_path)
             store.update_application_status(application.application_id, inspection.status, inspection.error)
-            if inspection.status == "profile_missing":
-                missing = ", ".join(inspection.missing_fields)
-                await callback.answer(f"Заявка остановлена: заполните в /profile: {missing}.", show_alert=True)
-                return
-            if inspection.status != "filled":
-                await callback.message.answer(
-                    manual_application_link_text(application.vacancy_url),
-                    parse_mode=ParseMode.HTML,
-                    disable_web_page_preview=True,
-                )
-                await callback.answer("Заявка остановлена: ссылка на вакансию отправлена.", show_alert=True)
-                return
-        if not created and application.vacancy_url and application.status in {"manual_required", "unsupported_site"}:
-            await callback.message.answer(
-                manual_application_link_text(application.vacancy_url),
-                parse_mode=ParseMode.HTML,
-                disable_web_page_preview=True,
+            notified = await send_application_result_notification(
+                bot,
+                callback.from_user.id,
+                inspection.status,
+                application.vacancy_url,
+                missing_fields=inspection.missing_fields,
             )
-            await callback.answer("Ссылка на вакансию отправлена.", show_alert=True)
+            message = (
+                "Результат отправлен вам в личный чат."
+                if notified
+                else "Не удалось отправить результат. Откройте личный чат с ботом и нажмите Start."
+            )
+            await callback.answer(message, show_alert=True)
             return
-        if created:
-            await callback.answer(f"Заявка {application.application_id} заполнена. Отправка не выполнялась.", show_alert=True)
-        else:
-            await callback.answer(f"Заявка {application.application_id} уже создана.", show_alert=True)
+        notified = await send_application_result_notification(
+            bot,
+            callback.from_user.id,
+            application.status,
+            application.vacancy_url,
+        )
+        message = (
+            "Актуальный результат отправлен вам в личный чат."
+            if notified
+            else "Не удалось отправить результат. Откройте личный чат с ботом и нажмите Start."
+        )
+        await callback.answer(message, show_alert=True)
 
     @dp.message(Command("start"))
     async def start(message: Message) -> None:

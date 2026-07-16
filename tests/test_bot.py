@@ -1,12 +1,15 @@
 import asyncio
 
 from tg_vacancy_bot.bot import (
+    application_result_markup,
+    application_result_text,
     build_status_text,
     format_whoami_text,
     manual_application_link_text,
     needs_profile_onboarding,
     profile_onboarding_text,
     send_profile_onboarding_reminders,
+    send_application_result_notification,
 )
 from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import OperatorProfile
@@ -96,6 +99,71 @@ def test_manual_application_link_text_escapes_external_url() -> None:
 
     assert "Открыть вакансию" in text
     assert "&amp;" in text
+
+
+def test_application_result_text_only_confirms_real_submission() -> None:
+    assert application_result_text("submitted") == "✅ Отклик отправлен."
+    assert "ещё не отправлен" in application_result_text("filled")
+    assert "Не удалось отправить" in application_result_text("failed")
+
+
+def test_application_result_text_lists_missing_profile_fields() -> None:
+    text = application_result_text("profile_missing", missing_fields=("email", "резюме"))
+
+    assert "Отклик не отправлен" in text
+    assert "email, резюме" in text
+    assert "/profile" in text
+
+
+def test_application_result_markup_links_to_vacancy() -> None:
+    markup = application_result_markup("https://example.com/jobs/1")
+
+    assert markup is not None
+    assert markup.inline_keyboard[0][0].text == "Открыть вакансию"
+    assert markup.inline_keyboard[0][0].url == "https://example.com/jobs/1"
+    assert application_result_markup(None) is None
+
+
+def test_application_result_notification_is_sent_privately() -> None:
+    class FakeBot:
+        def __init__(self) -> None:
+            self.messages: list[dict] = []
+
+        async def send_message(self, **kwargs) -> None:
+            self.messages.append(kwargs)
+
+    bot = FakeBot()
+
+    sent = asyncio.run(
+        send_application_result_notification(
+            bot,
+            42,
+            "filled",
+            "https://example.com/jobs/1",
+        )
+    )
+
+    assert sent is True
+    assert bot.messages[0]["chat_id"] == 42
+    assert "ещё не отправлен" in bot.messages[0]["text"]
+    assert bot.messages[0]["reply_markup"].inline_keyboard[0][0].url == "https://example.com/jobs/1"
+
+
+def test_application_result_notification_reports_unavailable_private_chat() -> None:
+    class RejectingBot:
+        async def send_message(self, **kwargs) -> None:
+            raise RuntimeError("private chat is unavailable")
+
+    sent = asyncio.run(
+        send_application_result_notification(
+            RejectingBot(),
+            42,
+            "failed",
+            None,
+        )
+    )
+
+    assert sent is False
 
 
 def test_profile_onboarding_text_lists_missing_application_data() -> None:

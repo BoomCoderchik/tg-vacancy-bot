@@ -258,6 +258,11 @@ Every normalized vacancy card now includes an `Откликнуться` button.
 only a short vacancy ID in Telegram and resolves the original URL from SQLite;
 the button is intentionally unavailable for `FORWARDED_MODE=copy`, because a
 copied third-party message cannot safely receive the normalized card markup.
+After the button is processed, the bot sends the operator a persistent private
+result message. It says `Отклик отправлен` only for a confirmed `submitted`
+status; prepared, manual, incomplete-profile, cancelled, and failed attempts are
+explicitly reported as not sent. The operator must have opened the bot's private
+chat first so Telegram can deliver this notification.
 
 ## Arbeitnow application form
 
