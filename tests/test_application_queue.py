@@ -130,8 +130,10 @@ def test_queue_processes_callback_downloads_resume_and_submits(tmp_path) -> None
     assert worker.calls[0][0] == vacancy.url
     assert worker.calls[0][1].full_name == "Ada Lovelace"
     assert worker.calls[0][2] == b"resume"
+    assert bot.answers == [("callback-1", "Отклик подготовлен.")]
     assert bot.messages[0]["chat_id"] == 42
-    assert "Отклик отправлен" in bot.messages[0]["text"]
+    assert "Отклик подготовлен" in bot.messages[0]["text"]
+    assert "Отклик отправлен" in bot.messages[1]["text"]
     application, created = store.create_application(42, store.fingerprint(vacancy))
     assert created is False
     assert application.status == "submitted"
@@ -203,6 +205,7 @@ def test_queue_resume_document_replaces_manual_file_id_secret(tmp_path) -> None:
     assert stored_profile.resume_original_name == "new-resume.pdf"
     assert bot.messages[0]["chat_id"] == 42
     assert "сохранено" in bot.messages[0]["text"]
+    assert "Отклик подготовлен" in bot.messages[1]["text"]
     assert bot.get_updates_calls[0].allowed_updates == ["callback_query", "message"]
 
 
@@ -227,10 +230,36 @@ def test_queue_without_resume_explains_how_to_upload_it(tmp_path) -> None:
 
     assert result.failed == 1
     assert worker.calls == []
+    assert "Отклик подготовлен" in bot.messages[0]["text"]
     assert "/queue_resume" in bot.messages[-1]["text"]
     application, created = store.create_application(42, store.fingerprint(vacancy))
     assert created is False
     assert application.status == "profile_missing"
+
+
+def test_queue_rejects_vacancy_without_application_url_without_browser(tmp_path) -> None:
+    settings = queue_settings(tmp_path)
+    store = VacancyStore(settings.database_path)
+    vacancy = Vacancy(
+        title="Python Engineer",
+        description="Backend",
+        source="Telegram",
+    )
+    store.mark_published(vacancy)
+    bot = FakeBot([application_update(1, vacancy)])
+    worker = SubmittedWorker()
+
+    result = asyncio.run(
+        process_application_queue_once(settings, bot=bot, store=store, browser_worker=worker)
+    )
+
+    assert result.failed == 1
+    assert worker.calls == []
+    assert bot.answers == [("callback-1", "Отклик не отправлен: у вакансии нет ссылки.")]
+    assert "Не удалось отправить отклик" in bot.messages[0]["text"]
+    application, created = store.create_application(42, store.fingerprint(vacancy))
+    assert created is False
+    assert application.status == "failed"
 
 
 def test_queue_resume_rejects_unauthorized_operator(tmp_path) -> None:

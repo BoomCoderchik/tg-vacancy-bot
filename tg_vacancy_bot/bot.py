@@ -144,12 +144,38 @@ def application_result_text(
     return "⏳ Отклик обрабатывается. Бот сообщит результат отдельным сообщением."
 
 
+def application_prepared_text() -> str:
+    return (
+        "Отклик подготовлен.\n\n"
+        "Я сохранил заявку по этой вакансии. Бот попробует обработать её через поддерживаемую форму "
+        "и пришлёт фактический результат отдельным сообщением."
+    )
+
+
 def application_result_markup(vacancy_url: str | None) -> InlineKeyboardMarkup | None:
     if not vacancy_url:
         return None
     return InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(text="Открыть вакансию", url=vacancy_url)]]
     )
+
+
+async def send_application_prepared_notification(
+    bot: Bot,
+    operator_user_id: int,
+    vacancy_url: str | None,
+) -> bool:
+    """Send a durable private queue confirmation; return False when Telegram rejects the DM."""
+    try:
+        await bot.send_message(
+            chat_id=operator_user_id,
+            text=application_prepared_text(),
+            reply_markup=application_result_markup(vacancy_url),
+        )
+    except Exception:
+        logger.warning("Could not send private application prepared notification.")
+        return False
+    return True
 
 
 async def send_application_result_notification(
@@ -446,6 +472,18 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             await callback.answer(message, show_alert=True)
             return
         if created and application.vacancy_url:
+            store.update_application_status(application.application_id, "queued")
+            prepared_notified = await send_application_prepared_notification(
+                bot,
+                callback.from_user.id,
+                application.vacancy_url,
+            )
+            prepared_message = (
+                "Отклик подготовлен."
+                if prepared_notified
+                else "Отклик подготовлен. Откройте личный чат с ботом, чтобы получать сообщения."
+            )
+            await callback.answer(prepared_message, show_alert=not prepared_notified)
             profile = store.get_operator_profile(callback.from_user.id)
             resume_path = (
                 resume_storage.path_for(profile.resume_stored_name)
@@ -454,19 +492,13 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             )
             inspection = await browser_worker.prepare_application(application.vacancy_url, profile, resume_path)
             store.update_application_status(application.application_id, inspection.status, inspection.error)
-            notified = await send_application_result_notification(
+            await send_application_result_notification(
                 bot,
                 callback.from_user.id,
                 inspection.status,
                 application.vacancy_url,
                 missing_fields=inspection.missing_fields,
             )
-            message = (
-                "Результат отправлен вам в личный чат."
-                if notified
-                else "Не удалось отправить результат. Откройте личный чат с ботом и нажмите Start."
-            )
-            await callback.answer(message, show_alert=True)
             return
         notified = await send_application_result_notification(
             bot,

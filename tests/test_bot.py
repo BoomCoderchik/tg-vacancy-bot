@@ -1,6 +1,7 @@
 import asyncio
 
 from tg_vacancy_bot.bot import (
+    application_prepared_text,
     application_result_markup,
     application_result_text,
     build_status_text,
@@ -9,6 +10,7 @@ from tg_vacancy_bot.bot import (
     needs_profile_onboarding,
     profile_onboarding_text,
     queue_resume_id_text,
+    send_application_prepared_notification,
     send_profile_onboarding_reminders,
     send_application_result_notification,
 )
@@ -116,6 +118,14 @@ def test_application_result_text_only_confirms_real_submission() -> None:
     assert "Не удалось отправить" in application_result_text("failed")
 
 
+def test_application_prepared_text_does_not_claim_submission() -> None:
+    text = application_prepared_text()
+
+    assert "Отклик подготовлен" in text
+    assert "Отклик отправлен" not in text
+    assert "отдельным сообщением" in text
+
+
 def test_application_result_text_lists_missing_profile_fields() -> None:
     text = application_result_text("profile_missing", missing_fields=("email", "резюме"))
 
@@ -155,6 +165,30 @@ def test_application_result_notification_is_sent_privately() -> None:
     assert sent is True
     assert bot.messages[0]["chat_id"] == 42
     assert "ещё не отправлен" in bot.messages[0]["text"]
+    assert bot.messages[0]["reply_markup"].inline_keyboard[0][0].url == "https://example.com/jobs/1"
+
+
+def test_application_prepared_notification_is_sent_privately() -> None:
+    class FakeBot:
+        def __init__(self) -> None:
+            self.messages: list[dict] = []
+
+        async def send_message(self, **kwargs) -> None:
+            self.messages.append(kwargs)
+
+    bot = FakeBot()
+
+    sent = asyncio.run(
+        send_application_prepared_notification(
+            bot,
+            42,
+            "https://example.com/jobs/1",
+        )
+    )
+
+    assert sent is True
+    assert bot.messages[0]["chat_id"] == 42
+    assert "Отклик подготовлен" in bot.messages[0]["text"]
     assert bot.messages[0]["reply_markup"].inline_keyboard[0][0].url == "https://example.com/jobs/1"
 
 

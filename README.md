@@ -170,8 +170,9 @@ vacancy before either one sees the other's SQLite state.
 The same workflow can process delayed `Откликнуться` callbacks without an
 always-on server. Telegram keeps the callback until a scheduled runner invokes
 `tg-vacancy-bot process-applications-once`; the runner downloads the configured
-resume by Telegram `file_id`, handles the application, sends a private result,
-and exits. Send a PDF/DOCX to the bot with the `/queue_resume` caption once to
+resume by Telegram `file_id`, first sends the operator a private confirmation
+that the application is prepared, handles the application, sends a private
+factual result, and exits. Send a PDF/DOCX to the bot with the `/queue_resume` caption once to
 register or replace the queue resume without copying its `file_id` into GitHub.
 This mode is opt-in and requires additional GitHub secrets. See
 [`docs/application-queue.md`](docs/application-queue.md) for setup, usage,
@@ -271,10 +272,11 @@ only a short vacancy ID in Telegram and resolves the original URL from SQLite;
 the button is intentionally unavailable for `FORWARDED_MODE=copy`, because a
 copied third-party message cannot safely receive the normalized card markup.
 After the button is processed, the bot sends the operator a persistent private
-result message. It says `Отклик отправлен` only for a confirmed `submitted`
-status; prepared, manual, incomplete-profile, cancelled, and failed attempts are
-explicitly reported as not sent. The operator must have opened the bot's private
-chat first so Telegram can deliver this notification.
+`Отклик подготовлен` message and then a factual result message. It says
+`Отклик отправлен` only for a confirmed `submitted` status; prepared, manual,
+incomplete-profile, cancelled, and failed attempts are explicitly reported as
+not sent. The operator must have opened the bot's private chat first so Telegram
+can deliver these notifications.
 
 ## Arbeitnow application form
 

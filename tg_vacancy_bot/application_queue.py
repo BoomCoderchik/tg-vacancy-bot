@@ -10,7 +10,7 @@ from aiogram.methods import GetUpdates
 from aiogram.types import CallbackQuery, Message, Update
 
 from .application_buttons import APPLICATION_CALLBACK_PREFIX
-from .bot import send_application_result_notification
+from .bot import send_application_prepared_notification, send_application_result_notification
 from .browser_worker import BrowserWorker
 from .config import Settings
 from .models import OperatorProfile
@@ -137,7 +137,6 @@ async def _process_update(
         values["skipped"] += 1
         return ApplicationQueueResult(**values)
 
-    await _answer_callback_quietly(bot, callback, "Отклик принят в обработку.")
     vacancy_id = (callback.data or "").removeprefix(APPLICATION_CALLBACK_PREFIX)
     application_result = store.create_application(operator_user_id, vacancy_id)
     if application_result is None:
@@ -149,6 +148,11 @@ async def _process_update(
         return ApplicationQueueResult(**values)
 
     application, created = application_result
+    if application.status == "failed":
+        await _answer_callback_quietly(bot, callback, "Отклик не отправлен: у вакансии нет ссылки.")
+        await send_application_result_notification(bot, operator_user_id, application.status, application.vacancy_url)
+        values["failed"] += 1
+        return ApplicationQueueResult(**values)
     if not created and application.status == "submitting":
         store.update_application_status(
             application.application_id,
@@ -165,6 +169,8 @@ async def _process_update(
 
     values["applications_processed"] += 1
     store.update_application_status(application.application_id, "queued")
+    await _answer_callback_quietly(bot, callback, "Отклик подготовлен.")
+    await send_application_prepared_notification(bot, operator_user_id, application.vacancy_url)
     profile = queue_operator_profile(settings, operator_user_id, store.get_operator_profile(operator_user_id))
     if not profile.resume_telegram_file_id or not profile.resume_original_name:
         store.update_application_status(
