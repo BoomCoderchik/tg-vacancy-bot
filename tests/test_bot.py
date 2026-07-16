@@ -118,6 +118,27 @@ def test_application_result_text_only_confirms_real_submission() -> None:
     assert "Не удалось отправить" in application_result_text("failed")
 
 
+def test_application_result_text_explains_manual_reason_safely() -> None:
+    text = application_result_text(
+        "manual_required",
+        error_description="Arbeitnow application form has changed.",
+    )
+
+    assert "Причина" in text
+    assert "разметка формы Arbeitnow отличается" in text
+    assert "Arbeitnow application form has changed" not in text
+
+
+def test_application_result_text_hides_unknown_runner_details() -> None:
+    text = application_result_text(
+        "failed",
+        error_description="Browser preparation failed: SecretException",
+    )
+
+    assert "браузерный запуск не смог подготовить форму" in text
+    assert "SecretException" not in text
+
+
 def test_application_prepared_text_does_not_claim_submission() -> None:
     text = application_prepared_text()
 
@@ -159,6 +180,7 @@ def test_application_result_notification_is_sent_privately() -> None:
             42,
             "filled",
             "https://example.com/jobs/1",
+            error_description="Arbeitnow application form has changed.",
         )
     )
 

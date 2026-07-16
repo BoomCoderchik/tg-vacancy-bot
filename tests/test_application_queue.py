@@ -108,6 +108,15 @@ class SubmittedWorker:
         return BrowserInspection(status="submitted", title="Success")
 
 
+class ManualRequiredWorker:
+    async def submit_application(self, vacancy_url, profile, resume_path, before_submit):
+        before_submit()
+        return BrowserInspection(
+            status="manual_required",
+            error="Arbeitnow application form has changed.",
+        )
+
+
 def test_queue_processes_callback_downloads_resume_and_submits(tmp_path) -> None:
     settings = queue_settings(tmp_path)
     store = VacancyStore(settings.database_path)
@@ -138,6 +147,28 @@ def test_queue_processes_callback_downloads_resume_and_submits(tmp_path) -> None
     assert created is False
     assert application.status == "submitted"
     assert bot.get_updates_calls[-1].offset == 2
+
+
+def test_queue_reports_manual_reason_from_browser_worker(tmp_path) -> None:
+    settings = queue_settings(tmp_path)
+    store = VacancyStore(settings.database_path)
+    vacancy = Vacancy(
+        title="Python Engineer",
+        description="Backend",
+        source="Arbeitnow",
+        url="https://www.arbeitnow.com/jobs/example",
+    )
+    store.mark_published(vacancy)
+    bot = FakeBot([application_update(1, vacancy)])
+
+    result = asyncio.run(
+        process_application_queue_once(settings, bot=bot, store=store, browser_worker=ManualRequiredWorker())
+    )
+
+    assert result.manual_required == 1
+    assert "Отклик подготовлен" in bot.messages[0]["text"]
+    assert "разметка формы Arbeitnow отличается" in bot.messages[1]["text"]
+    assert "Arbeitnow application form has changed" not in bot.messages[1]["text"]
 
 
 def test_queue_rejects_unauthorized_callback_without_browser(tmp_path) -> None:

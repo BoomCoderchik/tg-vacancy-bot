@@ -150,20 +150,39 @@ async def _process_update(
     application, created = application_result
     if application.status == "failed":
         await _answer_callback_quietly(bot, callback, "Отклик не отправлен: у вакансии нет ссылки.")
-        await send_application_result_notification(bot, operator_user_id, application.status, application.vacancy_url)
+        await send_application_result_notification(
+            bot,
+            operator_user_id,
+            application.status,
+            application.vacancy_url,
+            error_description=application.error_description,
+        )
         values["failed"] += 1
         return ApplicationQueueResult(**values)
     if not created and application.status == "submitting":
+        error = "A previous runner stopped during submission. Automatic retry is disabled to prevent a duplicate."
         store.update_application_status(
             application.application_id,
             "manual_required",
-            "A previous runner stopped during submission. Automatic retry is disabled to prevent a duplicate.",
+            error,
         )
-        await send_application_result_notification(bot, operator_user_id, "manual_required", application.vacancy_url)
+        await send_application_result_notification(
+            bot,
+            operator_user_id,
+            "manual_required",
+            application.vacancy_url,
+            error_description=error,
+        )
         values["manual_required"] += 1
         return ApplicationQueueResult(**values)
     if not created and application.status not in RETRYABLE_PRE_SUBMIT_STATUSES:
-        await send_application_result_notification(bot, operator_user_id, application.status, application.vacancy_url)
+        await send_application_result_notification(
+            bot,
+            operator_user_id,
+            application.status,
+            application.vacancy_url,
+            error_description=application.error_description,
+        )
         values["skipped"] += 1
         return ApplicationQueueResult(**values)
 
@@ -217,6 +236,12 @@ async def _process_update(
                 resume_path,
                 before_submit=before_submit,
             )
+        logger.info(
+            "Queued application result application_id=%s status=%s error=%s",
+            application.application_id,
+            inspection.status,
+            inspection.error or "",
+        )
         store.update_application_status(application.application_id, inspection.status, inspection.error)
         await send_application_result_notification(
             bot,
@@ -224,6 +249,7 @@ async def _process_update(
             inspection.status,
             application.vacancy_url,
             missing_fields=inspection.missing_fields,
+            error_description=inspection.error,
         )
         if inspection.status == "submitted":
             values["submitted"] += 1
@@ -241,7 +267,13 @@ async def _process_update(
             else "Queued application processing failed before submission."
         )
         store.update_application_status(application.application_id, status, error)
-        await send_application_result_notification(bot, operator_user_id, status, application.vacancy_url)
+        await send_application_result_notification(
+            bot,
+            operator_user_id,
+            status,
+            application.vacancy_url,
+            error_description=error,
+        )
         values["manual_required" if submit_started else "failed"] += 1
         return ApplicationQueueResult(**values)
 

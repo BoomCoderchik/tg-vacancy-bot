@@ -111,6 +111,7 @@ def application_result_text(
     status: ApplicationStatus,
     *,
     missing_fields: tuple[str, ...] = (),
+    error_description: str | None = None,
 ) -> str:
     """Describe the real application state without implying a submission that did not happen."""
     if status == "submitted":
@@ -128,20 +129,99 @@ def application_result_text(
             f"Не хватает данных профиля: {missing}. Заполните их через /profile и попробуйте снова."
         )
     if status in {"manual_required", "unsupported_site"}:
-        return (
+        text = (
             "⚠️ Отклик не отправлен автоматически.\n\n"
             "Для этой вакансии требуется открыть форму и завершить отклик вручную."
         )
+        if detail := _application_error_detail(error_description):
+            text += f"\n\nПричина: {detail}"
+        return text
     if status == "awaiting_confirmation":
         return (
             "🟡 Отклик ещё не отправлен.\n\n"
             "Форма ожидает вашего подтверждения перед отправкой."
         )
     if status == "failed":
-        return "❌ Не удалось отправить отклик. Попробуйте ещё раз или откройте вакансию вручную."
+        text = "❌ Не удалось отправить отклик. Попробуйте ещё раз или откройте вакансию вручную."
+        if detail := _application_error_detail(error_description):
+            text += f"\n\nПричина: {detail}"
+        return text
     if status == "cancelled":
         return "Отклик отменён и не отправлен."
     return "⏳ Отклик обрабатывается. Бот сообщит результат отдельным сообщением."
+
+
+def _application_error_detail(error_description: str | None) -> str | None:
+    """Return a safe user-facing reason without exposing raw runner details."""
+    if not error_description:
+        return None
+    normalized = " ".join(error_description.strip().split()).lower()
+    known_reasons = (
+        (
+            "vacancy does not contain an external application url",
+            "у вакансии нет внешней ссылки на форму отклика.",
+        ),
+        (
+            "domain is not in application_allowed_domains",
+            "домен формы не включён в список разрешённых для автоотклика.",
+        ),
+        (
+            "no application adapter is registered for this site",
+            "для этого сайта ещё нет поддерживаемого автозаполнения.",
+        ),
+        (
+            "arbeitnow redirected the application to an unsupported external site",
+            "Arbeitnow открыл внешнюю форму, которую бот пока не заполняет автоматически.",
+        ),
+        (
+            "arbeitnow application form has changed",
+            "разметка формы Arbeitnow отличается от ожидаемой.",
+        ),
+        (
+            "arbeitnow application form is ambiguous",
+            "на странице найдено несколько вариантов формы, и бот не может безопасно выбрать один.",
+        ),
+        (
+            "arbeitnow submit control has changed",
+            "кнопка отправки отличается от ожидаемой или недоступна.",
+        ),
+        (
+            "success state could not be verified",
+            "бот заполнил форму, но не смог надёжно подтвердить успешную отправку; повторять автоматически небезопасно.",
+        ),
+        (
+            "site protection detected",
+            "на странице обнаружена защита вроде CAPTCHA или 2FA.",
+        ),
+        (
+            "login is required",
+            "форма требует входа в аккаунт.",
+        ),
+        (
+            "previous runner stopped during submission",
+            "предыдущий запуск остановился во время отправки; автоматический повтор отключён, чтобы не отправить дубль.",
+        ),
+        (
+            "runner stopped after submission started",
+            "запуск остановился после начала отправки; автоматический повтор отключён, чтобы не отправить дубль.",
+        ),
+        (
+            "queued application processing failed before submission",
+            "очередь остановилась до начала отправки, поэтому можно попробовать ещё раз.",
+        ),
+        (
+            "browser preparation failed",
+            "браузерный запуск не смог подготовить форму.",
+        ),
+        (
+            "browser inspection failed",
+            "браузерный запуск не смог проверить страницу.",
+        ),
+    )
+    for marker, reason in known_reasons:
+        if marker in normalized:
+            return reason
+    return "бот остановил автоматическую отправку из-за неподдержанного состояния формы."
 
 
 def application_prepared_text() -> str:
@@ -185,12 +265,17 @@ async def send_application_result_notification(
     vacancy_url: str | None,
     *,
     missing_fields: tuple[str, ...] = (),
+    error_description: str | None = None,
 ) -> bool:
     """Send a durable private result message; return False when Telegram rejects the DM."""
     try:
         await bot.send_message(
             chat_id=operator_user_id,
-            text=application_result_text(status, missing_fields=missing_fields),
+            text=application_result_text(
+                status,
+                missing_fields=missing_fields,
+                error_description=error_description,
+            ),
             reply_markup=application_result_markup(vacancy_url),
         )
     except Exception:
@@ -463,6 +548,7 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
                 callback.from_user.id,
                 application.status,
                 application.vacancy_url,
+                error_description=application.error_description,
             )
             message = (
                 "Результат отправлен вам в личный чат."
@@ -498,6 +584,7 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
                 inspection.status,
                 application.vacancy_url,
                 missing_fields=inspection.missing_fields,
+                error_description=inspection.error,
             )
             return
         notified = await send_application_result_notification(
@@ -505,6 +592,7 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             callback.from_user.id,
             application.status,
             application.vacancy_url,
+            error_description=application.error_description,
         )
         message = (
             "Актуальный результат отправлен вам в личный чат."
