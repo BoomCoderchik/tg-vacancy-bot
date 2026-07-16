@@ -45,6 +45,7 @@ class VacancyStore:
             )
             self._apply_profile_migration(conn)
             self._apply_application_migration(conn)
+            self._apply_queue_resume_migration(conn)
 
     @staticmethod
     def _apply_profile_migration(conn: sqlite3.Connection) -> None:
@@ -102,6 +103,14 @@ class VacancyStore:
             )
             """
         )
+        conn.execute("INSERT INTO schema_migrations (version) VALUES (?)", (version,))
+
+    @staticmethod
+    def _apply_queue_resume_migration(conn: sqlite3.Connection) -> None:
+        version = 3
+        if conn.execute("SELECT 1 FROM schema_migrations WHERE version = ?", (version,)).fetchone():
+            return
+        conn.execute("ALTER TABLE operator_profiles ADD COLUMN resume_telegram_file_id TEXT")
         conn.execute("INSERT INTO schema_migrations (version) VALUES (?)", (version,))
 
     @staticmethod
@@ -197,7 +206,8 @@ class VacancyStore:
                     operator_user_id, full_name, email, phone, desired_salary, location,
                     work_format, employment_type, extra_fields_json, resume_original_name,
                     resume_stored_name, resume_text
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    , resume_telegram_file_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(operator_user_id) DO UPDATE SET
                     full_name = excluded.full_name,
                     email = excluded.email,
@@ -209,6 +219,7 @@ class VacancyStore:
                     extra_fields_json = excluded.extra_fields_json,
                     resume_original_name = excluded.resume_original_name,
                     resume_stored_name = excluded.resume_stored_name,
+                    resume_telegram_file_id = excluded.resume_telegram_file_id,
                     resume_text = excluded.resume_text,
                     updated_at = CURRENT_TIMESTAMP
                 """,
@@ -225,6 +236,7 @@ class VacancyStore:
                     profile.resume_original_name,
                     profile.resume_stored_name,
                     profile.resume_text,
+                    profile.resume_telegram_file_id,
                 ),
             )
 
@@ -254,6 +266,7 @@ class VacancyStore:
             extra_fields=extra_fields,
             resume_original_name=row["resume_original_name"],
             resume_stored_name=row["resume_stored_name"],
+            resume_telegram_file_id=row["resume_telegram_file_id"],
             resume_text=row["resume_text"],
         )
 

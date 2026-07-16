@@ -22,6 +22,14 @@
   - Publishes new deduplicated vacancies to `TARGET_CHAT_ID`.
   - Useful for external schedulers or manual testing.
 
+- `tg-vacancy-bot process-applications-once`
+  - Returns immediately when `APPLICATION_QUEUE_ENABLED=false`.
+  - Uses Telegram `getUpdates` to drain queued application callbacks in batches.
+  - Requires one allowlisted operator and a queue profile configured through private environment variables.
+  - Downloads the resume by Telegram `file_id` into a temporary directory.
+  - Runs the allowlisted browser adapter, persists the factual application status in SQLite, sends a private result, and exits.
+  - Never retries a callback that reached `submitting`, because the external form may already have accepted it.
+
 - `tg-vacancy-bot check-telegram`
   - Calls the real Telegram API.
   - Validates the bot token, target chat visibility, and bot membership/posting status.
@@ -73,6 +81,11 @@
 
 - `tg_vacancy_bot/deployment.py`
   - Hosts the minimal HTTP health endpoint used by web-service deployments.
+
+- `tg_vacancy_bot/application_queue.py`
+  - Implements the one-shot Telegram callback consumer used by GitHub Actions.
+  - Keeps profile secrets out of SQLite and keeps resume bytes out of Actions cache.
+  - Preserves update ordering and confirms Telegram offsets only after processing a batch.
   - Runs the bot process alongside the health endpoint without changing Telegram publishing behavior.
 
 - `tg_vacancy_bot/parser.py`

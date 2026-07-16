@@ -28,6 +28,34 @@ def test_settings_reads_resume_storage_options() -> None:
     assert settings.resume_max_size_bytes == 2048
 
 
+def test_settings_validates_application_queue_configuration() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        OPERATOR_USER_IDS="42",
+        APPLICATION_ALLOWED_DOMAINS="arbeitnow.com",
+        APPLICATION_QUEUE_ENABLED="true",
+        APPLICATION_AUTO_SUBMIT="true",
+        APPLICATION_QUEUE_PROFILE_FULL_NAME="Ada Lovelace",
+        APPLICATION_QUEUE_PROFILE_EMAIL="ada@example.com",
+        APPLICATION_QUEUE_RESUME_FILE_ID="telegram-file-id",
+        APPLICATION_QUEUE_RESUME_FILE_NAME="resume.pdf",
+    )
+
+    settings.require_application_queue()
+
+
+def test_settings_rejects_incomplete_application_queue_configuration() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        APPLICATION_QUEUE_ENABLED="true",
+    )
+
+    with pytest.raises(RuntimeError, match="Application queue configuration is incomplete"):
+        settings.require_application_queue()
+
+
 def test_settings_reads_source_max_age_hours() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",

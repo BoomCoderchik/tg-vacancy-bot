@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 
 from .bot import run_bot_sync
+from .application_queue import format_application_queue_result, process_application_queue_once
 from .console import write_stdout
 from .config import get_settings
 from .deployment import run_web_service_sync
@@ -28,6 +29,10 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("run-web", help="Run Telegram bot polling with an HTTP health endpoint.")
     subparsers.add_parser("init-env", help="Create .env from .env.example without overwriting an existing file.")
     subparsers.add_parser("poll-once", help="Poll public sources once and publish new vacancies.")
+    subparsers.add_parser(
+        "process-applications-once",
+        help="Process queued Telegram application callbacks once and exit.",
+    )
     subparsers.add_parser("check-sources", help="Check source adapter configuration without publishing.")
     preview_sources_parser = subparsers.add_parser(
         "preview-sources",
@@ -125,6 +130,11 @@ def main(argv: Sequence[str] | None = None) -> None:
 
         if args.command == "poll-once":
             asyncio.run(poll_once())
+            return
+
+        if args.command == "process-applications-once":
+            result = asyncio.run(process_application_queue_once(settings))
+            write_stdout(format_application_queue_result(result))
             return
 
         if args.command == "check-sources":

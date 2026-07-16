@@ -110,13 +110,14 @@ def test_store_migrates_and_persists_operator_profile(tmp_path) -> None:
         extra_fields={"notice_period": "2 weeks"},
         resume_original_name="ada-resume.pdf",
         resume_stored_name="42-private.pdf",
+        resume_telegram_file_id="telegram-file-id",
     )
 
     store.save_operator_profile(profile)
 
     assert store.get_operator_profile(42) == profile
     with sqlite3.connect(database_path) as connection:
-        assert connection.execute("SELECT version FROM schema_migrations").fetchall() == [(1,), (2,)]
+        assert connection.execute("SELECT version FROM schema_migrations").fetchall() == [(1,), (2,), (3,)]
 
 
 def test_store_updates_and_deletes_operator_profile(tmp_path) -> None:

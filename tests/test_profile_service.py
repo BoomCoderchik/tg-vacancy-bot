@@ -10,12 +10,13 @@ def test_profile_service_replaces_resume_and_preserves_profile_fields(tmp_path) 
     service = ProfileService(store, storage)
     store.save_operator_profile(OperatorProfile(operator_user_id=42, full_name="Ada"))
 
-    first = service.save_resume(42, "first.pdf", b"first")
-    second = service.save_resume(42, "second.docx", b"second")
+    first = service.save_resume(42, "first.pdf", b"first", telegram_file_id="telegram-first")
+    second = service.save_resume(42, "second.docx", b"second", telegram_file_id="telegram-second")
 
     assert first.full_name == "Ada"
     assert storage.path_for(first.resume_stored_name).exists() is False
     assert storage.path_for(second.resume_stored_name).read_bytes() == b"second"
+    assert second.resume_telegram_file_id == "telegram-second"
     assert store.get_operator_profile(42) == second
 
 
