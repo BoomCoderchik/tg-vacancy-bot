@@ -164,7 +164,7 @@ Optional source credentials:
 - Arbeitnow is controlled by `ENABLE_ARBEITNOW` and needs no API key.
 - Working Nomads is controlled by `ENABLE_WORKING_NOMADS` and needs no API key or Working Nomads account.
 - LinkedIn hiring-post search is controlled by `ENABLE_LINKEDIN_POST_SEARCH=false` by default and requires `SERPAPI_API_KEY` or `SERPER_API_KEY`.
-- Free LinkedIn hiring-post scraping is controlled by `ENABLE_LINKEDIN_POST_SCRAPER=false` by default and does not require an API key. `LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS` defaults to `duckduckgo,bing` so the scraper can continue through another public HTML result provider when DuckDuckGo returns an anti-bot challenge.
+- Free LinkedIn hiring-post scraping is controlled by `ENABLE_LINKEDIN_POST_SCRAPER=false` by default and does not require an API key. `LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS` defaults to `bing_rss,duckduckgo,bing` so the scraper first consumes Bing's RSS output, then falls back to public HTML result providers when RSS returns no usable LinkedIn posts. HTML providers that return anti-bot challenges are skipped; the scraper does not bypass CAPTCHA or protection pages.
 - Headless LinkedIn post parsing is controlled by `ENABLE_LINKEDIN_POST_HEADLESS=false` by default. It uses Playwright and does not use a LinkedIn account, proxy, or protection bypass. It uses `SERPAPI_API_KEY` or `SERPER_API_KEY` for reliable link discovery; without a key, Bing discovery is best effort.
 
 Optional OpenAI localization:

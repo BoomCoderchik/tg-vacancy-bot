@@ -82,7 +82,7 @@ class Settings(BaseSettings):
         alias="LINKEDIN_POST_SCRAPER_QUERY",
     )
     linkedin_post_scraper_search_providers_raw: str = Field(
-        default="duckduckgo,bing",
+        default="bing_rss,duckduckgo,bing",
         alias="LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS",
     )
     # Search depth is intentionally larger than the per-cycle publication
@@ -166,6 +166,9 @@ class Settings(BaseSettings):
     @property
     def linkedin_post_scraper_search_providers(self) -> tuple[str, ...]:
         aliases = {
+            "bing-rss": "bing_rss",
+            "bingrss": "bing_rss",
+            "bing_rss": "bing_rss",
             "ddg": "duckduckgo",
             "duck": "duckduckgo",
             "duckduckgo": "duckduckgo",
@@ -176,7 +179,7 @@ class Settings(BaseSettings):
             provider = aliases.get(raw_provider.strip().lower())
             if provider and provider not in providers:
                 providers.append(provider)
-        return tuple(providers or ("duckduckgo", "bing"))
+        return tuple(providers or ("bing_rss", "duckduckgo", "bing"))
 
     def require_runtime(self) -> None:
         missing = []

@@ -79,10 +79,11 @@ To avoid paid search APIs, enable the free scraper source:
 ```dotenv
 ENABLE_LINKEDIN_POST_SCRAPER=true
 LINKEDIN_POST_SCRAPER_QUERY=(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR "we're hiring" OR hiring) (frontend OR backend OR fullstack OR "software developer" OR "software engineer" OR react OR python) || (site:linkedin.com/posts OR site:linkedin.com/feed/update) ("looking for" OR "join our team" OR "open role") (developer OR engineer OR frontend OR backend OR fullstack OR react OR python) || (site:linkedin.com/posts OR site:linkedin.com/feed/update) ("ищем" OR "ищет" OR "нанимаем" OR "в команду") (разработчик OR инженер OR frontend OR backend OR fullstack OR react OR python)
+LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS=bing_rss,duckduckgo,bing
 LINKEDIN_POST_SCRAPER_RESULTS_WANTED=100
 ```
 
-This source scrapes public search-result HTML and keeps only real `linkedin.com/posts/...` and `linkedin.com/feed/update/...` links. It does not require an API key and does not create placeholder vacancies. Use `||` to separate fallback search queries. Because it depends on public search-result markup, it can be less stable than SerpApi and may return no rows when the search engine changes HTML or rate-limits requests.
+This source reads public search results and keeps only real `linkedin.com/posts/...` and `linkedin.com/feed/update/...` links. It tries Bing RSS first, then public search-result HTML providers. It does not require an API key and does not create placeholder vacancies. Use `||` to separate fallback search queries. Because the HTML fallback depends on public search-result markup, it can be less stable than SerpApi and may return no rows when the search engine changes HTML or rate-limits requests. If an HTML provider returns a CAPTCHA or anti-bot page, the scraper skips that provider rather than bypassing the protection.
 
 The scraper searches public, globally indexed results. It keeps only results with a reliable publication date (from the search result or the LinkedIn activity ID) and rejects posts older than `LINKEDIN_POST_MAX_AGE_HOURS` (maximum 120 hours) before they reach the common polling layer.
 The search depth is intentionally larger than the per-cycle publication budget: SQLite deduplication lets later polls publish the remaining fresh posts. Every source vacancy is localized to Russian before publication.

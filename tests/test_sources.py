@@ -7,6 +7,7 @@ from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.sources import build_adapters, filter_it_vacancies
 from tg_vacancy_bot.sources.adapters.arbeitnow import ArbeitnowAdapter
+from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import _rss_to_vacancies
 from tg_vacancy_bot.sources.adapters.working_nomads import WorkingNomadsAdapter
 
 
@@ -120,6 +121,26 @@ def test_working_nomads_adapter_maps_public_api_response(monkeypatch) -> None:
             raw_text="Build Python APIs with FastAPI.",
         )
     ]
+
+
+def test_linkedin_scraper_maps_bing_rss_result() -> None:
+    rss = """
+    <rss><channel><item>
+      <title>Hiring Java Developer | LinkedIn</title>
+      <link>https://www.linkedin.com/posts/example_hiring-javadeveloper-activity-7482782711737274368-hQ_1</link>
+      <description>We are hiring a Java Developer with backend experience.</description>
+      <pubDate>Fri, 17 Jul 2026 10:00:00 GMT</pubDate>
+    </item></channel></rss>
+    """
+
+    vacancies = _rss_to_vacancies(rss, limit=5)
+
+    assert len(vacancies) == 1
+    vacancy = vacancies[0]
+    assert vacancy.title == "Java Developer"
+    assert vacancy.url == "https://www.linkedin.com/posts/example_hiring-javadeveloper-activity-7482782711737274368-hQ_1"
+    assert vacancy.description == "We are hiring a Java Developer with backend experience."
+    assert vacancy.published_at == datetime(2026, 7, 17, 10, 0, tzinfo=UTC)
 
 
 def test_filter_it_vacancies_rejects_courses() -> None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from xml.etree import ElementTree
 from urllib.parse import parse_qs, unquote, urlparse
 
 from bs4 import BeautifulSoup, Tag
@@ -23,6 +24,7 @@ from tg_vacancy_bot.sources.adapters.linkedin_post_search import (
 
 DUCKDUCKGO_HTML_SEARCH_URL = "https://html.duckduckgo.com/html/"
 BING_SEARCH_URL = "https://www.bing.com/search"
+BING_RSS_SEARCH_URL = "https://www.bing.com/search"
 BROWSER_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -66,6 +68,16 @@ class LinkedInPostScraperAdapter(SourceAdapter):
                     if len(vacancies) >= limit:
                         break
                     attempted_providers.add(provider)
+                    if provider == "bing_rss":
+                        rss = await _fetch_bing_rss(session, query)
+                        vacancies.extend(
+                            _rss_to_vacancies(
+                                rss,
+                                limit=limit - len(vacancies),
+                                seen_urls=seen_urls,
+                            )
+                        )
+                        continue
                     html = await _fetch_search_html(session, provider, query)
                     if _looks_like_search_challenge(html):
                         challenged_providers.add(provider)
@@ -94,37 +106,69 @@ def _html_to_vacancies(html: str, limit: int, seen_urls: set[str] | None = None)
     seen = seen_urls if seen_urls is not None else set()
 
     for result in _search_html_results(soup):
-        search_title = _clean_title(result.title)
-        link = _normalize_result_url(result.link)
-        if not search_title or not link or not _is_linkedin_post_url(link) or link in seen:
+        vacancy = _result_to_vacancy(result, seen)
+        if vacancy is None:
             continue
-
-        snippet = result.snippet
-        if not snippet:
-            continue
-        title = _post_title(search_title, snippet)
-        published_at = _published_at_for_result(result.date_text, link)
-        if published_at is None:
-            # Do not publish an undated result: search engines can return very
-            # old indexed LinkedIn posts without exposing their publication date.
-            continue
-
-        seen.add(link)
-        vacancies.append(
-            Vacancy(
-                title=title,
-                description=snippet,
-                source=LinkedInPostScraperAdapter.name,
-                url=link,
-                location=None,
-                stack=_stack_from_text(f"{title} {snippet} {search_title}"),
-                published_at=published_at,
-                raw_text=f"{title} {snippet}",
-            )
-        )
+        vacancies.append(vacancy)
         if len(vacancies) >= limit:
             break
     return vacancies
+
+
+def _rss_to_vacancies(rss: str, limit: int, seen_urls: set[str] | None = None) -> list[Vacancy]:
+    vacancies: list[Vacancy] = []
+    seen = seen_urls if seen_urls is not None else set()
+    if limit <= 0 or not rss.strip():
+        return vacancies
+
+    try:
+        root = ElementTree.fromstring(rss)
+    except ElementTree.ParseError:
+        return vacancies
+
+    for item in root.findall(".//item"):
+        result = SearchHtmlResult(
+            title=_clean_title(_xml_child_text(item, "title")),
+            link=_xml_child_text(item, "link"),
+            snippet=html_to_text(_xml_child_text(item, "description")),
+            date_text=_xml_child_text(item, "pubDate"),
+        )
+        vacancy = _result_to_vacancy(result, seen)
+        if vacancy is None:
+            continue
+        vacancies.append(vacancy)
+        if len(vacancies) >= limit:
+            break
+    return vacancies
+
+
+def _result_to_vacancy(result: SearchHtmlResult, seen: set[str]) -> Vacancy | None:
+    search_title = _clean_title(result.title)
+    link = _normalize_result_url(result.link)
+    if not search_title or not link or not _is_linkedin_post_url(link) or link in seen:
+        return None
+
+    snippet = result.snippet
+    if not snippet:
+        return None
+    title = _post_title(search_title, snippet)
+    published_at = _published_at_for_result(result.date_text, link)
+    if published_at is None:
+        # Do not publish an undated result: search engines can return very old
+        # indexed LinkedIn posts without exposing their publication date.
+        return None
+
+    seen.add(link)
+    return Vacancy(
+        title=title,
+        description=snippet,
+        source=LinkedInPostScraperAdapter.name,
+        url=link,
+        location=None,
+        stack=_stack_from_text(f"{title} {snippet} {search_title}"),
+        published_at=published_at,
+        raw_text=f"{title} {snippet}",
+    )
 
 
 async def _fetch_search_html(session, provider: str, query: str) -> str:
@@ -133,6 +177,12 @@ async def _fetch_search_html(session, provider: str, query: str) -> str:
             response.raise_for_status()
             return await response.text()
     async with session.get(DUCKDUCKGO_HTML_SEARCH_URL, params={"q": query}) as response:
+        response.raise_for_status()
+        return await response.text()
+
+
+async def _fetch_bing_rss(session, query: str) -> str:
+    async with session.get(BING_RSS_SEARCH_URL, params={"q": query, "format": "rss", "setlang": "en"}) as response:
         response.raise_for_status()
         return await response.text()
 
@@ -248,6 +298,11 @@ def _date_text_for_container(container: Tag | None) -> str:
         if value:
             return value
     return ""
+
+
+def _xml_child_text(item: ElementTree.Element, child_name: str) -> str:
+    child = item.find(child_name)
+    return "".join(child.itertext()).strip() if child is not None else ""
 
 
 def _published_at_for_result(date_text: str, link: str) -> datetime | None:
