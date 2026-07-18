@@ -279,7 +279,10 @@ async def _process_update(
 
 
 def _is_queue_resume_command(message: Message) -> bool:
-    command_text = (message.caption or message.text or "").strip().split(maxsplit=1)[0].lower()
+    content = (message.caption or message.text or "").strip()
+    if not content:
+        return False
+    command_text = content.split(maxsplit=1)[0].lower()
     return command_text.split("@", maxsplit=1)[0] == QUEUE_RESUME_COMMAND
 
 

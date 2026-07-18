@@ -149,6 +149,13 @@ class VacancyStore:
             ).fetchone()
         return row["url"] if row else None
 
+    def application_queue_counts(self) -> tuple[int, int]:
+        """Return non-sensitive queue counters for operational diagnostics."""
+        with self._connect() as conn:
+            published = conn.execute("SELECT COUNT(*) FROM published_vacancies").fetchone()[0]
+            applications = conn.execute("SELECT COUNT(*) FROM applications").fetchone()[0]
+        return int(published), int(applications)
+
     def create_application(self, operator_user_id: int, vacancy_id: str) -> tuple[Application, bool] | None:
         if not re.fullmatch(r"[0-9a-f]{32}", vacancy_id):
             return None

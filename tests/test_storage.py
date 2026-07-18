@@ -57,6 +57,20 @@ def test_store_resolves_published_vacancy_url_by_short_callback_id(tmp_path) -> 
     assert store.published_vacancy_url("not-a-valid-id") is None
 
 
+def test_store_reports_safe_application_queue_counts(tmp_path) -> None:
+    store = VacancyStore(str(tmp_path / "vacancies.sqlite3"))
+    vacancy = Vacancy(
+        title="Python Engineer",
+        description="Backend role",
+        source="Arbeitnow",
+        url="https://www.arbeitnow.com/jobs/example",
+    )
+    store.mark_published(vacancy)
+    store.create_application(42, store.fingerprint(vacancy))
+
+    assert store.application_queue_counts() == (1, 1)
+
+
 def test_store_creates_one_application_per_operator_and_vacancy(tmp_path) -> None:
     store = VacancyStore(str(tmp_path / "vacancies.sqlite3"))
     vacancy = Vacancy(title="Python Engineer", description="Remote role", source="Test", url="https://jobs.example.com/42")

@@ -111,6 +111,10 @@ jobs:
       - name: Poll and publish new vacancies
         run: tg-vacancy-bot poll-once
 
+      - name: Diagnose application queue without consuming updates
+        if: ${{ always() && env.APPLICATION_QUEUE_ENABLED == 'true' }}
+        run: tg-vacancy-bot diagnose-application-queue
+
       - name: Process queued application clicks
         if: ${{ always() && env.APPLICATION_QUEUE_ENABLED == 'true' }}
         run: tg-vacancy-bot process-applications-once

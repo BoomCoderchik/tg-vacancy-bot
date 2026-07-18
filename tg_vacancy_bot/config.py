@@ -191,6 +191,15 @@ class Settings(BaseSettings):
             joined = ", ".join(missing)
             raise RuntimeError(f"Missing required environment variables: {joined}")
 
+    def require_bot_polling(self) -> None:
+        self.require_runtime()
+        if self.application_queue_enabled:
+            raise RuntimeError(
+                "Telegram long polling and the scheduled application queue must not run at the same time. "
+                "Set APPLICATION_QUEUE_ENABLED=false for run/run-web, or stop the polling bot and keep "
+                "the GitHub Actions queue enabled."
+            )
+
     def require_application_queue(self) -> None:
         self.require_runtime()
         missing = []
