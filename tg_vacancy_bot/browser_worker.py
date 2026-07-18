@@ -20,6 +20,16 @@ SUBMISSION_SUCCESS_MARKERS = (
     "vielen dank für deine bewerbung",
     "vielen dank für ihre bewerbung",
 )
+ARBEITNOW_FORM_SELECTOR = "#form_job_application"
+ARBEITNOW_REQUIRED_SELECTORS = (
+    "#first_name",
+    "#last_name",
+    "#email",
+    "#cv_or_resume",
+    "#terms",
+    "#button_send_application",
+    "#div_success_message",
+)
 
 
 def verified_submission_success(body_text: str, form_visible: bool) -> bool:
@@ -128,41 +138,73 @@ class BrowserWorker:
                     safety_stop = await self._safety_stop(page)
                     if safety_stop:
                         return safety_stop
-                    required_selectors = ("#first_name", "#last_name", "#email", "#cv", "#terms_of_service")
-                    if any(await page.locator(selector).count() != 1 for selector in required_selectors):
+                    form = page.locator(ARBEITNOW_FORM_SELECTOR)
+                    form_changed = await form.count() != 1
+                    for selector in ARBEITNOW_REQUIRED_SELECTORS:
+                        if await page.locator(selector).count() != 1:
+                            form_changed = True
+                            break
+                    if form_changed:
                         return BrowserInspection(status="manual_required", error="Arbeitnow application form has changed.")
-                    await page.locator("#first_name").fill(plan.first_name or "")
-                    await page.locator("#last_name").fill(plan.last_name or "")
-                    await page.locator("#email").fill(plan.email or "")
-                    if plan.phone:
-                        await page.locator("#phone").fill(plan.phone)
-                    if plan.personal_url:
-                        await page.locator("#personal_url").fill(plan.personal_url)
-                    if plan.cover_letter:
-                        await page.locator("#cover_letter").fill(plan.cover_letter)
-                    await page.locator("#cv").set_input_files(str(plan.resume_path))
-                    await page.locator("#terms_of_service").check()
+                    await form.locator("#first_name").fill(plan.first_name or "")
+                    await form.locator("#last_name").fill(plan.last_name or "")
+                    await form.locator("#email").fill(plan.email or "")
+                    optional_fields = (
+                        ("#phone", plan.phone),
+                        ("#personal_url", plan.personal_url),
+                        ("#cover_letter", plan.cover_letter),
+                    )
+                    for selector, value in optional_fields:
+                        field = form.locator(selector)
+                        field_count = await field.count()
+                        if field_count > 1:
+                            return BrowserInspection(
+                                status="manual_required",
+                                error="Arbeitnow application form is ambiguous.",
+                            )
+                        if value and field_count == 1:
+                            await field.fill(value)
+                    await form.locator("#cv_or_resume").set_input_files(str(plan.resume_path))
+                    await form.locator("#terms").check()
                     if not submit:
                         return BrowserInspection(status="filled", title=await page.title())
 
-                    form = page.locator("#terms_of_service").locator("xpath=ancestor::form[1]")
-                    if await form.count() != 1:
-                        return BrowserInspection(status="manual_required", error="Arbeitnow application form is ambiguous.")
-                    submit_button = form.locator('button[type="submit"], input[type="submit"]')
+                    submit_button = form.locator("#button_send_application")
                     if await submit_button.count() != 1 or not await submit_button.is_enabled():
                         return BrowserInspection(status="manual_required", error="Arbeitnow submit control has changed.")
                     if before_submit:
                         before_submit()
                     await submit_button.click()
                     try:
-                        await page.wait_for_load_state("networkidle", timeout=self.timeout_ms)
+                        await page.wait_for_function(
+                            """
+                            () => {
+                                const success = document.querySelector('#div_success_message');
+                                const visibleSuccess = success && getComputedStyle(success).display !== 'none';
+                                const visibleError = Array.from(
+                                    document.querySelectorAll('#form_job_application [id^="error-"]')
+                                ).some((element) =>
+                                    getComputedStyle(element).display !== 'none' &&
+                                    (element.textContent || '').trim()
+                                );
+                                return visibleSuccess || visibleError;
+                            }
+                            """,
+                            timeout=self.timeout_ms,
+                        )
                     except PlaywrightTimeoutError:
                         pass
-                    body = (await page.locator("body").inner_text(timeout=self.timeout_ms)).lower()
-                    terms = page.locator("#terms_of_service")
-                    form_visible = await terms.is_visible() if await terms.count() else False
-                    if verified_submission_success(body, form_visible):
+                    success = page.locator("#div_success_message")
+                    success_text = await success.inner_text(timeout=self.timeout_ms)
+                    form_visible = await form.is_visible()
+                    if await success.is_visible() and verified_submission_success(success_text, form_visible):
                         return BrowserInspection(status="submitted", title=await page.title())
+                    visible_errors = form.locator('[id^="error-"]:visible')
+                    if await visible_errors.count():
+                        return BrowserInspection(
+                            status="manual_required",
+                            error="Arbeitnow rejected one or more application fields.",
+                        )
                     return BrowserInspection(
                         status="manual_required",
                         error="The form may have been sent, but the success state could not be verified. Do not retry automatically.",

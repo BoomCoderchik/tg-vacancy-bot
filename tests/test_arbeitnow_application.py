@@ -2,7 +2,7 @@ from tg_vacancy_bot.arbeitnow_application import build_arbeitnow_application_pla
 from tg_vacancy_bot.models import OperatorProfile
 
 
-def test_arbeitnow_plan_uses_verified_apply_url_and_profile_fields(tmp_path) -> None:
+def test_arbeitnow_plan_uses_inline_form_url_and_profile_fields(tmp_path) -> None:
     resume = tmp_path / "resume.pdf"
     resume.write_bytes(b"pdf")
     profile = OperatorProfile(
@@ -15,7 +15,7 @@ def test_arbeitnow_plan_uses_verified_apply_url_and_profile_fields(tmp_path) -> 
 
     plan = build_arbeitnow_application_plan("https://www.arbeitnow.com/jobs/example", profile, resume)
 
-    assert plan.application_url == "https://www.arbeitnow.com/jobs/example/apply"
+    assert plan.application_url == "https://www.arbeitnow.com/jobs/example"
     assert plan.first_name == "Ada"
     assert plan.last_name == "Lovelace"
     assert plan.missing_fields == ()
