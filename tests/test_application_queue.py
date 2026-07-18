@@ -185,6 +185,67 @@ def test_queue_reports_manual_reason_from_browser_worker(tmp_path) -> None:
     assert "Arbeitnow application form has changed" not in bot.messages[1]["text"]
 
 
+def test_queue_retries_legacy_arbeitnow_redirect_before_submit(tmp_path) -> None:
+    settings = queue_settings(tmp_path)
+    store = VacancyStore(settings.database_path)
+    vacancy = Vacancy(
+        title="Python Engineer",
+        description="Backend",
+        source="Arbeitnow",
+        url="https://www.arbeitnow.com/jobs/example",
+    )
+    store.mark_published(vacancy)
+    application, created = store.create_application(42, store.fingerprint(vacancy))
+    assert created is True
+    store.update_application_status(
+        application.application_id,
+        "manual_required",
+        "Arbeitnow redirected the application to an unsupported external site.",
+    )
+    bot = FakeBot([application_update(1, vacancy)])
+    worker = SubmittedWorker()
+
+    result = asyncio.run(
+        process_application_queue_once(settings, bot=bot, store=store, browser_worker=worker)
+    )
+
+    assert result.applications_processed == 1
+    assert result.submitted == 1
+    assert len(worker.calls) == 1
+    application, created = store.create_application(42, store.fingerprint(vacancy))
+    assert created is False
+    assert application.status == "submitted"
+
+
+def test_queue_does_not_retry_unverified_post_submit_result(tmp_path) -> None:
+    settings = queue_settings(tmp_path)
+    store = VacancyStore(settings.database_path)
+    vacancy = Vacancy(
+        title="Python Engineer",
+        description="Backend",
+        source="Arbeitnow",
+        url="https://www.arbeitnow.com/jobs/example",
+    )
+    store.mark_published(vacancy)
+    application, created = store.create_application(42, store.fingerprint(vacancy))
+    assert created is True
+    store.update_application_status(
+        application.application_id,
+        "manual_required",
+        "The form may have been sent, but the success state could not be verified. Do not retry automatically.",
+    )
+    bot = FakeBot([application_update(1, vacancy)])
+    worker = SubmittedWorker()
+
+    result = asyncio.run(
+        process_application_queue_once(settings, bot=bot, store=store, browser_worker=worker)
+    )
+
+    assert result.skipped == 1
+    assert result.applications_processed == 0
+    assert worker.calls == []
+
+
 def test_queue_rejects_unauthorized_callback_without_browser(tmp_path) -> None:
     settings = queue_settings(tmp_path)
     store = VacancyStore(settings.database_path)

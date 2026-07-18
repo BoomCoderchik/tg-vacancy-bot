@@ -44,8 +44,6 @@ def build_arbeitnow_application_plan(
     personal_url = extra_fields.get("personal_url") or extra_fields.get("website")
     cover_letter = extra_fields.get("cover_letter")
     application_url = vacancy_url.rstrip("/")
-    if not application_url.endswith("/apply"):
-        application_url = f"{application_url}/apply"
 
     missing = []
     if not first_name or not last_name:
