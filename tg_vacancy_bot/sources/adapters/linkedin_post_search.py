@@ -16,6 +16,7 @@ SERPAPI_SEARCH_URL = "https://serpapi.com/search.json"
 SERPER_SEARCH_URL = "https://google.serper.dev/search"
 SERPER_MAX_RESULTS_PER_REQUEST = 10
 POST_URL_MARKERS = ("linkedin.com/posts/", "linkedin.com/feed/update/")
+ACTIVITY_ID_PATTERN = re.compile(r"activity-(\d{15,20})(?:[-/?#]|$)", re.IGNORECASE)
 HASHTAG_PATTERN = re.compile(r"(?<!\w)#[\w.+-]+", re.UNICODE)
 ROLE_TERM_PATTERN = re.compile(
     r"\b(?P<role>"
@@ -163,7 +164,7 @@ def _result_to_vacancy(
         url=link,
         location=None,
         stack=_stack_from_text(f"{title} {snippet} {search_title}"),
-        published_at=_parse_search_date(_text(result, "date")),
+        published_at=_published_at_for_result(_text(result, "date"), link),
         raw_text=f"{title} {snippet}",
     )
 
@@ -268,3 +269,21 @@ def _parse_search_date(value: str) -> datetime | None:
         except ValueError:
             pass
     return None
+
+
+def _published_at_for_result(date_text: str, link: str) -> datetime | None:
+    parsed = _parse_search_date(date_text)
+    if parsed is not None:
+        return parsed
+    return _published_at_from_activity_id(link)
+
+
+def _published_at_from_activity_id(link: str) -> datetime | None:
+    match = ACTIVITY_ID_PATTERN.search(link)
+    if not match:
+        return None
+    try:
+        timestamp_ms = int(match.group(1)) >> 22
+        return datetime.fromtimestamp(timestamp_ms / 1000, tz=UTC)
+    except (ValueError, OSError, OverflowError):
+        return None

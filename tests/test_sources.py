@@ -7,6 +7,10 @@ from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.sources import build_adapters, filter_it_vacancies
 from tg_vacancy_bot.sources.adapters.arbeitnow import ArbeitnowAdapter
+from tg_vacancy_bot.sources.adapters.linkedin_post_search import (
+    _filter_recent_linkedin_posts,
+    _result_to_vacancy as _search_result_to_vacancy,
+)
 from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import _rss_to_vacancies
 from tg_vacancy_bot.sources.adapters.working_nomads import WorkingNomadsAdapter
 
@@ -141,6 +145,25 @@ def test_linkedin_scraper_maps_bing_rss_result() -> None:
     assert vacancy.url == "https://www.linkedin.com/posts/example_hiring-javadeveloper-activity-7482782711737274368-hQ_1"
     assert vacancy.description == "We are hiring a Java Developer with backend experience."
     assert vacancy.published_at == datetime(2026, 7, 17, 10, 0, tzinfo=UTC)
+
+
+def test_linkedin_search_uses_activity_id_when_provider_date_is_missing(monkeypatch) -> None:
+    result = {
+        "title": "Hiring Python Developer | LinkedIn",
+        "link": "https://www.linkedin.com/posts/example_hiring-pythondeveloper-activity-7483822807449600000-hQ_1",
+        "snippet": "We are hiring a Python Developer with backend API experience.",
+        "date": "",
+    }
+
+    vacancy = _search_result_to_vacancy(result, source="LinkedIn Hiring Posts (Serper)")
+
+    assert vacancy is not None
+    assert vacancy.published_at == datetime(2026, 7, 17, 10, 0, tzinfo=UTC)
+    monkeypatch.setattr(
+        "tg_vacancy_bot.sources.adapters.linkedin_post_search.utcnow",
+        lambda: datetime(2026, 7, 18, 9, 0, tzinfo=UTC),
+    )
+    assert _filter_recent_linkedin_posts([vacancy], max_age_hours=48) == [vacancy]
 
 
 def test_filter_it_vacancies_rejects_courses() -> None:
