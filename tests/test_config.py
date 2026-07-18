@@ -61,6 +61,17 @@ def test_settings_allows_queue_resume_to_be_registered_through_telegram() -> Non
     settings.require_application_queue()
 
 
+def test_settings_rejects_long_polling_while_scheduled_application_queue_is_enabled() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        APPLICATION_QUEUE_ENABLED="true",
+    )
+
+    with pytest.raises(RuntimeError, match="must not run at the same time"):
+        settings.require_bot_polling()
+
+
 def test_settings_rejects_incomplete_application_queue_configuration() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",

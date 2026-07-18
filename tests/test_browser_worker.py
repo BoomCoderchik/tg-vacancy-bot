@@ -1,6 +1,11 @@
 import asyncio
 
-from tg_vacancy_bot.browser_worker import BrowserWorker, verified_submission_success
+from tg_vacancy_bot.browser_worker import (
+    ARBEITNOW_FORM_SELECTOR,
+    ARBEITNOW_REQUIRED_SELECTORS,
+    BrowserWorker,
+    verified_submission_success,
+)
 from tg_vacancy_bot.models import OperatorProfile
 
 
@@ -31,7 +36,24 @@ def test_browser_worker_requires_profile_data_before_opening_arbeitnow(tmp_path)
     assert result.missing_fields == ("full_name", "email", "resume")
 
 
+def test_browser_worker_uses_current_arbeitnow_inline_form_contract() -> None:
+    assert ARBEITNOW_FORM_SELECTOR == "#form_job_application"
+    assert ARBEITNOW_REQUIRED_SELECTORS == (
+        "#first_name",
+        "#last_name",
+        "#email",
+        "#cv_or_resume",
+        "#terms",
+        "#button_send_application",
+        "#div_success_message",
+    )
+
+
 def test_browser_worker_requires_proof_before_reporting_submission() -> None:
+    assert verified_submission_success(
+        "Your job application has been sent successfully. Good luck!",
+        form_visible=False,
+    ) is True
     assert verified_submission_success("Thank you for your application", form_visible=False) is True
     assert verified_submission_success("Thank you for your application", form_visible=True) is False
     assert verified_submission_success("The form was accepted", form_visible=False) is False

@@ -1,6 +1,7 @@
 import pytest
 import logging
 
+from tg_vacancy_bot.application_diagnostics import ApplicationQueueDiagnostics
 from tg_vacancy_bot.app import main, poll_once
 from tg_vacancy_bot.config import Settings, get_settings
 from tg_vacancy_bot.models import Vacancy
@@ -18,6 +19,39 @@ def test_main_reports_missing_runtime_config(capsys, monkeypatch, tmp_path) -> N
     assert exc.value.code == 2
     assert "Missing required environment variables" in capsys.readouterr().err
     get_settings.cache_clear()
+
+
+def test_main_prints_safe_application_queue_diagnostics(capsys, monkeypatch) -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="secret-token",
+        TARGET_CHAT_ID="@target",
+    )
+
+    async def fake_diagnostics(_settings):
+        return ApplicationQueueDiagnostics(
+            bot_id=123456,
+            bot_username="queue_bot",
+            target_title="Vacancy Channel",
+            target_type="channel",
+            webhook_configured=False,
+            pending_update_count=0,
+            published_vacancies=5,
+            applications=0,
+            queue_resume_registered=True,
+        )
+
+    monkeypatch.setattr("tg_vacancy_bot.app.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "tg_vacancy_bot.app.collect_application_queue_diagnostics",
+        fake_diagnostics,
+    )
+
+    main(["diagnose-application-queue"])
+
+    output = capsys.readouterr().out
+    assert "Application queue diagnostics" in output
+    assert "Bot: @queue_bot (id=123456)" in output
+    assert "secret-token" not in output
 
 
 def test_check_sources_reports_missing_linkedin_post_search_provider_key(capsys, monkeypatch) -> None:

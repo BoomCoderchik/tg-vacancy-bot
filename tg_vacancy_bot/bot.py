@@ -723,7 +723,7 @@ def _message_is_authorized(message: Message, settings: Settings) -> bool:
 
 
 async def run_bot(settings: Settings) -> None:
-    settings.require_runtime()
+    settings.require_bot_polling()
     logging.basicConfig(level=logging.INFO)
 
     lock_path = bot_run_lock_path(settings.database_path, settings.telegram_bot_token)

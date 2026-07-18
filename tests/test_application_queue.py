@@ -69,6 +69,20 @@ def resume_update(
     )
 
 
+def empty_message_update(update_id: int, *, user_id: int = 42) -> Update:
+    return Update.model_validate(
+        {
+            "update_id": update_id,
+            "message": {
+                "message_id": update_id,
+                "date": 1_700_000_000,
+                "chat": {"id": user_id, "type": "private", "first_name": "Ada"},
+                "from": {"id": user_id, "is_bot": False, "first_name": "Ada"},
+            },
+        }
+    )
+
+
 class FakeBot:
     def __init__(self, updates, expected_resume_file_id="telegram-resume-id") -> None:
         self.updates = list(updates)
@@ -171,6 +185,67 @@ def test_queue_reports_manual_reason_from_browser_worker(tmp_path) -> None:
     assert "Arbeitnow application form has changed" not in bot.messages[1]["text"]
 
 
+def test_queue_retries_legacy_arbeitnow_redirect_before_submit(tmp_path) -> None:
+    settings = queue_settings(tmp_path)
+    store = VacancyStore(settings.database_path)
+    vacancy = Vacancy(
+        title="Python Engineer",
+        description="Backend",
+        source="Arbeitnow",
+        url="https://www.arbeitnow.com/jobs/example",
+    )
+    store.mark_published(vacancy)
+    application, created = store.create_application(42, store.fingerprint(vacancy))
+    assert created is True
+    store.update_application_status(
+        application.application_id,
+        "manual_required",
+        "Arbeitnow redirected the application to an unsupported external site.",
+    )
+    bot = FakeBot([application_update(1, vacancy)])
+    worker = SubmittedWorker()
+
+    result = asyncio.run(
+        process_application_queue_once(settings, bot=bot, store=store, browser_worker=worker)
+    )
+
+    assert result.applications_processed == 1
+    assert result.submitted == 1
+    assert len(worker.calls) == 1
+    application, created = store.create_application(42, store.fingerprint(vacancy))
+    assert created is False
+    assert application.status == "submitted"
+
+
+def test_queue_does_not_retry_unverified_post_submit_result(tmp_path) -> None:
+    settings = queue_settings(tmp_path)
+    store = VacancyStore(settings.database_path)
+    vacancy = Vacancy(
+        title="Python Engineer",
+        description="Backend",
+        source="Arbeitnow",
+        url="https://www.arbeitnow.com/jobs/example",
+    )
+    store.mark_published(vacancy)
+    application, created = store.create_application(42, store.fingerprint(vacancy))
+    assert created is True
+    store.update_application_status(
+        application.application_id,
+        "manual_required",
+        "The form may have been sent, but the success state could not be verified. Do not retry automatically.",
+    )
+    bot = FakeBot([application_update(1, vacancy)])
+    worker = SubmittedWorker()
+
+    result = asyncio.run(
+        process_application_queue_once(settings, bot=bot, store=store, browser_worker=worker)
+    )
+
+    assert result.skipped == 1
+    assert result.applications_processed == 0
+    assert worker.calls == []
+
+
 def test_queue_rejects_unauthorized_callback_without_browser(tmp_path) -> None:
     settings = queue_settings(tmp_path)
     store = VacancyStore(settings.database_path)
@@ -238,6 +313,25 @@ def test_queue_resume_document_replaces_manual_file_id_secret(tmp_path) -> None:
     assert "сохранено" in bot.messages[0]["text"]
     assert "Отклик подготовлен" in bot.messages[1]["text"]
     assert bot.get_updates_calls[0].allowed_updates == ["callback_query", "message"]
+
+
+def test_queue_skips_empty_message_before_resume_document(tmp_path) -> None:
+    settings = queue_settings(tmp_path).model_copy(
+        update={"application_queue_resume_file_id": ""}
+    )
+    store = VacancyStore(settings.database_path)
+    bot = FakeBot(
+        [empty_message_update(1), resume_update(2)],
+        expected_resume_file_id="new-telegram-resume-id",
+    )
+
+    result = asyncio.run(process_application_queue_once(settings, bot=bot, store=store))
+
+    assert result.updates_seen == 2
+    assert result.skipped == 1
+    assert result.resumes_updated == 1
+    assert store.get_operator_profile(42).resume_telegram_file_id == "new-telegram-resume-id"
+    assert bot.get_updates_calls[-1].offset == 3
 
 
 def test_queue_without_resume_explains_how_to_upload_it(tmp_path) -> None:

@@ -19,6 +19,9 @@ from .storage import VacancyStore
 
 logger = logging.getLogger(__name__)
 RETRYABLE_PRE_SUBMIT_STATUSES = frozenset({"created", "queued", "loading", "profile_missing"})
+RETRYABLE_PRE_SUBMIT_MANUAL_ERRORS = frozenset(
+    {"Arbeitnow redirected the application to an unsupported external site."}
+)
 QUEUE_RESUME_COMMAND = "/queue_resume"
 ALLOWED_RESUME_SUFFIXES = frozenset({".pdf", ".docx"})
 
@@ -175,7 +178,15 @@ async def _process_update(
         )
         values["manual_required"] += 1
         return ApplicationQueueResult(**values)
-    if not created and application.status not in RETRYABLE_PRE_SUBMIT_STATUSES:
+    retryable_manual_result = (
+        application.status == "manual_required"
+        and application.error_description in RETRYABLE_PRE_SUBMIT_MANUAL_ERRORS
+    )
+    if (
+        not created
+        and application.status not in RETRYABLE_PRE_SUBMIT_STATUSES
+        and not retryable_manual_result
+    ):
         await send_application_result_notification(
             bot,
             operator_user_id,
@@ -279,7 +290,10 @@ async def _process_update(
 
 
 def _is_queue_resume_command(message: Message) -> bool:
-    command_text = (message.caption or message.text or "").strip().split(maxsplit=1)[0].lower()
+    content = (message.caption or message.text or "").strip()
+    if not content:
+        return False
+    command_text = content.split(maxsplit=1)[0].lower()
     return command_text.split("@", maxsplit=1)[0] == QUEUE_RESUME_COMMAND
 
 

@@ -268,6 +268,13 @@ Messages that do not look like allowed development/design/AI vacancies are skipp
 - `/queue_resume`: attach this caption to a PDF/DOCX sent privately while queue mode is active; the next GitHub Actions run registers or replaces the queue resume.
 - `/queue_resume_id`: legacy private operator-only command that shows the saved Telegram `file_id`; it is no longer needed for normal queue setup.
 
+For queue troubleshooting, `tg-vacancy-bot diagnose-application-queue` reports
+the public bot identity, pending Telegram update count, queue-resume presence,
+and aggregate SQLite counts without consuming updates or printing secrets.
+`run` and `run-web` now fail fast when `APPLICATION_QUEUE_ENABLED=true`, because
+long polling and the scheduled `getUpdates` queue must not use the same bot token
+at the same time.
+
 Every normalized vacancy card now includes an `Откликнуться` button. It keeps
 only a short vacancy ID in Telegram and resolves the original URL from SQLite;
 the button is intentionally unavailable for `FORWARDED_MODE=copy`, because a
@@ -281,15 +288,16 @@ can deliver these notifications.
 
 ## Arbeitnow application form
 
-The first supported form is Arbeitnow's public application page. Put
+The first supported form is Arbeitnow's inline application form on the public vacancy page. Put
 `APPLICATION_ALLOWED_DOMAINS=arbeitnow.com` in `.env`, complete `/profile` with a
 first and last name, email, and PDF/DOCX resume, then press `Откликнуться` on an
 Arbeitnow card. The always-on bot fills only the verified fields and uploads the
 local resume, then stops before final submit. The opt-in GitHub Actions queue can
-submit only a verified direct Arbeitnow form and reports success only after a
-recognized success page. Current Arbeitnow vacancies commonly redirect to JOIN,
-which requires email authentication and reCAPTCHA; that path stops for manual
-action and is never reported as submitted.
+submit only a verified direct Arbeitnow form and reports success only after the
+form disappears and Arbeitnow shows its explicit success message. The separate
+`company portal` link may redirect to JOIN, but the adapter does not use that link.
+Unknown forms, login, CAPTCHA, and 2FA still stop for manual action and are never
+reported as submitted.
 
 ## Working Nomads source
 
