@@ -69,6 +69,20 @@ def resume_update(
     )
 
 
+def empty_message_update(update_id: int, *, user_id: int = 42) -> Update:
+    return Update.model_validate(
+        {
+            "update_id": update_id,
+            "message": {
+                "message_id": update_id,
+                "date": 1_700_000_000,
+                "chat": {"id": user_id, "type": "private", "first_name": "Ada"},
+                "from": {"id": user_id, "is_bot": False, "first_name": "Ada"},
+            },
+        }
+    )
+
+
 class FakeBot:
     def __init__(self, updates, expected_resume_file_id="telegram-resume-id") -> None:
         self.updates = list(updates)
@@ -238,6 +252,25 @@ def test_queue_resume_document_replaces_manual_file_id_secret(tmp_path) -> None:
     assert "сохранено" in bot.messages[0]["text"]
     assert "Отклик подготовлен" in bot.messages[1]["text"]
     assert bot.get_updates_calls[0].allowed_updates == ["callback_query", "message"]
+
+
+def test_queue_skips_empty_message_before_resume_document(tmp_path) -> None:
+    settings = queue_settings(tmp_path).model_copy(
+        update={"application_queue_resume_file_id": ""}
+    )
+    store = VacancyStore(settings.database_path)
+    bot = FakeBot(
+        [empty_message_update(1), resume_update(2)],
+        expected_resume_file_id="new-telegram-resume-id",
+    )
+
+    result = asyncio.run(process_application_queue_once(settings, bot=bot, store=store))
+
+    assert result.updates_seen == 2
+    assert result.skipped == 1
+    assert result.resumes_updated == 1
+    assert store.get_operator_profile(42).resume_telegram_file_id == "new-telegram-resume-id"
+    assert bot.get_updates_calls[-1].offset == 3
 
 
 def test_queue_without_resume_explains_how_to_upload_it(tmp_path) -> None:
