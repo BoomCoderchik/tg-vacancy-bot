@@ -22,6 +22,10 @@
   - Publishes new deduplicated vacancies to `TARGET_CHAT_ID`.
   - Useful for external schedulers or manual testing.
 
+- `tg-vacancy-bot diagnose-linkedin`
+  - Runs only configured SerpApi/Serper URL discovery and prints a secret-free report.
+  - Does not start Playwright, publish to Telegram, localize text, or mutate deduplication state.
+
 - `tg-vacancy-bot process-applications-once`
   - Returns immediately when `APPLICATION_QUEUE_ENABLED=false`.
   - Uses Telegram `getUpdates` to drain queued application callbacks and private queue-resume messages in batches.

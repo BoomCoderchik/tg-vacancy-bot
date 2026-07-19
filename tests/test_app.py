@@ -84,6 +84,23 @@ def test_check_sources_reports_missing_linkedin_post_search_provider_key(capsys,
     assert "Registered adapters: none" in output
 
 
+def test_diagnose_linkedin_runs_without_runtime_or_publisher(capsys, monkeypatch) -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="",
+        TARGET_CHAT_ID="",
+        SERPAPI_API_KEY="",
+        SERPER_API_KEY="",
+    )
+    monkeypatch.setattr("tg_vacancy_bot.app.get_settings", lambda: settings)
+
+    main(["diagnose-linkedin", "--limit", "3", "--show-limit", "0"])
+
+    output = capsys.readouterr().out
+    assert "LinkedIn diagnostics" in output
+    assert "stage=discovery status=misconfigured" in output
+    assert "unique=0" in output
+
+
 def test_check_sources_reports_registered_linkedin_post_search_without_exposing_key(
     capsys,
     monkeypatch,

@@ -18,6 +18,7 @@ from .console import write_stdout
 from .config import get_settings
 from .deployment import run_web_service_sync
 from .env_setup import init_env_file
+from .linkedin_diagnostics import collect_linkedin_diagnostics, format_linkedin_diagnostics
 from .preview import parse_publishable_message, preview_message_card_async
 from .publisher import TelegramPublisher
 from .sources import build_adapters, filter_it_vacancies, source_configuration_warnings
@@ -42,6 +43,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="Inspect application queue state without consuming Telegram updates.",
     )
     subparsers.add_parser("check-sources", help="Check source adapter configuration without publishing.")
+    diagnose_linkedin_parser = subparsers.add_parser(
+        "diagnose-linkedin",
+        help="Run keyed LinkedIn URL discovery without browser access or publishing.",
+    )
+    diagnose_linkedin_parser.add_argument(
+        "--limit",
+        type=int,
+        default=10,
+        help="Maximum URL candidates requested from each configured provider.",
+    )
+    diagnose_linkedin_parser.add_argument(
+        "--show-limit",
+        type=int,
+        default=5,
+        help="Maximum public LinkedIn URLs printed in the safe report.",
+    )
     preview_sources_parser = subparsers.add_parser(
         "preview-sources",
         help="Fetch configured sources and print filtered candidates without publishing.",
@@ -152,6 +169,11 @@ def main(argv: Sequence[str] | None = None) -> None:
 
         if args.command == "check-sources":
             write_stdout(format_source_check(settings))
+            return
+
+        if args.command == "diagnose-linkedin":
+            report = asyncio.run(collect_linkedin_diagnostics(settings, limit=args.limit))
+            write_stdout(format_linkedin_diagnostics(report, show_limit=args.show_limit))
             return
 
         if args.command == "preview-sources":

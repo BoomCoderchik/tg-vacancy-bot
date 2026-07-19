@@ -104,6 +104,14 @@ LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS=20
 
 It discovers globally indexed public posts without a country restriction. Search results are first retained as raw URL candidates, so a missing search snippet or date no longer removes a link before the browser can inspect it. When the authorized headless pipeline is active, the standalone LinkedIn search and scraper adapters are not registered as parallel publishers.
 
+Before enabling browser access, verify real keyed discovery without Telegram publication:
+
+```bash
+tg-vacancy-bot diagnose-linkedin --limit 10 --show-limit 5
+```
+
+The report shows configured-provider status, candidate and unique URL counts, and the permission-gate state. It never launches Playwright, creates a Telegram publisher, writes publication state, prints search snippets, or exposes API keys.
+
 Direct page reading is fail-closed: both `LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=true` and a non-empty `LINKEDIN_HEADLESS_PERMISSION_REFERENCE` are required. Set them only after receiving documented LinkedIn crawling permission or an approved access path. The adapter does not use a LinkedIn account, cookies, proxies, fake identities, scrolling automation, or any CAPTCHA/login/2FA bypass. It publishes only posts whose public page contains extractable text, whose activity URL has a reliable publication date, and whose date is no more than five days old. A login, protection page, or off-domain redirect is skipped without a snippet fallback. On GitHub Actions, Chromium is installed only when the same permission gate is satisfied.
 
 ## Required Telegram Setup
