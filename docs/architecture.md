@@ -61,6 +61,7 @@
   - Supports localization for manual messages and requires it for every source vacancy before publication.
   - Supports optional OpenAI/OpenAI-compatible description localization with `LOCALIZE_DESCRIPTIONS`, `LOCALIZATION_PROVIDER`, `OPENAI_*`, and the built-in Groq mode (`GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_FALLBACK_MODELS`).
   - Supports opt-in, globally scoped LinkedIn hiring-post search with `ENABLE_LINKEDIN_POST_SEARCH`, `SERPAPI_API_KEY` or `SERPER_API_KEY`, `LINKEDIN_POST_SEARCH_QUERY`, and `LINKEDIN_POST_SEARCH_RESULTS_WANTED`.
+  - Supports opt-in XCrawl monitoring of selected public X account timelines with `ENABLE_XCRAWL_X_POSTS`, `XCRAWL_API_KEY`, `XCRAWL_X_HANDLES`, `XCRAWL_X_MAX_TWEETS`, and `XCRAWL_X_PAGES`.
   - Supports opt-in, globally scoped free LinkedIn hiring-post scraping with `ENABLE_LINKEDIN_POST_SCRAPER`, `LINKEDIN_POST_SCRAPER_QUERY`, `LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS`, and `LINKEDIN_POST_SCRAPER_RESULTS_WANTED`.
   - Supports opt-in, globally scoped headless parsing of publicly available LinkedIn posts with `ENABLE_LINKEDIN_POST_HEADLESS`, `LINKEDIN_HEADLESS_ACCESS_AUTHORIZED`, `LINKEDIN_HEADLESS_PERMISSION_REFERENCE`, `LINKEDIN_POST_HEADLESS_QUERY`, `LINKEDIN_POST_HEADLESS_RESULTS_WANTED`, `LINKEDIN_POST_SEARCH_INTENTS_PER_CYCLE`, and `LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS`. A blank query activates 24 built-in Russian/English intents across 12 allowed role families. The rotating window defaults to six intents per 15-minute cycle, covering the full profile each hour. SerpApi and Serper requests use Google’s closest supported recency window before raw URL candidates reach the exact freshness decision. Direct page reading remains disabled unless both the authorization flag and a documented permission reference are present. Every automatic LinkedIn adapter requires a reliable publication date before publication and enforces `LINKEDIN_POST_MAX_AGE_HOURS` with a hard maximum of 120 hours.
 
@@ -105,7 +106,7 @@
   - Extracts public `https://t.me/...` links from forwarded Telegram channel metadata.
 
 - `tg_vacancy_bot/sources/`
-  - Source adapter package for Arbeitnow, Working Nomads, and the explicit opt-in LinkedIn exception.
+  - Source adapter package for Arbeitnow, Working Nomads, and explicit opt-in social-post exceptions for LinkedIn and XCrawl X posts.
   - Arbeitnow has a supported no-registration application form. Working Nomads uses a public feed and routes the operator to varied employer forms, which remain manual until a verified dedicated adapter exists.
   - Parses publication dates when sources provide them and leaves `published_at=None` when they do not.
 
@@ -170,6 +171,7 @@ Optional source credentials:
 - LinkedIn hiring-post search is controlled by `ENABLE_LINKEDIN_POST_SEARCH=false` by default and requires `SERPAPI_API_KEY` or `SERPER_API_KEY`.
 - Free LinkedIn hiring-post scraping is controlled by `ENABLE_LINKEDIN_POST_SCRAPER=false` by default and does not require an API key. `LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS` defaults to `bing_rss,duckduckgo,bing` so the scraper first consumes Bing's RSS output, then falls back to public HTML result providers when RSS returns no usable LinkedIn posts. HTML providers that return anti-bot challenges are skipped; the scraper does not bypass CAPTCHA or protection pages.
 - Headless LinkedIn post parsing is controlled by `ENABLE_LINKEDIN_POST_HEADLESS=false` by default. It uses Playwright and does not use a LinkedIn account, proxy, or protection bypass. Direct reading additionally requires `LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=true` and a non-empty `LINKEDIN_HEADLESS_PERMISSION_REFERENCE` that records documented LinkedIn permission or an approved access path. Without that gate the adapter is not registered. It uses `SERPAPI_API_KEY` or `SERPER_API_KEY` for reliable link discovery; without a key, Bing discovery is best effort.
+- XCrawl X Posts is controlled by `ENABLE_XCRAWL_X_POSTS=false` by default. It requires `XCRAWL_API_KEY` and one or more `XCRAWL_X_HANDLES`, then uses XCrawl's documented `x_user_tweets` API to read public timelines only. It does not use an X account, login, proxy, or protection bypass.
 
 Optional OpenAI localization:
 
@@ -204,3 +206,7 @@ The project permits four automatic LinkedIn adapters across three opt-in paths:
 - `LinkedInPostHeadlessAdapter`, enabled only when the headless flag and documented permission gate are both satisfied, discovers public LinkedIn post links through configured SerpApi or Serper search (or best-effort Bing without a key). Search providers return raw URL candidates without requiring a snippet or search-result date; the browser then maps page text into `Vacancy` only when the final URL remains on a supported LinkedIn post path and no login or protection page is detected. While this pipeline is registered, standalone search/scraper adapters are not registered as parallel LinkedIn publishers.
 
 All LinkedIn adapters are opt-in and do not use a LinkedIn account. If a provider blocks, rate-limits, lacks credentials, or returns no rows, the source path fails or returns no publishable vacancies; it must not create fake vacancies or placeholder records.
+
+## XCrawl X Boundary
+
+The XCrawl adapter is opt-in and limited to an operator-provided list of public X account handles. It maps real returned posts to stable `x.com/<handle>/status/<id>` URLs, then lets the common filtering, freshness, localization, publication-limit, and SQLite-deduplication layers decide whether to publish them. If XCrawl rejects the request, rate-limits it, lacks credentials, or returns no posts, the adapter fails or returns no publishable vacancies; it never creates placeholders.

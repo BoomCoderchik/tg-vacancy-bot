@@ -149,6 +149,24 @@ def test_settings_reads_linkedin_post_scraper_options() -> None:
     assert settings.linkedin_post_scraper_results_wanted == 8
 
 
+def test_settings_reads_xcrawl_x_post_options() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_XCRAWL_X_POSTS="true",
+        XCRAWL_API_KEY="xcrawl-test-key",
+        XCRAWL_X_HANDLES="@HiringAccount, hiringaccount, invalid-handle!, second_account",
+        XCRAWL_X_MAX_TWEETS="25",
+        XCRAWL_X_PAGES="2",
+    )
+
+    assert settings.enable_xcrawl_x_posts is True
+    assert settings.xcrawl_api_key == "xcrawl-test-key"
+    assert settings.xcrawl_x_handles == ("hiringaccount", "second_account")
+    assert settings.xcrawl_x_max_tweets == 25
+    assert settings.xcrawl_x_pages == 2
+
+
 def test_settings_limits_linkedin_post_age_to_five_days() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
