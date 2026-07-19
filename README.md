@@ -88,19 +88,48 @@ This source reads public search results and keeps only real `linkedin.com/posts/
 The scraper searches public, globally indexed results. It keeps only results with a reliable publication date (from the search result or the LinkedIn activity ID) and rejects posts older than `LINKEDIN_POST_MAX_AGE_HOURS` (maximum 120 hours) before they reach the common polling layer.
 The search depth is intentionally larger than the per-cycle publication budget: SQLite deduplication lets later polls publish the remaining fresh posts. Every source vacancy is localized to Russian before publication.
 
+## XCrawl X Posts
+
+To monitor selected public X accounts for suitable vacancies, configure XCrawl's real X User Tweets API:
+
+```dotenv
+ENABLE_XCRAWL_X_POSTS=true
+XCRAWL_API_KEY=
+XCRAWL_X_HANDLES=@account_one,@account_two
+XCRAWL_X_MAX_TWEETS=20
+XCRAWL_X_PAGES=1
+```
+
+`XCRAWL_X_HANDLES` is required because the API reads account timelines. The bot only keeps posts that meet the existing development/UI/UX/AI vacancy policy, gives each one a stable `x.com` post link for deduplication, and never logs in to X or bypasses protection. Put the same values in GitHub Actions secrets for scheduled polling; do not commit the key.
+
 ## Headless LinkedIn Hiring Post Parser
 
 The optional `LinkedInPostHeadlessAdapter` uses the project’s existing open-source [Playwright](https://github.com/microsoft/playwright-python) runtime to parse publicly indexed LinkedIn post pages in a clean headless browser context. For reliable link discovery, configure an existing SerpApi or Serper key; without one it falls back to Bing, which is best effort and can return no rows when blocked:
 
 ```dotenv
 ENABLE_LINKEDIN_POST_HEADLESS=true
+LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=true
+LINKEDIN_HEADLESS_PERMISSION_REFERENCE=linkedin-crawling-approval-id-or-url
 SERPAPI_API_KEY=your_key # or SERPER_API_KEY=your_key
-LINKEDIN_POST_HEADLESS_QUERY=(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR hiring OR "ищем" OR "ищет") (frontend OR backend OR developer OR engineer OR react OR python OR разработчик OR инженер)
+LINKEDIN_POST_HEADLESS_QUERY=
 LINKEDIN_POST_HEADLESS_RESULTS_WANTED=10
+LINKEDIN_POST_SEARCH_INTENTS_PER_CYCLE=6
 LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS=20
 ```
 
-It discovers globally indexed public posts without a country restriction. It does not use a LinkedIn account, cookies, proxies, fake identities, scrolling automation, or any CAPTCHA/login/2FA bypass. It publishes only posts whose public page contains extractable text, whose activity URL has a reliable publication date, and whose date is no more than five days old. A login or protection page is skipped without a fallback vacancy. On GitHub Actions, enabling the source installs Chromium before polling.
+When `LINKEDIN_POST_HEADLESS_QUERY` is blank, the autonomous profile uses 24 explicit searches: 12 allowed role families in Russian and English. Six intents run per 15-minute cycle by default, so the whole profile is covered each hour without spending the search quota on 24 requests every cycle. Set a custom `||`-separated query list only when overriding that built-in profile intentionally.
+
+It discovers globally indexed public posts without a country restriction. Each selected intent receives a balanced result quota; candidates from all selected families are then ordered by their verifiable publication-date hint before the browser-read limit is applied. SerpApi and Serper requests also use Google’s nearest supported recent-results window (`tbs=qdr:*`); the bot still verifies every date against the exact configured age limit. Search results are retained as raw URL candidates, so a missing search snippet or date no longer removes a link before the browser can inspect it. When the authorized headless pipeline is active, the standalone LinkedIn search and scraper adapters are not registered as parallel publishers.
+
+Before enabling browser access, verify real keyed discovery without Telegram publication:
+
+```bash
+tg-vacancy-bot diagnose-linkedin --use-default-profile --limit 10 --show-limit 5
+```
+
+The report shows configured-provider status, candidate and unique URL counts, and the permission-gate state. When a provider rejects every request, it reports only a safe HTTP status class (for example, `Http429`) rather than a secret-bearing request URL or response body. It never launches Playwright, creates a Telegram publisher, writes publication state, prints search snippets, or exposes API keys.
+
+Direct page reading is fail-closed: both `LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=true` and a non-empty `LINKEDIN_HEADLESS_PERMISSION_REFERENCE` are required. Set them only after receiving documented LinkedIn crawling permission or an approved access path. The adapter does not use a LinkedIn account, cookies, proxies, fake identities, scrolling automation, or any CAPTCHA/login/2FA bypass. It publishes only posts whose public page contains extractable text, whose activity URL has a reliable publication date, and whose date is no more than five days old. A login, protection page, or off-domain redirect is skipped without a snippet fallback. On GitHub Actions, Chromium is installed only when the same permission gate is satisfied.
 
 ## Required Telegram Setup
 
@@ -158,8 +187,8 @@ use:
 - `TARGET_CHAT_ID`
 - One localization key when `LOCALIZE_DESCRIPTIONS=true`: `OPENAI_API_KEY` for the default mode, or `GROQ_API_KEY` when `LOCALIZATION_PROVIDER=groq`.
 
-Optional LinkedIn keys and toggles such as `SERPAPI_API_KEY`, `SERPER_API_KEY`, and
-`ENABLE_LINKEDIN_POST_*` can also be configured as GitHub secrets. The workflow keeps `DATABASE_PATH` under
+Optional source keys and toggles such as `SERPAPI_API_KEY`, `SERPER_API_KEY`, `XCRAWL_API_KEY`,
+`ENABLE_LINKEDIN_POST_*`, and `ENABLE_XCRAWL_X_POSTS` can also be configured as GitHub secrets. The workflow keeps `DATABASE_PATH` under
 `data/` and restores it with the GitHub Actions cache so source deduplication is
 preserved between scheduled runs.
 

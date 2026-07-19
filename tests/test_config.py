@@ -98,14 +98,20 @@ def test_settings_reads_linkedin_post_headless_options() -> None:
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
         ENABLE_LINKEDIN_POST_HEADLESS="true",
+        LINKEDIN_HEADLESS_ACCESS_AUTHORIZED="true",
+        LINKEDIN_HEADLESS_PERMISSION_REFERENCE="linkedin-approval-123",
         LINKEDIN_POST_HEADLESS_QUERY='site:linkedin.com/posts "ищем" frontend',
         LINKEDIN_POST_HEADLESS_RESULTS_WANTED="7",
+        LINKEDIN_POST_SEARCH_INTENTS_PER_CYCLE="8",
         LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS="25",
     )
 
     assert settings.enable_linkedin_post_headless is True
+    assert settings.linkedin_headless_access_authorized is True
+    assert settings.linkedin_headless_permission_reference == "linkedin-approval-123"
     assert settings.linkedin_post_headless_query == 'site:linkedin.com/posts "ищем" frontend'
     assert settings.linkedin_post_headless_results_wanted == 7
+    assert settings.linkedin_post_search_intents_per_cycle == 8
     assert settings.linkedin_post_headless_timeout_seconds == 25
 
 
@@ -141,6 +147,24 @@ def test_settings_reads_linkedin_post_scraper_options() -> None:
     assert settings.linkedin_post_scraper_query == 'site:linkedin.com/posts "ищем" frontend'
     assert settings.linkedin_post_scraper_search_providers == ("bing_rss", "duckduckgo", "bing")
     assert settings.linkedin_post_scraper_results_wanted == 8
+
+
+def test_settings_reads_xcrawl_x_post_options() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_XCRAWL_X_POSTS="true",
+        XCRAWL_API_KEY="xcrawl-test-key",
+        XCRAWL_X_HANDLES="@HiringAccount, hiringaccount, invalid-handle!, second_account",
+        XCRAWL_X_MAX_TWEETS="25",
+        XCRAWL_X_PAGES="2",
+    )
+
+    assert settings.enable_xcrawl_x_posts is True
+    assert settings.xcrawl_api_key == "xcrawl-test-key"
+    assert settings.xcrawl_x_handles == ("hiringaccount", "second_account")
+    assert settings.xcrawl_x_max_tweets == 25
+    assert settings.xcrawl_x_pages == 2
 
 
 def test_settings_limits_linkedin_post_age_to_five_days() -> None:
