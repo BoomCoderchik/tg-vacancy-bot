@@ -9,6 +9,8 @@ Before changing code, read:
 - `docs/sources.md`
 - `docs/task-workflow.md`
 - `docs/git-workflow.md`
+- `docs/multi-agent-workflow.md` when a request is large enough to behave like
+  a multi-step session or the user explicitly asks for multi-agent work.
 
 Follow `docs/task-workflow.md` for the project task lifecycle: understand the
 request, inspect context, plan when needed, implement narrowly, verify, review,
@@ -18,6 +20,10 @@ Follow `docs/git-workflow.md` for every feature or code/documentation change.
 Each completed feature or change must be committed after verification, and the
 finished task branch must be pushed to GitHub unless pushing is impossible and
 the blocker is reported clearly.
+
+Follow `docs/multi-agent-workflow.md` for large session-like tasks. The lead
+agent may start up to four specialist AI agents, each with a bounded role,
+shared context, explicit outputs, and final reconciliation by the lead agent.
 
 ## GitFlow
 
