@@ -13,6 +13,7 @@ from tg_vacancy_bot.sources.adapters.linkedin_post_search import (
 )
 from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import _rss_to_vacancies
 from tg_vacancy_bot.sources.adapters.working_nomads import WorkingNomadsAdapter
+from tg_vacancy_bot.sources.adapters.xcrawl_x_posts import XCrawlXPostsAdapter
 
 
 def test_build_adapters_registers_public_no_account_sources_by_default() -> None:
@@ -53,6 +54,23 @@ def test_build_adapters_keeps_opt_in_linkedin_scraper() -> None:
     )
 
     assert [adapter.name for adapter in build_adapters(settings)] == ["LinkedIn Hiring Post Scraper"]
+
+
+def test_build_adapters_registers_xcrawl_x_posts_when_configured() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_ARBEITNOW=False,
+        ENABLE_WORKING_NOMADS=False,
+        ENABLE_LINKEDIN_POST_SEARCH=False,
+        ENABLE_LINKEDIN_POST_SCRAPER=False,
+        ENABLE_LINKEDIN_POST_HEADLESS=False,
+        ENABLE_XCRAWL_X_POSTS=True,
+        XCRAWL_API_KEY="xcrawl-test-key",
+        XCRAWL_X_HANDLES="@hiringaccount",
+    )
+
+    assert [adapter.name for adapter in build_adapters(settings)] == ["XCrawl X Posts"]
 
 
 def test_build_adapters_keeps_headless_disabled_without_authorized_access() -> None:
@@ -180,6 +198,52 @@ def test_working_nomads_adapter_maps_public_api_response(monkeypatch) -> None:
     ]
 
 
+def test_xcrawl_x_posts_adapter_maps_real_api_shape(monkeypatch) -> None:
+    session = _FakePostSession(
+        {
+            "user": {"name": "Example Co", "screen_name": "hiringaccount"},
+            "tweets": [
+                {
+                    "id": "1234567890",
+                    "full_text": "We are hiring a Senior Python Developer to build FastAPI services.",
+                    "created_at": "Fri, 17 Jul 2026 10:00:00 GMT",
+                }
+            ],
+        }
+    )
+    monkeypatch.setattr("tg_vacancy_bot.sources.adapters.xcrawl_x_posts.source_session", lambda **_: session)
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        XCRAWL_API_KEY="xcrawl-test-key",
+        XCRAWL_X_HANDLES="@hiringaccount",
+    )
+
+    vacancies = asyncio.run(XCrawlXPostsAdapter(settings).fetch())
+
+    assert session.requests == [
+        {
+            "engine": "x_user_tweets",
+            "screen_name": "hiringaccount",
+            "max_tweets": 20,
+            "pages": 1,
+            "delay": 1,
+        }
+    ]
+    assert vacancies == [
+        Vacancy(
+            title="Senior Python Developer",
+            company="Example Co",
+            description="We are hiring a Senior Python Developer to build FastAPI services.",
+            source="XCrawl X Posts",
+            url="https://x.com/hiringaccount/status/1234567890",
+            stack=("Python", "FastAPI"),
+            published_at=datetime(2026, 7, 17, 10, 0, tzinfo=UTC),
+            raw_text="We are hiring a Senior Python Developer to build FastAPI services.",
+        )
+    ]
+
+
 def test_linkedin_scraper_maps_bing_rss_result() -> None:
     rss = """
     <rss><channel><item>
@@ -297,4 +361,14 @@ class _FakeSession:
         return None
 
     def get(self, url: str) -> _FakeResponse:
+        return self._response
+
+
+class _FakePostSession(_FakeSession):
+    def __init__(self, json_data: dict) -> None:
+        super().__init__(json_data)
+        self.requests: list[dict] = []
+
+    def post(self, url: str, *, json: dict) -> _FakeResponse:
+        self.requests.append(json)
         return self._response

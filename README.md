@@ -88,6 +88,20 @@ This source reads public search results and keeps only real `linkedin.com/posts/
 The scraper searches public, globally indexed results. It keeps only results with a reliable publication date (from the search result or the LinkedIn activity ID) and rejects posts older than `LINKEDIN_POST_MAX_AGE_HOURS` (maximum 120 hours) before they reach the common polling layer.
 The search depth is intentionally larger than the per-cycle publication budget: SQLite deduplication lets later polls publish the remaining fresh posts. Every source vacancy is localized to Russian before publication.
 
+## XCrawl X Posts
+
+To monitor selected public X accounts for suitable vacancies, configure XCrawl's real X User Tweets API:
+
+```dotenv
+ENABLE_XCRAWL_X_POSTS=true
+XCRAWL_API_KEY=
+XCRAWL_X_HANDLES=@account_one,@account_two
+XCRAWL_X_MAX_TWEETS=20
+XCRAWL_X_PAGES=1
+```
+
+`XCRAWL_X_HANDLES` is required because the API reads account timelines. The bot only keeps posts that meet the existing development/UI/UX/AI vacancy policy, gives each one a stable `x.com` post link for deduplication, and never logs in to X or bypasses protection. Put the same values in GitHub Actions secrets for scheduled polling; do not commit the key.
+
 ## Headless LinkedIn Hiring Post Parser
 
 The optional `LinkedInPostHeadlessAdapter` uses the project’s existing open-source [Playwright](https://github.com/microsoft/playwright-python) runtime to parse publicly indexed LinkedIn post pages in a clean headless browser context. For reliable link discovery, configure an existing SerpApi or Serper key; without one it falls back to Bing, which is best effort and can return no rows when blocked:
@@ -173,8 +187,8 @@ use:
 - `TARGET_CHAT_ID`
 - One localization key when `LOCALIZE_DESCRIPTIONS=true`: `OPENAI_API_KEY` for the default mode, or `GROQ_API_KEY` when `LOCALIZATION_PROVIDER=groq`.
 
-Optional LinkedIn keys and toggles such as `SERPAPI_API_KEY`, `SERPER_API_KEY`, and
-`ENABLE_LINKEDIN_POST_*` can also be configured as GitHub secrets. The workflow keeps `DATABASE_PATH` under
+Optional source keys and toggles such as `SERPAPI_API_KEY`, `SERPER_API_KEY`, `XCRAWL_API_KEY`,
+`ENABLE_LINKEDIN_POST_*`, and `ENABLE_XCRAWL_X_POSTS` can also be configured as GitHub secrets. The workflow keeps `DATABASE_PATH` under
 `data/` and restores it with the GitHub Actions cache so source deduplication is
 preserved between scheduled runs.
 

@@ -41,6 +41,11 @@ jobs:
       SOURCE_MAX_AGE_HOURS: ${{ secrets.SOURCE_MAX_AGE_HOURS || '48' }}
       ENABLE_ARBEITNOW: "true"
       ENABLE_WORKING_NOMADS: "true"
+      ENABLE_XCRAWL_X_POSTS: ${{ secrets.ENABLE_XCRAWL_X_POSTS || 'false' }}
+      XCRAWL_API_KEY: ${{ secrets.XCRAWL_API_KEY }}
+      XCRAWL_X_HANDLES: ${{ secrets.XCRAWL_X_HANDLES }}
+      XCRAWL_X_MAX_TWEETS: ${{ secrets.XCRAWL_X_MAX_TWEETS || '20' }}
+      XCRAWL_X_PAGES: ${{ secrets.XCRAWL_X_PAGES || '1' }}
       ENABLE_LINKEDIN_POST_SEARCH: ${{ secrets.ENABLE_LINKEDIN_POST_SEARCH || 'false' }}
       SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
       SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
