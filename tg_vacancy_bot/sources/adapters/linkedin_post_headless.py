@@ -32,6 +32,10 @@ from tg_vacancy_bot.sources.linkedin_search_profile import (
 BING_SEARCH_URL = "https://www.bing.com/search"
 logger = logging.getLogger(__name__)
 POST_TEXT_SELECTORS = (
+    "article p.attributed-text-segment-list__content",
+    "article [class*='attributed-text-segment-list__content']",
+    "p.attributed-text-segment-list__content",
+    "[class*='attributed-text-segment-list__content']",
     ".feed-shared-update-v2__description-wrapper",
     ".feed-shared-inline-show-more-text",
     "[data-test-id*='commentary']",

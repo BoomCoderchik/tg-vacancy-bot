@@ -371,6 +371,25 @@ def test_headless_uses_validated_final_linkedin_url_after_redirect() -> None:
     assert vacancy.url == final_url
 
 
+def test_headless_extracts_static_public_post_content_selector() -> None:
+    html = """
+    <html>
+      <body>
+        <article>
+          <p class="attributed-text-segment-list__content">
+            We are hiring a Backend Engineer to build Python APIs.
+          </p>
+        </article>
+      </body>
+    </html>
+    """
+
+    assert (
+        linkedin_post_headless._extract_post_text(html)
+        == "We are hiring a Backend Engineer to build Python APIs."
+    )
+
+
 def test_headless_fetch_is_fail_closed_before_playwright(monkeypatch) -> None:
     def fail_playwright():
         raise AssertionError("Playwright must not start without recorded permission")
