@@ -5,7 +5,7 @@ import pytest
 
 from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
-from tg_vacancy_bot.sources import build_adapters, filter_it_vacancies
+from tg_vacancy_bot.sources import build_adapters, filter_it_vacancies, source_configuration_warnings
 from tg_vacancy_bot.sources.adapters.arbeitnow import ArbeitnowAdapter
 from tg_vacancy_bot.sources.adapters.linkedin_post_search import (
     _filter_recent_linkedin_posts,
@@ -53,6 +53,59 @@ def test_build_adapters_keeps_opt_in_linkedin_scraper() -> None:
     )
 
     assert [adapter.name for adapter in build_adapters(settings)] == ["LinkedIn Hiring Post Scraper"]
+
+
+def test_build_adapters_keeps_headless_disabled_without_authorized_access() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_ARBEITNOW=False,
+        ENABLE_WORKING_NOMADS=False,
+        ENABLE_LINKEDIN_POST_SEARCH=True,
+        ENABLE_LINKEDIN_POST_SCRAPER=True,
+        ENABLE_LINKEDIN_POST_HEADLESS=True,
+        LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=False,
+        SERPER_API_KEY="search-key",
+    )
+
+    assert build_adapters(settings) == []
+
+
+def test_build_adapters_keeps_headless_disabled_without_permission_reference() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_ARBEITNOW=False,
+        ENABLE_WORKING_NOMADS=False,
+        ENABLE_LINKEDIN_POST_SEARCH=False,
+        ENABLE_LINKEDIN_POST_SCRAPER=False,
+        ENABLE_LINKEDIN_POST_HEADLESS=True,
+        LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=True,
+        LINKEDIN_HEADLESS_PERMISSION_REFERENCE="",
+        SERPER_API_KEY="search-key",
+    )
+
+    assert build_adapters(settings) == []
+
+
+def test_build_adapters_registers_only_headless_linkedin_pipeline_when_authorized() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_ARBEITNOW=False,
+        ENABLE_WORKING_NOMADS=False,
+        ENABLE_LINKEDIN_POST_SEARCH=True,
+        ENABLE_LINKEDIN_POST_SCRAPER=True,
+        ENABLE_LINKEDIN_POST_HEADLESS=True,
+        LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=True,
+        LINKEDIN_HEADLESS_PERMISSION_REFERENCE="linkedin-approval-123",
+        SERPER_API_KEY="search-key",
+    )
+
+    assert [adapter.name for adapter in build_adapters(settings)] == [
+        "LinkedIn Hiring Posts (Headless)"
+    ]
+    assert not any("LinkedIn Hiring Posts source" in warning for warning in source_configuration_warnings(settings))
 
 
 def test_arbeitnow_adapter_maps_public_api_response(monkeypatch) -> None:

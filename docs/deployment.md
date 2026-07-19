@@ -170,14 +170,19 @@ Required GitHub repository secrets:
 Set these only if the matching LinkedIn feature is enabled:
 
 - `SERPAPI_API_KEY` or `SERPER_API_KEY` when `ENABLE_LINKEDIN_POST_SEARCH=true`
+- `LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=true` and `LINKEDIN_HEADLESS_PERMISSION_REFERENCE` only after documented LinkedIn crawling permission or an approved access path exists
 
 Optional secrets can override defaults, including `SOURCE_MAX_PUBLISH_PER_POLL`,
 `SOURCE_MAX_AGE_HOURS`, `ENABLE_LINKEDIN_POST_SCRAPER`, and
 `ENABLE_LINKEDIN_POST_HEADLESS`, `LOCALIZATION_PROVIDER`, and
 `LOCALIZATION_MAX_PER_POLL`. Set `OPENAI_API_KEY` for the default provider or
 `GROQ_API_KEY` when `LOCALIZATION_PROVIDER=groq` to enable actual translation.
-The workflow still publishes a real vacancy with its original description if the selected provider is unavailable. When the headless source is enabled, the
-scheduled workflow installs Chromium before polling.
+The workflow still publishes a real vacancy with its original description if the selected provider is unavailable. The scheduled workflow installs Chromium for LinkedIn page reading only when the headless flag, authorization flag, and permission reference are all configured.
+
+Leave `LINKEDIN_POST_HEADLESS_QUERY` unset to use the built-in rotating Russian/
+English development-role profile. `LINKEDIN_POST_SEARCH_INTENTS_PER_CYCLE`
+defaults to `6`, which covers all 24 built-in intents over four 15-minute runs.
+Set a custom `||`-separated query only as an intentional override.
 
 The workflow stores the SQLite deduplication database in `data/` and restores it
 through the GitHub Actions cache. Keep only one production scheduler active for

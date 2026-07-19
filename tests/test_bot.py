@@ -58,18 +58,20 @@ def test_build_status_text_reports_linkedin_post_search_missing_key() -> None:
     assert "LinkedInHeadless=off" in text
 
 
-def test_build_status_text_reports_linkedin_post_search_on_without_exposing_key() -> None:
+def test_build_status_text_reports_linkedin_search_suppressed_by_headless() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="secret-token",
         TARGET_CHAT_ID="@target",
         ENABLE_LINKEDIN_POST_SEARCH=True,
         SERPAPI_API_KEY="serp-secret",
         ENABLE_LINKEDIN_POST_HEADLESS=True,
+        LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=True,
+        LINKEDIN_HEADLESS_PERMISSION_REFERENCE="linkedin-approval-123",
     )
 
     text = build_status_text(settings)
 
-    assert "LinkedInPosts=on" in text
+    assert "LinkedInPosts=suppressed-by-headless" in text
     assert "LinkedInHeadless=on" in text
     assert "serp-secret" not in text
 
@@ -87,6 +89,35 @@ def test_build_status_text_reports_linkedin_post_search_on_with_serper_key() -> 
 
     assert "LinkedInPosts=on" in text
     assert "serper-secret" not in text
+
+
+def test_build_status_text_reports_headless_permission_boundary() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="secret-token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_LINKEDIN_POST_SEARCH=False,
+        ENABLE_LINKEDIN_POST_HEADLESS=True,
+        LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=False,
+    )
+
+    text = build_status_text(settings)
+
+    assert "LinkedInHeadless=permission-required" in text
+
+
+def test_build_status_text_reports_missing_headless_permission_reference() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="secret-token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_LINKEDIN_POST_SEARCH=False,
+        ENABLE_LINKEDIN_POST_HEADLESS=True,
+        LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=True,
+        LINKEDIN_HEADLESS_PERMISSION_REFERENCE="",
+    )
+
+    text = build_status_text(settings)
+
+    assert "LinkedInHeadless=permission-reference-required" in text
 
 
 def test_format_whoami_text_returns_user_id() -> None:

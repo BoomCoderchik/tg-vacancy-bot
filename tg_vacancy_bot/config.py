@@ -60,6 +60,14 @@ class Settings(BaseSettings):
     enable_linkedin_post_search: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SEARCH")
     enable_linkedin_post_scraper: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SCRAPER")
     enable_linkedin_post_headless: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_HEADLESS")
+    linkedin_headless_access_authorized: bool = Field(
+        default=False,
+        alias="LINKEDIN_HEADLESS_ACCESS_AUTHORIZED",
+    )
+    linkedin_headless_permission_reference: str = Field(
+        default="",
+        alias="LINKEDIN_HEADLESS_PERMISSION_REFERENCE",
+    )
     # LinkedIn posts must have a verifiable publication date and remain no more
     # than five days old. A lower value is allowed, but never a longer window.
     linkedin_post_max_age_hours: int = Field(default=120, alias="LINKEDIN_POST_MAX_AGE_HOURS", gt=0, le=120)
@@ -89,10 +97,15 @@ class Settings(BaseSettings):
     # budget: deduplication lets later polls publish the remaining fresh posts.
     linkedin_post_scraper_results_wanted: int = Field(default=100, alias="LINKEDIN_POST_SCRAPER_RESULTS_WANTED")
     linkedin_post_headless_query: str = Field(
-        default=DEFAULT_LINKEDIN_POST_SCRAPER_QUERY,
+        default="",
         alias="LINKEDIN_POST_HEADLESS_QUERY",
     )
     linkedin_post_headless_results_wanted: int = Field(default=10, alias="LINKEDIN_POST_HEADLESS_RESULTS_WANTED")
+    linkedin_post_search_intents_per_cycle: int = Field(
+        default=6,
+        alias="LINKEDIN_POST_SEARCH_INTENTS_PER_CYCLE",
+        gt=0,
+    )
     linkedin_post_headless_timeout_seconds: int = Field(
         default=20,
         alias="LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS",

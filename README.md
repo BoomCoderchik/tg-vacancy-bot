@@ -94,13 +94,28 @@ The optional `LinkedInPostHeadlessAdapter` uses the project’s existing open-so
 
 ```dotenv
 ENABLE_LINKEDIN_POST_HEADLESS=true
+LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=true
+LINKEDIN_HEADLESS_PERMISSION_REFERENCE=linkedin-crawling-approval-id-or-url
 SERPAPI_API_KEY=your_key # or SERPER_API_KEY=your_key
-LINKEDIN_POST_HEADLESS_QUERY=(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR hiring OR "ищем" OR "ищет") (frontend OR backend OR developer OR engineer OR react OR python OR разработчик OR инженер)
+LINKEDIN_POST_HEADLESS_QUERY=
 LINKEDIN_POST_HEADLESS_RESULTS_WANTED=10
+LINKEDIN_POST_SEARCH_INTENTS_PER_CYCLE=6
 LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS=20
 ```
 
-It discovers globally indexed public posts without a country restriction. It does not use a LinkedIn account, cookies, proxies, fake identities, scrolling automation, or any CAPTCHA/login/2FA bypass. It publishes only posts whose public page contains extractable text, whose activity URL has a reliable publication date, and whose date is no more than five days old. A login or protection page is skipped without a fallback vacancy. On GitHub Actions, enabling the source installs Chromium before polling.
+When `LINKEDIN_POST_HEADLESS_QUERY` is blank, the autonomous profile uses 24 explicit searches: 12 allowed role families in Russian and English. Six intents run per 15-minute cycle by default, so the whole profile is covered each hour without spending the search quota on 24 requests every cycle. Set a custom `||`-separated query list only when overriding that built-in profile intentionally.
+
+It discovers globally indexed public posts without a country restriction. Each selected intent receives a balanced result quota; candidates from all selected families are then ordered by their verifiable publication-date hint before the browser-read limit is applied. SerpApi and Serper requests also use Google’s nearest supported recent-results window (`tbs=qdr:*`); the bot still verifies every date against the exact configured age limit. Search results are retained as raw URL candidates, so a missing search snippet or date no longer removes a link before the browser can inspect it. When the authorized headless pipeline is active, the standalone LinkedIn search and scraper adapters are not registered as parallel publishers.
+
+Before enabling browser access, verify real keyed discovery without Telegram publication:
+
+```bash
+tg-vacancy-bot diagnose-linkedin --use-default-profile --limit 10 --show-limit 5
+```
+
+The report shows configured-provider status, candidate and unique URL counts, and the permission-gate state. When a provider rejects every request, it reports only a safe HTTP status class (for example, `Http429`) rather than a secret-bearing request URL or response body. It never launches Playwright, creates a Telegram publisher, writes publication state, prints search snippets, or exposes API keys.
+
+Direct page reading is fail-closed: both `LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=true` and a non-empty `LINKEDIN_HEADLESS_PERMISSION_REFERENCE` are required. Set them only after receiving documented LinkedIn crawling permission or an approved access path. The adapter does not use a LinkedIn account, cookies, proxies, fake identities, scrolling automation, or any CAPTCHA/login/2FA bypass. It publishes only posts whose public page contains extractable text, whose activity URL has a reliable publication date, and whose date is no more than five days old. A login, protection page, or off-domain redirect is skipped without a snippet fallback. On GitHub Actions, Chromium is installed only when the same permission gate is satisfied.
 
 ## Required Telegram Setup
 
