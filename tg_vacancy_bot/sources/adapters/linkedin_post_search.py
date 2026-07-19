@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
+
+import aiohttp
 
 from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
@@ -16,6 +20,7 @@ SERPAPI_SEARCH_URL = "https://serpapi.com/search.json"
 SERPER_SEARCH_URL = "https://google.serper.dev/search"
 SERPER_MAX_RESULTS_PER_REQUEST = 10
 POST_URL_MARKERS = ("linkedin.com/posts/", "linkedin.com/feed/update/")
+POST_PATH_PREFIXES = ("/posts/", "/feed/update/")
 ACTIVITY_ID_PATTERN = re.compile(r"activity-(\d{15,20})(?:[-/?#]|$)", re.IGNORECASE)
 HASHTAG_PATTERN = re.compile(r"(?<!\w)#[\w.+-]+", re.UNICODE)
 ROLE_TERM_PATTERN = re.compile(
@@ -58,6 +63,18 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+@dataclass(frozen=True, slots=True)
+class LinkedInPostCandidate:
+    """Raw search discovery result that has not passed vacancy policy yet."""
+
+    url: str
+    search_title: str
+    snippet: str
+    date_text: str
+    provider: str
+    query: str
+
+
 class LinkedInPostSearchAdapter(SourceAdapter):
     name = "LinkedIn Hiring Posts"
 
@@ -65,35 +82,45 @@ class LinkedInPostSearchAdapter(SourceAdapter):
         self.settings = settings
 
     async def fetch(self) -> list[Vacancy]:
-        limit = max(self.settings.linkedin_post_search_results_wanted, 0)
-        vacancies: list[Vacancy] = []
+        candidates = await self.discover()
+        vacancies = [
+            vacancy
+            for candidate in candidates
+            if (vacancy := _candidate_to_vacancy(candidate)) is not None
+        ]
+        return _filter_recent_linkedin_posts(vacancies, self.settings.linkedin_post_max_age_hours)
+
+    async def discover(self, *, limit: int | None = None) -> list[LinkedInPostCandidate]:
+        wanted = max(
+            self.settings.linkedin_post_search_results_wanted if limit is None else limit,
+            0,
+        )
+        candidates: list[LinkedInPostCandidate] = []
         seen_urls: set[str] = set()
         async with source_session() as session:
             for query in _search_queries(self.settings.linkedin_post_search_query):
-                if len(vacancies) >= limit:
+                if len(candidates) >= wanted:
                     break
                 params = {
                     "engine": "google",
                     "api_key": self.settings.serpapi_api_key,
                     "q": query,
-                    "num": limit,
+                    "num": wanted,
                     "hl": "ru",
                 }
-                async with session.get(SERPAPI_SEARCH_URL, params=params) as response:
-                    response.raise_for_status()
-                    payload = await response.json()
+                payload = await _get_search_payload(session, SERPAPI_SEARCH_URL, params=params)
 
                 for result in payload.get("organic_results", []):
                     if not isinstance(result, Mapping):
                         continue
-                    vacancy = _result_to_vacancy(result)
-                    if vacancy is None or not vacancy.url or vacancy.url in seen_urls:
+                    candidate = _result_to_candidate(result, provider=self.name, query=query)
+                    if candidate is None or candidate.url in seen_urls:
                         continue
-                    seen_urls.add(vacancy.url)
-                    vacancies.append(vacancy)
-                    if len(vacancies) >= limit:
+                    seen_urls.add(candidate.url)
+                    candidates.append(candidate)
+                    if len(candidates) >= wanted:
                         break
-        return _filter_recent_linkedin_posts(vacancies, self.settings.linkedin_post_max_age_hours)
+        return candidates
 
 
 class LinkedInPostSerperAdapter(SourceAdapter):
@@ -103,15 +130,27 @@ class LinkedInPostSerperAdapter(SourceAdapter):
         self.settings = settings
 
     async def fetch(self) -> list[Vacancy]:
-        limit = max(self.settings.linkedin_post_search_results_wanted, 0)
+        candidates = await self.discover()
+        vacancies = [
+            vacancy
+            for candidate in candidates
+            if (vacancy := _candidate_to_vacancy(candidate)) is not None
+        ]
+        return _filter_recent_linkedin_posts(vacancies, self.settings.linkedin_post_max_age_hours)
+
+    async def discover(self, *, limit: int | None = None) -> list[LinkedInPostCandidate]:
+        wanted = max(
+            self.settings.linkedin_post_search_results_wanted if limit is None else limit,
+            0,
+        )
         headers = {"X-API-KEY": self.settings.serper_api_key, "Content-Type": "application/json"}
-        vacancies: list[Vacancy] = []
+        candidates: list[LinkedInPostCandidate] = []
         seen_urls: set[str] = set()
         async with source_session(headers=headers) as session:
             for query in _search_queries(self.settings.linkedin_post_search_query):
                 page = 1
-                while len(vacancies) < limit:
-                    request_limit = min(SERPER_MAX_RESULTS_PER_REQUEST, limit - len(vacancies))
+                while len(candidates) < wanted:
+                    request_limit = min(SERPER_MAX_RESULTS_PER_REQUEST, wanted - len(candidates))
                     payload = {
                         "q": query,
                         "num": request_limit,
@@ -119,9 +158,11 @@ class LinkedInPostSerperAdapter(SourceAdapter):
                     }
                     if page > 1:
                         payload["page"] = page
-                    async with session.post(SERPER_SEARCH_URL, json=payload) as response:
-                        response.raise_for_status()
-                        response_payload = await response.json()
+                    response_payload = await _post_search_payload(
+                        session,
+                        SERPER_SEARCH_URL,
+                        payload=payload,
+                    )
 
                     results = response_payload.get("organic", [])
                     if not isinstance(results, list):
@@ -129,20 +170,21 @@ class LinkedInPostSerperAdapter(SourceAdapter):
                     for result in results:
                         if not isinstance(result, Mapping):
                             continue
-                        vacancy = _result_to_vacancy(
+                        candidate = _result_to_candidate(
                             result,
-                            source=LinkedInPostSerperAdapter.name,
+                            provider=self.name,
+                            query=query,
                         )
-                        if vacancy is None or not vacancy.url or vacancy.url in seen_urls:
+                        if candidate is None or candidate.url in seen_urls:
                             continue
-                        seen_urls.add(vacancy.url)
-                        vacancies.append(vacancy)
-                        if len(vacancies) >= limit:
+                        seen_urls.add(candidate.url)
+                        candidates.append(candidate)
+                        if len(candidates) >= wanted:
                             break
                     if len(results) < request_limit:
                         break
                     page += 1
-        return _filter_recent_linkedin_posts(vacancies, self.settings.linkedin_post_max_age_hours)
+        return candidates
 
 
 def _result_to_vacancy(
@@ -150,22 +192,46 @@ def _result_to_vacancy(
     *,
     source: str = LinkedInPostSearchAdapter.name,
 ) -> Vacancy | None:
+    candidate = _result_to_candidate(result, provider=source, query="")
+    return _candidate_to_vacancy(candidate) if candidate is not None else None
+
+
+def _result_to_candidate(
+    result: Mapping[str, Any],
+    *,
+    provider: str,
+    query: str,
+) -> LinkedInPostCandidate | None:
     search_title = _clean_title(_text(result, "title"))
-    link = _text(result, "link")
+    link = _canonicalize_linkedin_post_url(_text(result, "link"))
     snippet = _text(result, "snippet")
-    if not search_title or not link or not snippet or not _is_linkedin_post_url(link):
+    if not link:
         return None
-    title = _post_title(search_title, snippet)
+
+    return LinkedInPostCandidate(
+        url=link,
+        search_title=search_title,
+        snippet=snippet,
+        date_text=_text(result, "date"),
+        provider=provider,
+        query=query,
+    )
+
+
+def _candidate_to_vacancy(candidate: LinkedInPostCandidate) -> Vacancy | None:
+    if not candidate.search_title or not candidate.snippet:
+        return None
+    title = _post_title(candidate.search_title, candidate.snippet)
 
     return Vacancy(
         title=title,
-        description=snippet,
-        source=source,
-        url=link,
+        description=candidate.snippet,
+        source=candidate.provider,
+        url=candidate.url,
         location=None,
-        stack=_stack_from_text(f"{title} {snippet} {search_title}"),
-        published_at=_published_at_for_result(_text(result, "date"), link),
-        raw_text=f"{title} {snippet}",
+        stack=_stack_from_text(f"{title} {candidate.snippet} {candidate.search_title}"),
+        published_at=_published_at_for_result(candidate.date_text, candidate.url),
+        raw_text=f"{title} {candidate.snippet}",
     )
 
 
@@ -181,6 +247,43 @@ def _filter_recent_linkedin_posts(vacancies: list[Vacancy], max_age_hours: int) 
 def _is_linkedin_post_url(link: str) -> bool:
     lower = link.lower()
     return any(marker in lower for marker in POST_URL_MARKERS)
+
+
+def _canonicalize_linkedin_post_url(link: str) -> str:
+    value = (link or "").strip()
+    if not value:
+        return ""
+    parsed = urlsplit(value)
+    hostname = (parsed.hostname or "").lower()
+    if parsed.scheme not in {"http", "https"} or not (
+        hostname == "linkedin.com" or hostname.endswith(".linkedin.com")
+    ):
+        return ""
+    path = parsed.path.rstrip("/")
+    if not any(path.startswith(prefix) and len(path) > len(prefix) for prefix in POST_PATH_PREFIXES):
+        return ""
+    canonical = urlunsplit(("https", "www.linkedin.com", path, "", ""))
+    return canonical
+
+
+async def _get_search_payload(session, url: str, *, params: Mapping[str, Any]) -> Mapping[str, Any]:
+    try:
+        async with session.get(url, params=params) as response:
+            response.raise_for_status()
+            payload = await response.json()
+    except aiohttp.ClientError as exc:
+        raise RuntimeError(f"LinkedIn search provider request failed: {type(exc).__name__}") from None
+    return payload if isinstance(payload, Mapping) else {}
+
+
+async def _post_search_payload(session, url: str, *, payload: Mapping[str, Any]) -> Mapping[str, Any]:
+    try:
+        async with session.post(url, json=payload) as response:
+            response.raise_for_status()
+            response_payload = await response.json()
+    except aiohttp.ClientError as exc:
+        raise RuntimeError(f"LinkedIn search provider request failed: {type(exc).__name__}") from None
+    return response_payload if isinstance(response_payload, Mapping) else {}
 
 
 def _post_title(search_title: str, snippet: str) -> str:

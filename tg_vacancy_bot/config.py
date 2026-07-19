@@ -60,6 +60,14 @@ class Settings(BaseSettings):
     enable_linkedin_post_search: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SEARCH")
     enable_linkedin_post_scraper: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SCRAPER")
     enable_linkedin_post_headless: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_HEADLESS")
+    linkedin_headless_access_authorized: bool = Field(
+        default=False,
+        alias="LINKEDIN_HEADLESS_ACCESS_AUTHORIZED",
+    )
+    linkedin_headless_permission_reference: str = Field(
+        default="",
+        alias="LINKEDIN_HEADLESS_PERMISSION_REFERENCE",
+    )
     # LinkedIn posts must have a verifiable publication date and remain no more
     # than five days old. A lower value is allowed, but never a longer window.
     linkedin_post_max_age_hours: int = Field(default=120, alias="LINKEDIN_POST_MAX_AGE_HOURS", gt=0, le=120)

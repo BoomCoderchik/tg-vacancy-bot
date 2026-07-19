@@ -61,8 +61,8 @@ def build_status_text(settings: Settings) -> str:
         f"Arbeitnow={'on' if settings.enable_arbeitnow else 'off'}",
         f"WorkingNomads={'on' if settings.enable_working_nomads else 'off'}",
         f"LinkedInPosts={_linkedin_post_search_state(settings)}",
-        f"LinkedInPostScraper={'on' if settings.enable_linkedin_post_scraper else 'off'}",
-        f"LinkedInHeadless={'on' if settings.enable_linkedin_post_headless else 'off'}",
+        f"LinkedInPostScraper={_linkedin_post_scraper_state(settings)}",
+        f"LinkedInHeadless={_linkedin_headless_state(settings)}",
     ]
     return "\n".join(
         [
@@ -80,8 +80,28 @@ def build_status_text(settings: Settings) -> str:
 def _linkedin_post_search_state(settings: Settings) -> str:
     if not settings.enable_linkedin_post_search:
         return "off"
+    if settings.enable_linkedin_post_headless:
+        return "suppressed-by-headless"
     if not (settings.serpapi_api_key or settings.serper_api_key):
         return "missing-key"
+    return "on"
+
+
+def _linkedin_post_scraper_state(settings: Settings) -> str:
+    if not settings.enable_linkedin_post_scraper:
+        return "off"
+    if settings.enable_linkedin_post_headless:
+        return "suppressed-by-headless"
+    return "on"
+
+
+def _linkedin_headless_state(settings: Settings) -> str:
+    if not settings.enable_linkedin_post_headless:
+        return "off"
+    if not settings.linkedin_headless_access_authorized:
+        return "permission-required"
+    if not settings.linkedin_headless_permission_reference.strip():
+        return "permission-reference-required"
     return "on"
 
 

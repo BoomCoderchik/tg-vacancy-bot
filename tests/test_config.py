@@ -98,12 +98,16 @@ def test_settings_reads_linkedin_post_headless_options() -> None:
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
         ENABLE_LINKEDIN_POST_HEADLESS="true",
+        LINKEDIN_HEADLESS_ACCESS_AUTHORIZED="true",
+        LINKEDIN_HEADLESS_PERMISSION_REFERENCE="linkedin-approval-123",
         LINKEDIN_POST_HEADLESS_QUERY='site:linkedin.com/posts "ищем" frontend',
         LINKEDIN_POST_HEADLESS_RESULTS_WANTED="7",
         LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS="25",
     )
 
     assert settings.enable_linkedin_post_headless is True
+    assert settings.linkedin_headless_access_authorized is True
+    assert settings.linkedin_headless_permission_reference == "linkedin-approval-123"
     assert settings.linkedin_post_headless_query == 'site:linkedin.com/posts "ищем" frontend'
     assert settings.linkedin_post_headless_results_wanted == 7
     assert settings.linkedin_post_headless_timeout_seconds == 25

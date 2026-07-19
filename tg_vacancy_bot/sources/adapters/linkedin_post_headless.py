@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from urllib.parse import urlencode
 
@@ -11,9 +12,10 @@ from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.sources.base import SourceAdapter, html_to_text
 from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import _published_at_from_activity_id
 from tg_vacancy_bot.sources.adapters.linkedin_post_search import (
+    LinkedInPostCandidate,
     LinkedInPostSearchAdapter,
     LinkedInPostSerperAdapter,
-    _is_linkedin_post_url,
+    _canonicalize_linkedin_post_url,
     _post_title,
     _search_queries,
     _stack_from_text,
@@ -22,6 +24,7 @@ from tg_vacancy_bot.sources.freshness import filter_fresh_vacancies
 
 
 BING_SEARCH_URL = "https://www.bing.com/search"
+logger = logging.getLogger(__name__)
 POST_TEXT_SELECTORS = (
     ".feed-shared-update-v2__description-wrapper",
     ".feed-shared-inline-show-more-text",
@@ -51,6 +54,11 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
         self.settings = settings
 
     async def fetch(self) -> list[Vacancy]:
+        if not (
+            self.settings.linkedin_headless_access_authorized
+            and self.settings.linkedin_headless_permission_reference.strip()
+        ):
+            return []
         limit = max(self.settings.linkedin_post_headless_results_wanted, 0)
         if not limit:
             return []
@@ -94,11 +102,22 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
         if self.settings.serper_api_key:
             providers.append(LinkedInPostSerperAdapter(search_settings))
 
+        candidates: list[LinkedInPostCandidate] = []
+        seen_urls: set[str] = set()
         for provider in providers:
-            urls = _post_urls_from_vacancies(await provider.fetch(), limit)
-            if urls:
-                return urls
-        return ()
+            try:
+                discovered = await provider.discover(limit=limit)
+            except Exception as exc:
+                logger.warning("%s discovery failed: %s", provider.name, type(exc).__name__)
+                continue
+            for candidate in discovered:
+                if candidate.url in seen_urls:
+                    continue
+                seen_urls.add(candidate.url)
+                candidates.append(candidate)
+                if len(candidates) >= limit:
+                    return _post_urls_from_candidates(candidates, limit)
+        return _post_urls_from_candidates(candidates, limit)
 
     async def _discover_bing_post_urls(self, limit: int, timeout_ms: int) -> tuple[str, ...]:
         urls: list[str] = []
@@ -124,11 +143,14 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
         page.set_default_timeout(timeout_ms)
         try:
             await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+            final_url = _canonicalize_linkedin_post_url(page.url)
+            if not final_url:
+                return None
             html = await page.content()
             if _requires_manual_access(html):
                 return None
             description = _extract_post_text(html)
-            published_at = _published_at_from_activity_id(url)
+            published_at = _published_at_from_activity_id(final_url)
             if not description or published_at is None:
                 return None
             title = _post_title(await page.title(), description)
@@ -138,7 +160,7 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
                 title=title,
                 description=description,
                 source=self.name,
-                url=url,
+                url=final_url,
                 location=None,
                 stack=_stack_from_text(f"{title} {description}"),
                 published_at=published_at,
@@ -158,17 +180,20 @@ async def _search_public_post_urls(page, query: str) -> tuple[str, ...]:
     urls: list[str] = []
     for anchor in soup.select("li.b_algo h2 a[href], a[href*='linkedin.com/posts/'], a[href*='linkedin.com/feed/update/']"):
         href = str(anchor.get("href") or "").strip()
-        if href and _is_linkedin_post_url(href) and href not in urls:
-            urls.append(href)
+        canonical = _canonicalize_linkedin_post_url(href)
+        if canonical and canonical not in urls:
+            urls.append(canonical)
     return tuple(urls)
 
 
-def _post_urls_from_vacancies(vacancies: list[Vacancy], limit: int) -> tuple[str, ...]:
+def _post_urls_from_candidates(
+    candidates: list[LinkedInPostCandidate],
+    limit: int,
+) -> tuple[str, ...]:
     urls: list[str] = []
-    for vacancy in vacancies:
-        url = (vacancy.url or "").strip()
-        if url and _is_linkedin_post_url(url) and url not in urls:
-            urls.append(url)
+    for candidate in candidates:
+        if candidate.url and candidate.url not in urls:
+            urls.append(candidate.url)
         if len(urls) >= limit:
             break
     return tuple(urls)

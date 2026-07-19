@@ -22,7 +22,7 @@ Automatic polling is deliberately limited to sources with a public feed and a do
 
 ## LinkedIn exception
 
-LinkedIn is retained as an explicit opt-in discovery source. It may use SerpApi, Serper, public search-result scraping, or a public-page headless reader to find recent hiring posts. It never logs in to LinkedIn, creates an account, bypasses protection, or applies on the operator's behalf.
+LinkedIn is retained as an explicit opt-in discovery source. It may use SerpApi, Serper, or public search results to discover post URLs. Search candidates are kept before vacancy and freshness filtering so the headless stage can inspect a real page rather than depend on a search snippet. Direct public-page headless reading additionally requires a documented LinkedIn permission or approved access path recorded through the fail-closed authorization settings. It never logs in to LinkedIn, creates an account, bypasses protection, or applies on the operator's behalf.
 
 Every source vacancy is passed to the real description-localization provider before publication. If translation fails, the bot logs the error and publishes the original description with the vacancy link, so an operator can still inspect and open it. Russian source text is recognized and retained without an unnecessary model call.
 
