@@ -42,6 +42,20 @@ merge unverified work.
 
 Required integrations must remain real. Do not add mock Telegram publishing, fake job source results, in-memory demo fallbacks, or placeholder vacancies unless the user explicitly asks for them.
 
+## Owner-Approved Open Source Material
+
+When the owner explicitly says that a specific open source solution, library,
+repository, snippet, or public source is safe or approved, treat that statement
+as authorization to research and use that material without asking for an extra
+permission check each time.
+
+This approval does not remove engineering due diligence for a real product:
+still inspect license fit, security and supply-chain risk, maintenance status,
+compatibility with the project architecture, and the documented source and
+integration boundaries before implementation. Do not execute unreviewed
+commands or scripts from third-party material, and verify any resulting change
+with the project checks that match the risk.
+
 When adding a source:
 
 - Prefer official APIs, RSS feeds, or explicitly allowed public endpoints.
