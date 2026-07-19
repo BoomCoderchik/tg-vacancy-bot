@@ -85,7 +85,7 @@ def test_result_to_candidate_accepts_url_without_search_metadata() -> None:
         (1, "qdr:h"),
         (24, "qdr:d"),
         (25, "qdr:w"),
-        (120, "qdr:w"),
+        (240, "qdr:m"),
     ],
 )
 def test_google_recency_filter_uses_the_narrowest_supported_window(
@@ -117,7 +117,7 @@ def test_serpapi_discovery_requests_a_server_side_recency_window(monkeypatch) ->
     settings = Settings(
         SERPAPI_API_KEY="test-key",
         LINKEDIN_POST_SEARCH_QUERY="custom query",
-        LINKEDIN_POST_MAX_AGE_HOURS=120,
+        LINKEDIN_POST_MAX_AGE_HOURS=240,
     )
 
     assert asyncio.run(LinkedInPostSearchAdapter(settings).discover(limit=2)) == []
@@ -128,7 +128,7 @@ def test_serpapi_discovery_requests_a_server_side_recency_window(monkeypatch) ->
             "q": "custom query",
             "num": 2,
             "hl": "ru",
-            "tbs": "qdr:w",
+            "tbs": "qdr:m",
         }
     ]
 
@@ -155,12 +155,12 @@ def test_serper_discovery_requests_a_server_side_recency_window(monkeypatch) -> 
     settings = Settings(
         SERPER_API_KEY="test-key",
         LINKEDIN_POST_SEARCH_QUERY="custom query",
-        LINKEDIN_POST_MAX_AGE_HOURS=120,
+        LINKEDIN_POST_MAX_AGE_HOURS=240,
     )
 
     assert asyncio.run(LinkedInPostSerperAdapter(settings).discover(limit=2)) == []
     assert captured_payloads == [
-        {"q": "custom query", "num": 2, "hl": "ru", "tbs": "qdr:w"}
+        {"q": "custom query", "num": 2, "hl": "ru", "tbs": "qdr:m"}
     ]
 
 
@@ -297,7 +297,7 @@ def test_headless_prioritizes_undated_candidate_before_known_stale_candidate(mon
         SERPAPI_API_KEY="serpapi-key",
         SERPER_API_KEY="",
         LINKEDIN_POST_HEADLESS_QUERY="stale query || undated query",
-        LINKEDIN_POST_MAX_AGE_HOURS=120,
+        LINKEDIN_POST_MAX_AGE_HOURS=240,
     )
 
     urls = asyncio.run(LinkedInPostHeadlessAdapter(settings)._discover_keyed_post_urls(limit=1))

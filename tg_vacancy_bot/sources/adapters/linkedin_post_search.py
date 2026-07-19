@@ -122,7 +122,7 @@ class LinkedInPostSearchAdapter(SourceAdapter):
                     "hl": "ru",
                     # Google only supports coarse date windows. The common
                     # freshness filter below still enforces the exact
-                    # configured five-day (or shorter) limit.
+                    # configured ten-day (or shorter) limit.
                     "tbs": _google_recency_filter(self.settings.linkedin_post_max_age_hours),
                 }
                 payload = await _get_search_payload(session, SERPAPI_SEARCH_URL, params=params)

@@ -198,7 +198,7 @@ def test_diagnostics_counts_fresh_stale_and_undated_candidates(monkeypatch) -> N
         SERPAPI_API_KEY="secret",
         SERPER_API_KEY="",
         LINKEDIN_POST_HEADLESS_QUERY="custom query",
-        LINKEDIN_POST_MAX_AGE_HOURS=120,
+        LINKEDIN_POST_MAX_AGE_HOURS=240,
     )
 
     report = asyncio.run(collect_linkedin_diagnostics(settings, limit=10))

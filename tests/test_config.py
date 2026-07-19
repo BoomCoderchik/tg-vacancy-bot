@@ -167,20 +167,20 @@ def test_settings_reads_xcrawl_x_post_options() -> None:
     assert settings.xcrawl_x_pages == 2
 
 
-def test_settings_limits_linkedin_post_age_to_five_days() -> None:
+def test_settings_limits_linkedin_post_age_to_ten_days() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
-        LINKEDIN_POST_MAX_AGE_HOURS="120",
+        LINKEDIN_POST_MAX_AGE_HOURS="240",
     )
 
-    assert settings.linkedin_post_max_age_hours == 120
+    assert settings.linkedin_post_max_age_hours == 240
 
     with pytest.raises(ValidationError):
         Settings(
             TELEGRAM_BOT_TOKEN="token",
             TARGET_CHAT_ID="@target",
-            LINKEDIN_POST_MAX_AGE_HOURS="121",
+            LINKEDIN_POST_MAX_AGE_HOURS="241",
         )
 
 

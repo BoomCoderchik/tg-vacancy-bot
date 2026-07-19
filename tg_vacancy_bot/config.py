@@ -76,8 +76,8 @@ class Settings(BaseSettings):
         alias="LINKEDIN_HEADLESS_PERMISSION_REFERENCE",
     )
     # LinkedIn posts must have a verifiable publication date and remain no more
-    # than five days old. A lower value is allowed, but never a longer window.
-    linkedin_post_max_age_hours: int = Field(default=120, alias="LINKEDIN_POST_MAX_AGE_HOURS", gt=0, le=120)
+    # than ten days old. A lower value is allowed, but never a longer window.
+    linkedin_post_max_age_hours: int = Field(default=240, alias="LINKEDIN_POST_MAX_AGE_HOURS", gt=0, le=240)
     serpapi_api_key: str = Field(default="", alias="SERPAPI_API_KEY")
     serper_api_key: str = Field(default="", alias="SERPER_API_KEY")
     linkedin_post_search_query: str = Field(

@@ -22,7 +22,7 @@ DATABASE_PATH=data/vacancies.sqlite3
 SOURCE_POLL_INTERVAL_SECONDS=60
 SOURCE_MAX_PUBLISH_PER_POLL=20
 SOURCE_MAX_AGE_HOURS=48
-LINKEDIN_POST_MAX_AGE_HOURS=120
+LINKEDIN_POST_MAX_AGE_HOURS=240
 ```
 
 Sixty-second polling is near-real-time for ordinary job APIs. Instant delivery
@@ -65,7 +65,7 @@ DATABASE_PATH=data/vacancies.sqlite3
 SOURCE_POLL_INTERVAL_SECONDS=60
 SOURCE_MAX_PUBLISH_PER_POLL=20
 SOURCE_MAX_AGE_HOURS=48
-LINKEDIN_POST_MAX_AGE_HOURS=120
+LINKEDIN_POST_MAX_AGE_HOURS=240
 ```
 
 Validate the real Telegram integration before starting the service:

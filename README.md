@@ -50,7 +50,7 @@ For an always-on vacancy parser, run the bot continuously with source polling en
 SOURCE_POLL_INTERVAL_SECONDS=60
 SOURCE_MAX_AGE_HOURS=48
 SOURCE_MAX_PUBLISH_PER_POLL=20
-LINKEDIN_POST_MAX_AGE_HOURS=120
+LINKEDIN_POST_MAX_AGE_HOURS=240
 ```
 
 The bot does not wait for manual forwarding in this mode. It polls real configured sources, publishes vacancies that are new to the bot, skips repeats through SQLite deduplication, and drops dated source vacancies older than `SOURCE_MAX_AGE_HOURS`. Vacancies from sources without a publication date are not assigned a fake date; they rely on source ordering, the publish limit, and deduplication.
@@ -70,7 +70,7 @@ LINKEDIN_POST_SEARCH_QUERY=(site:linkedin.com/posts OR site:linkedin.com/feed/up
 LINKEDIN_POST_SEARCH_RESULTS_WANTED=10
 ```
 
-This source uses SerpApi or Serper Google Search results for publicly indexed LinkedIn post URLs worldwide. It publishes only real search results with a short snippet-based summary and the LinkedIn post link. Every LinkedIn result needs a reliable publication date and is rejected once it is older than `LINKEDIN_POST_MAX_AGE_HOURS` (maximum 120 hours). Use `||` to separate fallback search queries when you want the keyed provider to try several hiring-post searches. If neither `SERPAPI_API_KEY` nor `SERPER_API_KEY` is set, the source is not registered.
+This source uses SerpApi or Serper Google Search results for publicly indexed LinkedIn post URLs worldwide. It publishes only real search results with a short snippet-based summary and the LinkedIn post link. Every LinkedIn result needs a reliable publication date and is rejected once it is older than `LINKEDIN_POST_MAX_AGE_HOURS` (maximum 240 hours / 10 days). Use `||` to separate fallback search queries when you want the keyed provider to try several hiring-post searches. If neither `SERPAPI_API_KEY` nor `SERPER_API_KEY` is set, the source is not registered.
 
 ## Free LinkedIn Hiring Post Scraper
 
@@ -85,7 +85,7 @@ LINKEDIN_POST_SCRAPER_RESULTS_WANTED=100
 
 This source reads public search results and keeps only real `linkedin.com/posts/...` and `linkedin.com/feed/update/...` links. It tries Bing RSS first, then public search-result HTML providers. It does not require an API key and does not create placeholder vacancies. Use `||` to separate fallback search queries. Because the HTML fallback depends on public search-result markup, it can be less stable than SerpApi and may return no rows when the search engine changes HTML or rate-limits requests. If an HTML provider returns a CAPTCHA or anti-bot page, the scraper skips that provider rather than bypassing the protection.
 
-The scraper searches public, globally indexed results. It keeps only results with a reliable publication date (from the search result or the LinkedIn activity ID) and rejects posts older than `LINKEDIN_POST_MAX_AGE_HOURS` (maximum 120 hours) before they reach the common polling layer.
+The scraper searches public, globally indexed results. It keeps only results with a reliable publication date (from the search result or the LinkedIn activity ID) and rejects posts older than `LINKEDIN_POST_MAX_AGE_HOURS` (maximum 240 hours / 10 days) before they reach the common polling layer.
 The search depth is intentionally larger than the per-cycle publication budget: SQLite deduplication lets later polls publish the remaining fresh posts. Every source vacancy is localized to Russian before publication.
 
 ## XCrawl X Posts
@@ -129,7 +129,7 @@ tg-vacancy-bot diagnose-linkedin --use-default-profile --limit 10 --show-limit 5
 
 The report shows configured-provider status, candidate and unique URL counts, and the permission-gate state. When a provider rejects every request, it reports only a safe HTTP status class (for example, `Http429`) rather than a secret-bearing request URL or response body. It never launches Playwright, creates a Telegram publisher, writes publication state, prints search snippets, or exposes API keys.
 
-Direct page reading is fail-closed: both `LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=true` and a non-empty `LINKEDIN_HEADLESS_PERMISSION_REFERENCE` are required. Set them only after receiving documented LinkedIn crawling permission or an approved access path. The adapter does not use a LinkedIn account, cookies, proxies, fake identities, scrolling automation, or any CAPTCHA/login/2FA bypass. It publishes only posts whose public page contains extractable text, whose activity URL has a reliable publication date, and whose date is no more than five days old. A login, protection page, or off-domain redirect is skipped without a snippet fallback. On GitHub Actions, Chromium is installed only when the same permission gate is satisfied.
+Direct page reading is fail-closed: both `LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=true` and a non-empty `LINKEDIN_HEADLESS_PERMISSION_REFERENCE` are required. Set them only after receiving documented LinkedIn crawling permission or an approved access path. The adapter does not use a LinkedIn account, cookies, proxies, fake identities, scrolling automation, or any CAPTCHA/login/2FA bypass. It publishes only posts whose public page contains extractable text, whose activity URL has a reliable publication date, and whose date is no more than ten days old. A login, protection page, or off-domain redirect is skipped without a snippet fallback. On GitHub Actions, Chromium is installed only when the same permission gate is satisfied.
 
 ## Required Telegram Setup
 
