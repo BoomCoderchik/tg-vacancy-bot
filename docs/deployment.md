@@ -179,6 +179,11 @@ Optional secrets can override defaults, including `SOURCE_MAX_PUBLISH_PER_POLL`,
 `GROQ_API_KEY` when `LOCALIZATION_PROVIDER=groq` to enable actual translation.
 The workflow still publishes a real vacancy with its original description if the selected provider is unavailable. The scheduled workflow installs Chromium for LinkedIn page reading only when the headless flag, authorization flag, and permission reference are all configured.
 
+Leave `LINKEDIN_POST_HEADLESS_QUERY` unset to use the built-in rotating Russian/
+English development-role profile. `LINKEDIN_POST_SEARCH_INTENTS_PER_CYCLE`
+defaults to `6`, which covers all 24 built-in intents over four 15-minute runs.
+Set a custom `||`-separated query only as an intentional override.
+
 The workflow stores the SQLite deduplication database in `data/` and restores it
 through the GitHub Actions cache. Keep only one production scheduler active for
 the same Telegram channel unless all schedulers share the same database; a VM

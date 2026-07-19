@@ -101,6 +101,23 @@ def test_diagnose_linkedin_runs_without_runtime_or_publisher(capsys, monkeypatch
     assert "unique=0" in output
 
 
+def test_diagnose_linkedin_can_force_default_profile(capsys, monkeypatch) -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="",
+        TARGET_CHAT_ID="",
+        SERPAPI_API_KEY="",
+        SERPER_API_KEY="",
+        LINKEDIN_POST_HEADLESS_QUERY="custom query",
+    )
+    monkeypatch.setattr("tg_vacancy_bot.app.get_settings", lambda: settings)
+
+    main(["diagnose-linkedin", "--use-default-profile", "--show-limit", "0"])
+
+    output = capsys.readouterr().out
+    assert "stage=discovery status=misconfigured" in output
+    assert "profile_intents=6/24" in output
+
+
 def test_check_sources_reports_registered_linkedin_post_search_without_exposing_key(
     capsys,
     monkeypatch,

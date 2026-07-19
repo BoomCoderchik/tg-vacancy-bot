@@ -45,6 +45,8 @@ def test_poll_sources_workflow_defaults_optional_runtime_values() -> None:
     assert "ENABLE_LINKEDIN_POST_SCRAPER: ${{ secrets.ENABLE_LINKEDIN_POST_SCRAPER || 'false' }}" in text
     assert "LINKEDIN_HEADLESS_ACCESS_AUTHORIZED: ${{ secrets.LINKEDIN_HEADLESS_ACCESS_AUTHORIZED || 'false' }}" in text
     assert "LINKEDIN_HEADLESS_PERMISSION_REFERENCE: ${{ secrets.LINKEDIN_HEADLESS_PERMISSION_REFERENCE }}" in text
+    assert "LINKEDIN_POST_HEADLESS_QUERY: ${{ secrets.LINKEDIN_POST_HEADLESS_QUERY }}" in text
+    assert "LINKEDIN_POST_SEARCH_INTENTS_PER_CYCLE: ${{ secrets.LINKEDIN_POST_SEARCH_INTENTS_PER_CYCLE || '6' }}" in text
     assert "LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS: ${{ secrets.LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS || 'bing_rss,duckduckgo,bing' }}" in text
     assert "SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}" in text
     assert "LINKEDIN_POST_SEARCH_QUERY: ${{ secrets.LINKEDIN_POST_SEARCH_QUERY ||" in text

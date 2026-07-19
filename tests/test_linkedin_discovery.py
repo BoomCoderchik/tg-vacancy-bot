@@ -1,5 +1,7 @@
 import asyncio
+from datetime import UTC, datetime
 from types import SimpleNamespace
+from contextlib import asynccontextmanager
 
 import aiohttp
 import pytest
@@ -11,7 +13,15 @@ from tg_vacancy_bot.sources.adapters.linkedin_post_search import (
     LinkedInPostCandidate,
     _canonicalize_linkedin_post_url,
     _get_search_payload,
+    _google_recency_filter,
     _result_to_candidate,
+    LinkedInSearchProviderError,
+    LinkedInPostSearchAdapter,
+    LinkedInPostSerperAdapter,
+)
+from tg_vacancy_bot.sources.linkedin_search_profile import (
+    DEFAULT_SEARCH_INTENTS,
+    select_cycle_intents,
 )
 
 
@@ -69,18 +79,105 @@ def test_result_to_candidate_accepts_url_without_search_metadata() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("max_age_hours", "expected"),
+    [
+        (1, "qdr:h"),
+        (24, "qdr:d"),
+        (25, "qdr:w"),
+        (120, "qdr:w"),
+    ],
+)
+def test_google_recency_filter_uses_the_narrowest_supported_window(
+    max_age_hours: int,
+    expected: str,
+) -> None:
+    assert _google_recency_filter(max_age_hours) == expected
+
+
+def test_serpapi_discovery_requests_a_server_side_recency_window(monkeypatch) -> None:
+    captured_params: list[dict[str, object]] = []
+
+    @asynccontextmanager
+    async def fake_source_session(*args: object, **kwargs: object):
+        yield object()
+
+    async def fake_get_search_payload(session: object, url: str, *, params: dict[str, object]):
+        captured_params.append(params)
+        return {"organic_results": []}
+
+    monkeypatch.setattr(
+        "tg_vacancy_bot.sources.adapters.linkedin_post_search.source_session",
+        fake_source_session,
+    )
+    monkeypatch.setattr(
+        "tg_vacancy_bot.sources.adapters.linkedin_post_search._get_search_payload",
+        fake_get_search_payload,
+    )
+    settings = Settings(
+        SERPAPI_API_KEY="test-key",
+        LINKEDIN_POST_SEARCH_QUERY="custom query",
+        LINKEDIN_POST_MAX_AGE_HOURS=120,
+    )
+
+    assert asyncio.run(LinkedInPostSearchAdapter(settings).discover(limit=2)) == []
+    assert captured_params == [
+        {
+            "engine": "google",
+            "api_key": "test-key",
+            "q": "custom query",
+            "num": 2,
+            "hl": "ru",
+            "tbs": "qdr:w",
+        }
+    ]
+
+
+def test_serper_discovery_requests_a_server_side_recency_window(monkeypatch) -> None:
+    captured_payloads: list[dict[str, object]] = []
+
+    @asynccontextmanager
+    async def fake_source_session(*args: object, **kwargs: object):
+        yield object()
+
+    async def fake_post_search_payload(session: object, url: str, *, payload: dict[str, object]):
+        captured_payloads.append(payload)
+        return {"organic": []}
+
+    monkeypatch.setattr(
+        "tg_vacancy_bot.sources.adapters.linkedin_post_search.source_session",
+        fake_source_session,
+    )
+    monkeypatch.setattr(
+        "tg_vacancy_bot.sources.adapters.linkedin_post_search._post_search_payload",
+        fake_post_search_payload,
+    )
+    settings = Settings(
+        SERPER_API_KEY="test-key",
+        LINKEDIN_POST_SEARCH_QUERY="custom query",
+        LINKEDIN_POST_MAX_AGE_HOURS=120,
+    )
+
+    assert asyncio.run(LinkedInPostSerperAdapter(settings).discover(limit=2)) == []
+    assert captured_payloads == [
+        {"q": "custom query", "num": 2, "hl": "ru", "tbs": "qdr:w"}
+    ]
+
+
 def test_headless_keyed_discovery_preserves_candidate_without_date_or_snippet(monkeypatch) -> None:
-    calls: list[int | None] = []
+    calls: list[tuple[int | None, str]] = []
+    current_time = datetime(2026, 7, 19, 12, 0, tzinfo=UTC)
 
     class FakeSearchProvider:
         def __init__(self, settings: Settings) -> None:
             self.settings = settings
 
         async def discover(self, *, limit: int | None = None) -> list[LinkedInPostCandidate]:
-            calls.append(limit)
+            calls.append((limit, self.settings.linkedin_post_search_query))
             return [_candidate()]
 
     monkeypatch.setattr(linkedin_post_headless, "LinkedInPostSearchAdapter", FakeSearchProvider)
+    monkeypatch.setattr(linkedin_post_headless, "utcnow", lambda: current_time)
     settings = Settings(
         ENABLE_ARBEITNOW=False,
         ENABLE_WORKING_NOMADS=False,
@@ -90,8 +187,13 @@ def test_headless_keyed_discovery_preserves_candidate_without_date_or_snippet(mo
 
     urls = asyncio.run(LinkedInPostHeadlessAdapter(settings)._discover_keyed_post_urls(limit=5))
 
+    expected_intents = select_cycle_intents(
+        DEFAULT_SEARCH_INTENTS,
+        max_intents=6,
+        cycle_index=linkedin_post_headless._search_cycle_index(current_time),
+    )
     assert urls == (POST_URL,)
-    assert calls == [5]
+    assert calls == [(1, intent.query) for intent in expected_intents]
 
 
 def test_headless_keyed_discovery_deduplicates_urls_across_providers(monkeypatch) -> None:
@@ -109,6 +211,7 @@ def test_headless_keyed_discovery_deduplicates_urls_across_providers(monkeypatch
         ENABLE_WORKING_NOMADS=False,
         SERPAPI_API_KEY="serpapi-key",
         SERPER_API_KEY="serper-key",
+        LINKEDIN_POST_HEADLESS_QUERY="custom query",
     )
 
     urls = asyncio.run(LinkedInPostHeadlessAdapter(settings)._discover_keyed_post_urls(limit=5))
@@ -137,11 +240,69 @@ def test_headless_keyed_discovery_continues_after_provider_failure(monkeypatch) 
 
     monkeypatch.setattr(linkedin_post_headless, "LinkedInPostSearchAdapter", FailingProvider)
     monkeypatch.setattr(linkedin_post_headless, "LinkedInPostSerperAdapter", WorkingProvider)
-    settings = Settings(SERPAPI_API_KEY="serpapi-key", SERPER_API_KEY="serper-key")
+    settings = Settings(
+        SERPAPI_API_KEY="serpapi-key",
+        SERPER_API_KEY="serper-key",
+        LINKEDIN_POST_HEADLESS_QUERY="custom query",
+    )
 
     urls = asyncio.run(LinkedInPostHeadlessAdapter(settings)._discover_keyed_post_urls(limit=5))
 
     assert urls == (POST_URL,)
+
+
+def test_headless_prioritizes_newest_candidates_across_query_families(monkeypatch) -> None:
+    older_url = "https://www.linkedin.com/posts/older_activity-7435364783379341312-example"
+    newer_url = "https://www.linkedin.com/posts/newer_activity-7483822807449600000-example"
+
+    class FakeProvider:
+        def __init__(self, settings: Settings) -> None:
+            self.settings = settings
+
+        async def discover(self, *, limit: int | None = None) -> list[LinkedInPostCandidate]:
+            url = older_url if self.settings.linkedin_post_search_query == "older query" else newer_url
+            return [_candidate(url)]
+
+    monkeypatch.setattr(linkedin_post_headless, "LinkedInPostSearchAdapter", FakeProvider)
+    settings = Settings(
+        SERPAPI_API_KEY="serpapi-key",
+        SERPER_API_KEY="",
+        LINKEDIN_POST_HEADLESS_QUERY="older query || newer query",
+    )
+
+    urls = asyncio.run(LinkedInPostHeadlessAdapter(settings)._discover_keyed_post_urls(limit=1))
+
+    assert urls == (newer_url,)
+
+
+def test_headless_prioritizes_undated_candidate_before_known_stale_candidate(monkeypatch) -> None:
+    stale_url = "https://www.linkedin.com/posts/old_activity-7435364783379341312-example"
+    undated_url = "https://www.linkedin.com/posts/no-date-example"
+
+    class FakeProvider:
+        def __init__(self, settings: Settings) -> None:
+            self.settings = settings
+
+        async def discover(self, *, limit: int | None = None) -> list[LinkedInPostCandidate]:
+            url = stale_url if self.settings.linkedin_post_search_query == "stale query" else undated_url
+            return [_candidate(url)]
+
+    monkeypatch.setattr(linkedin_post_headless, "LinkedInPostSearchAdapter", FakeProvider)
+    monkeypatch.setattr(
+        linkedin_post_headless,
+        "utcnow",
+        lambda: datetime(2026, 7, 19, 12, 0, tzinfo=UTC),
+    )
+    settings = Settings(
+        SERPAPI_API_KEY="serpapi-key",
+        SERPER_API_KEY="",
+        LINKEDIN_POST_HEADLESS_QUERY="stale query || undated query",
+        LINKEDIN_POST_MAX_AGE_HOURS=120,
+    )
+
+    urls = asyncio.run(LinkedInPostHeadlessAdapter(settings)._discover_keyed_post_urls(limit=1))
+
+    assert urls == (undated_url,)
 
 
 def test_headless_rejects_off_domain_redirect_before_reading_content() -> None:
@@ -249,7 +410,7 @@ def test_search_provider_error_does_not_expose_api_key() -> None:
         def get(self, url: str, *, params: dict):
             return FailingResponse()
 
-    with pytest.raises(RuntimeError) as exc_info:
+    with pytest.raises(LinkedInSearchProviderError) as exc_info:
         asyncio.run(
             _get_search_payload(
                 FailingSession(),
@@ -259,4 +420,6 @@ def test_search_provider_error_does_not_expose_api_key() -> None:
         )
 
     assert secret not in str(exc_info.value)
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.failure_type == ""
     assert exc_info.value.__suppress_context__ is True

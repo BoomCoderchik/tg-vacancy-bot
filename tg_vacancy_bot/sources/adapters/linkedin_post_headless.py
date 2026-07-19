@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
 from bs4 import BeautifulSoup
@@ -16,11 +17,16 @@ from tg_vacancy_bot.sources.adapters.linkedin_post_search import (
     LinkedInPostSearchAdapter,
     LinkedInPostSerperAdapter,
     _canonicalize_linkedin_post_url,
+    _published_at_for_result,
     _post_title,
-    _search_queries,
     _stack_from_text,
 )
 from tg_vacancy_bot.sources.freshness import filter_fresh_vacancies
+from tg_vacancy_bot.sources.linkedin_search_profile import (
+    fair_query_limits,
+    select_cycle_intents,
+    select_search_intents,
+)
 
 
 BING_SEARCH_URL = "https://www.bing.com/search"
@@ -90,34 +96,65 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
         )
 
     async def _discover_keyed_post_urls(self, limit: int) -> tuple[str, ...]:
-        search_settings = self.settings.model_copy(
-            update={
-                "linkedin_post_search_query": self.settings.linkedin_post_headless_query,
-                "linkedin_post_search_results_wanted": limit,
-            }
-        )
-        providers = []
+        provider_types = []
         if self.settings.serpapi_api_key:
-            providers.append(LinkedInPostSearchAdapter(search_settings))
+            provider_types.append(LinkedInPostSearchAdapter)
         if self.settings.serper_api_key:
-            providers.append(LinkedInPostSerperAdapter(search_settings))
+            provider_types.append(LinkedInPostSerperAdapter)
 
+        current_time = utcnow()
+        all_intents = select_search_intents(self.settings.linkedin_post_headless_query)
+        intents = select_cycle_intents(
+            all_intents,
+            max_intents=self.settings.linkedin_post_search_intents_per_cycle,
+            cycle_index=_search_cycle_index(current_time),
+        )
+        discovery_budget = max(limit, len(intents))
+        query_limits = fair_query_limits(discovery_budget, intents)
         candidates: list[LinkedInPostCandidate] = []
         seen_urls: set[str] = set()
-        for provider in providers:
-            try:
-                discovered = await provider.discover(limit=limit)
-            except Exception as exc:
-                logger.warning("%s discovery failed: %s", provider.name, type(exc).__name__)
+        for intent, query_limit in zip(intents, query_limits, strict=True):
+            if query_limit <= 0:
                 continue
-            for candidate in discovered:
-                if candidate.url in seen_urls:
+            search_settings = self.settings.model_copy(
+                update={
+                    "linkedin_post_search_query": intent.query,
+                    "linkedin_post_search_results_wanted": query_limit,
+                }
+            )
+            for provider_type in provider_types:
+                provider = provider_type(search_settings)
+                try:
+                    discovered = await provider.discover(limit=query_limit)
+                except Exception as exc:
+                    logger.warning("%s discovery failed: %s", provider.name, type(exc).__name__)
                     continue
-                seen_urls.add(candidate.url)
-                candidates.append(candidate)
-                if len(candidates) >= limit:
-                    return _post_urls_from_candidates(candidates, limit)
-        return _post_urls_from_candidates(candidates, limit)
+                new_for_intent = 0
+                for position, candidate in enumerate(discovered, start=1):
+                    if candidate.url in seen_urls:
+                        continue
+                    seen_urls.add(candidate.url)
+                    candidates.append(
+                        replace(
+                            candidate,
+                            family=intent.family,
+                            language=intent.language,
+                            position=candidate.position or position,
+                        )
+                    )
+                    new_for_intent += 1
+                if new_for_intent:
+                    break
+        prioritized = sorted(
+            candidates,
+            key=lambda candidate: _candidate_priority_key(
+                candidate,
+                current_time=current_time,
+                max_age_hours=self.settings.linkedin_post_max_age_hours,
+            ),
+            reverse=True,
+        )
+        return _post_urls_from_candidates(prioritized, limit)
 
     async def _discover_bing_post_urls(self, limit: int, timeout_ms: int) -> tuple[str, ...]:
         urls: list[str] = []
@@ -127,8 +164,14 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
             try:
                 search_page = await context.new_page()
                 search_page.set_default_timeout(timeout_ms)
-                for query in _search_queries(self.settings.linkedin_post_headless_query):
-                    for url in await _search_public_post_urls(search_page, query):
+                all_intents = select_search_intents(self.settings.linkedin_post_headless_query)
+                intents = select_cycle_intents(
+                    all_intents,
+                    max_intents=self.settings.linkedin_post_search_intents_per_cycle,
+                    cycle_index=_search_cycle_index(utcnow()),
+                )
+                for intent in intents:
+                    for url in await _search_public_post_urls(search_page, intent.query):
                         if url not in urls:
                             urls.append(url)
                         if len(urls) >= limit:
@@ -197,6 +240,23 @@ def _post_urls_from_candidates(
         if len(urls) >= limit:
             break
     return tuple(urls)
+
+
+def _candidate_priority_key(
+    candidate: LinkedInPostCandidate,
+    *,
+    current_time: datetime,
+    max_age_hours: int,
+) -> tuple[int, datetime]:
+    published_at = _published_at_for_result(candidate.date_text, candidate.url)
+    if published_at is None:
+        return (1, datetime.min.replace(tzinfo=UTC))
+    cutoff = current_time - timedelta(hours=max_age_hours)
+    return (2 if published_at >= cutoff else 0, published_at)
+
+
+def _search_cycle_index(current_time: datetime) -> int:
+    return int(current_time.timestamp() // (15 * 60))
 
 
 def _extract_post_text(html: str) -> str:

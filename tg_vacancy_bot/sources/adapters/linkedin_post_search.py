@@ -73,6 +73,19 @@ class LinkedInPostCandidate:
     date_text: str
     provider: str
     query: str
+    family: str = ""
+    language: str = ""
+    position: int = 0
+
+
+class LinkedInSearchProviderError(RuntimeError):
+    """Safe provider failure that preserves only a response status code."""
+
+    def __init__(self, status_code: int | None = None, failure_type: str = "") -> None:
+        self.status_code = status_code
+        self.failure_type = failure_type
+        detail = f" (HTTP {status_code})" if status_code is not None else ""
+        super().__init__(f"LinkedIn search provider request failed{detail}")
 
 
 class LinkedInPostSearchAdapter(SourceAdapter):
@@ -107,6 +120,10 @@ class LinkedInPostSearchAdapter(SourceAdapter):
                     "q": query,
                     "num": wanted,
                     "hl": "ru",
+                    # Google only supports coarse date windows. The common
+                    # freshness filter below still enforces the exact
+                    # configured five-day (or shorter) limit.
+                    "tbs": _google_recency_filter(self.settings.linkedin_post_max_age_hours),
                 }
                 payload = await _get_search_payload(session, SERPAPI_SEARCH_URL, params=params)
 
@@ -155,6 +172,7 @@ class LinkedInPostSerperAdapter(SourceAdapter):
                         "q": query,
                         "num": request_limit,
                         "hl": "ru",
+                        "tbs": _google_recency_filter(self.settings.linkedin_post_max_age_hours),
                     }
                     if page > 1:
                         payload["page"] = page
@@ -201,6 +219,7 @@ def _result_to_candidate(
     *,
     provider: str,
     query: str,
+    position: int = 0,
 ) -> LinkedInPostCandidate | None:
     search_title = _clean_title(_text(result, "title"))
     link = _canonicalize_linkedin_post_url(_text(result, "link"))
@@ -215,6 +234,7 @@ def _result_to_candidate(
         date_text=_text(result, "date"),
         provider=provider,
         query=query,
+        position=max(position, 0),
     )
 
 
@@ -244,6 +264,25 @@ def _filter_recent_linkedin_posts(vacancies: list[Vacancy], max_age_hours: int) 
     )
 
 
+def _google_recency_filter(max_age_hours: int) -> str:
+    """Return the narrowest supported Google ``tbs=qdr`` time window.
+
+    The caller must still verify every candidate date: Google can only express
+    hour/day/week/month/year ranges, while the configured LinkedIn boundary is
+    exact and may be as short as a few hours.
+    """
+
+    if max_age_hours <= 1:
+        return "qdr:h"
+    if max_age_hours <= 24:
+        return "qdr:d"
+    if max_age_hours <= 24 * 7:
+        return "qdr:w"
+    if max_age_hours <= 24 * 31:
+        return "qdr:m"
+    return "qdr:y"
+
+
 def _is_linkedin_post_url(link: str) -> bool:
     lower = link.lower()
     return any(marker in lower for marker in POST_URL_MARKERS)
@@ -271,8 +310,10 @@ async def _get_search_payload(session, url: str, *, params: Mapping[str, Any]) -
         async with session.get(url, params=params) as response:
             response.raise_for_status()
             payload = await response.json()
+    except aiohttp.ClientResponseError as exc:
+        raise LinkedInSearchProviderError(exc.status) from None
     except aiohttp.ClientError as exc:
-        raise RuntimeError(f"LinkedIn search provider request failed: {type(exc).__name__}") from None
+        raise LinkedInSearchProviderError(failure_type=type(exc).__name__) from None
     return payload if isinstance(payload, Mapping) else {}
 
 
@@ -281,8 +322,10 @@ async def _post_search_payload(session, url: str, *, payload: Mapping[str, Any])
         async with session.post(url, json=payload) as response:
             response.raise_for_status()
             response_payload = await response.json()
+    except aiohttp.ClientResponseError as exc:
+        raise LinkedInSearchProviderError(exc.status) from None
     except aiohttp.ClientError as exc:
-        raise RuntimeError(f"LinkedIn search provider request failed: {type(exc).__name__}") from None
+        raise LinkedInSearchProviderError(failure_type=type(exc).__name__) from None
     return response_payload if isinstance(response_payload, Mapping) else {}
 
 

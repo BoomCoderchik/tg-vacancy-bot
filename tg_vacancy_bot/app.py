@@ -59,6 +59,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=5,
         help="Maximum public LinkedIn URLs printed in the safe report.",
     )
+    diagnose_linkedin_parser.add_argument(
+        "--use-default-profile",
+        action="store_true",
+        help="Ignore a configured custom query and diagnose the built-in rotating role profile.",
+    )
     preview_sources_parser = subparsers.add_parser(
         "preview-sources",
         help="Fetch configured sources and print filtered candidates without publishing.",
@@ -172,7 +177,12 @@ def main(argv: Sequence[str] | None = None) -> None:
             return
 
         if args.command == "diagnose-linkedin":
-            report = asyncio.run(collect_linkedin_diagnostics(settings, limit=args.limit))
+            diagnostic_settings = (
+                settings.model_copy(update={"linkedin_post_headless_query": ""})
+                if args.use_default_profile
+                else settings
+            )
+            report = asyncio.run(collect_linkedin_diagnostics(diagnostic_settings, limit=args.limit))
             write_stdout(format_linkedin_diagnostics(report, show_limit=args.show_limit))
             return
 
