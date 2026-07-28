@@ -11,15 +11,23 @@ from tg_vacancy_bot.storage import VacancyStore
 
 
 class FakeBot:
-    async def get_me(self):
+    async def get_me(self, **kwargs):
+        assert kwargs["request_timeout"] == 15
         return SimpleNamespace(id=123456, username="queue_bot")
 
-    async def get_chat(self, chat_id):
+    async def get_chat(self, chat_id, **kwargs):
         assert chat_id == "@target"
+        assert kwargs["request_timeout"] == 15
         return SimpleNamespace(title="Vacancy Channel", full_name=None, id=-1001, type="channel")
 
-    async def get_webhook_info(self):
+    async def get_webhook_info(self, **kwargs):
+        assert kwargs["request_timeout"] == 15
         return SimpleNamespace(url="", pending_update_count=2)
+
+
+class TimeoutBot:
+    async def get_me(self, **kwargs):
+        raise TimeoutError
 
 
 def queue_settings(tmp_path) -> Settings:
@@ -84,3 +92,34 @@ def test_application_queue_diagnostics_accept_secret_resume_fallback(tmp_path) -
     )
 
     assert result.queue_resume_registered is True
+
+
+def test_application_queue_diagnostics_reports_telegram_timeout_without_failing(tmp_path) -> None:
+    settings = queue_settings(tmp_path).model_copy(
+        update={"application_queue_resume_file_id": "secret-file-id"}
+    )
+    store = VacancyStore(settings.database_path)
+    store.mark_published(
+        Vacancy(
+            title="Python Engineer",
+            description="Backend role",
+            source="Arbeitnow",
+            url="https://www.arbeitnow.com/jobs/example",
+        )
+    )
+
+    result = asyncio.run(
+        collect_application_queue_diagnostics(settings, bot=TimeoutBot(), store=store)
+    )
+    text = format_application_queue_diagnostics(result)
+
+    assert result.telegram_error == "TimeoutError"
+    assert result.bot_id is None
+    assert result.pending_update_count is None
+    assert result.published_vacancies == 1
+    assert result.queue_resume_registered is True
+    assert "Telegram API: unavailable (TimeoutError)" in text
+    assert "Pending Telegram updates: unknown" in text
+    assert "Published vacancies in SQLite: 1" in text
+    assert "secret-token" not in text
+    assert "secret-file-id" not in text
