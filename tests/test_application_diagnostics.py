@@ -38,7 +38,6 @@ def queue_settings(tmp_path) -> Settings:
         DATABASE_PATH=str(tmp_path / "vacancies.sqlite3"),
         APPLICATION_QUEUE_ENABLED="true",
         APPLICATION_AUTO_SUBMIT="true",
-        APPLICATION_ALLOWED_DOMAINS="arbeitnow.com",
         APPLICATION_QUEUE_PROFILE_FULL_NAME="Ada Lovelace",
         APPLICATION_QUEUE_PROFILE_EMAIL="ada@example.com",
     )
@@ -51,8 +50,8 @@ def test_application_queue_diagnostics_report_safe_runtime_state(tmp_path) -> No
         Vacancy(
             title="Python Engineer",
             description="Backend role",
-            source="Arbeitnow",
-            url="https://www.arbeitnow.com/jobs/example",
+            source="LinkedIn Hiring Post Scraper",
+            url="https://www.linkedin.com/posts/example_hiring-python-engineer-activity-7483822807449600000-hQ_1",
         )
     )
     store.save_operator_profile(
@@ -103,8 +102,8 @@ def test_application_queue_diagnostics_reports_telegram_timeout_without_failing(
         Vacancy(
             title="Python Engineer",
             description="Backend role",
-            source="Arbeitnow",
-            url="https://www.arbeitnow.com/jobs/example",
+            source="LinkedIn Hiring Post Scraper",
+            url="https://www.linkedin.com/posts/example_hiring-python-engineer-activity-7483822807449600000-hQ_1",
         )
     )
 

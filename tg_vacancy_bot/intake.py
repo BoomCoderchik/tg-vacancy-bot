@@ -24,7 +24,6 @@ JOB_TERMS = [
 VACANCY_DOMAINS = [
     "linkedin.com",
     "remotive.com",
-    "arbeitnow.com",
     "remoteok.com",
     "jooble.org",
     "adzuna.com",

@@ -28,7 +28,7 @@ class FakeStore:
 
 
 class FakeAdapter:
-    name = "Arbeitnow"
+    name = "LinkedIn Hiring Post Scraper"
 
     async def fetch(self) -> list[Vacancy]:
         return [
@@ -131,7 +131,7 @@ def test_poll_sources_once_skips_stale_published_vacancies(monkeypatch) -> None:
     )
 
     class StaleAdapter:
-        name = "Arbeitnow"
+        name = "LinkedIn Hiring Post Scraper"
 
         async def fetch(self) -> list[Vacancy]:
             return [

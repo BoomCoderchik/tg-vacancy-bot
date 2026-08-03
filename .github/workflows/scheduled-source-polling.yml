@@ -27,7 +27,6 @@ jobs:
       DATABASE_PATH: data/vacancies.sqlite3
       APPLICATION_QUEUE_ENABLED: ${{ secrets.APPLICATION_QUEUE_ENABLED || 'false' }}
       APPLICATION_AUTO_SUBMIT: ${{ secrets.APPLICATION_AUTO_SUBMIT || 'false' }}
-      APPLICATION_ALLOWED_DOMAINS: ${{ secrets.APPLICATION_ALLOWED_DOMAINS || 'arbeitnow.com' }}
       APPLICATION_QUEUE_PROFILE_FULL_NAME: ${{ secrets.APPLICATION_QUEUE_PROFILE_FULL_NAME }}
       APPLICATION_QUEUE_PROFILE_EMAIL: ${{ secrets.APPLICATION_QUEUE_PROFILE_EMAIL }}
       APPLICATION_QUEUE_PROFILE_PHONE: ${{ secrets.APPLICATION_QUEUE_PROFILE_PHONE }}
@@ -39,13 +38,6 @@ jobs:
       SOURCE_POLL_INTERVAL_SECONDS: "0"
       SOURCE_MAX_PUBLISH_PER_POLL: ${{ secrets.SOURCE_MAX_PUBLISH_PER_POLL || '20' }}
       SOURCE_MAX_AGE_HOURS: ${{ secrets.SOURCE_MAX_AGE_HOURS || '48' }}
-      ENABLE_ARBEITNOW: "true"
-      ENABLE_WORKING_NOMADS: "true"
-      ENABLE_XCRAWL_X_POSTS: ${{ secrets.ENABLE_XCRAWL_X_POSTS || 'false' }}
-      XCRAWL_API_KEY: ${{ secrets.XCRAWL_API_KEY }}
-      XCRAWL_X_HANDLES: ${{ secrets.XCRAWL_X_HANDLES }}
-      XCRAWL_X_MAX_TWEETS: ${{ secrets.XCRAWL_X_MAX_TWEETS || '20' }}
-      XCRAWL_X_PAGES: ${{ secrets.XCRAWL_X_PAGES || '1' }}
       ENABLE_LINKEDIN_POST_SEARCH: ${{ secrets.ENABLE_LINKEDIN_POST_SEARCH || 'false' }}
       SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
       SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
@@ -92,8 +84,8 @@ jobs:
       - name: Install bot
         run: pip install .
 
-      - name: Install Chromium for browser-backed sources or applications
-        if: (env.ENABLE_LINKEDIN_POST_HEADLESS == 'true' && env.LINKEDIN_HEADLESS_ACCESS_AUTHORIZED == 'true' && env.LINKEDIN_HEADLESS_PERMISSION_REFERENCE != '') || env.APPLICATION_QUEUE_ENABLED == 'true'
+      - name: Install Chromium for browser-backed sources
+        if: env.ENABLE_LINKEDIN_POST_HEADLESS == 'true' && env.LINKEDIN_HEADLESS_ACCESS_AUTHORIZED == 'true' && env.LINKEDIN_HEADLESS_PERMISSION_REFERENCE != ''
         run: python -m playwright install --with-deps chromium
 
       - name: Verify production card formatting

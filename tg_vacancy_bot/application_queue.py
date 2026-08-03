@@ -19,9 +19,7 @@ from .storage import VacancyStore
 
 logger = logging.getLogger(__name__)
 RETRYABLE_PRE_SUBMIT_STATUSES = frozenset({"created", "queued", "loading", "profile_missing"})
-RETRYABLE_PRE_SUBMIT_MANUAL_ERRORS = frozenset(
-    {"Arbeitnow redirected the application to an unsupported external site."}
-)
+RETRYABLE_PRE_SUBMIT_MANUAL_ERRORS = frozenset()
 QUEUE_RESUME_COMMAND = "/queue_resume"
 ALLOWED_RESUME_SUFFIXES = frozenset({".pdf", ".docx"})
 

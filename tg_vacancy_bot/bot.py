@@ -58,8 +58,6 @@ class ProfileForm(StatesGroup):
 
 def build_status_text(settings: Settings) -> str:
     source_states = [
-        f"Arbeitnow={'on' if settings.enable_arbeitnow else 'off'}",
-        f"WorkingNomads={'on' if settings.enable_working_nomads else 'off'}",
         f"LinkedInPosts={_linkedin_post_search_state(settings)}",
         f"LinkedInPostScraper={_linkedin_post_scraper_state(settings)}",
         f"LinkedInHeadless={_linkedin_headless_state(settings)}",
@@ -188,22 +186,6 @@ def _application_error_detail(error_description: str | None) -> str | None:
         (
             "no application adapter is registered for this site",
             "для этого сайта ещё нет поддерживаемого автозаполнения.",
-        ),
-        (
-            "arbeitnow redirected the application to an unsupported external site",
-            "Arbeitnow открыл внешнюю форму, которую бот пока не заполняет автоматически.",
-        ),
-        (
-            "arbeitnow application form has changed",
-            "разметка формы Arbeitnow отличается от ожидаемой.",
-        ),
-        (
-            "arbeitnow application form is ambiguous",
-            "на странице найдено несколько вариантов формы, и бот не может безопасно выбрать один.",
-        ),
-        (
-            "arbeitnow submit control has changed",
-            "кнопка отправки отличается от ожидаемой или недоступна.",
         ),
         (
             "success state could not be verified",

@@ -33,7 +33,6 @@ def test_settings_validates_application_queue_configuration() -> None:
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
         OPERATOR_USER_IDS="42",
-        APPLICATION_ALLOWED_DOMAINS="arbeitnow.com",
         APPLICATION_QUEUE_ENABLED="true",
         APPLICATION_AUTO_SUBMIT="true",
         APPLICATION_QUEUE_PROFILE_FULL_NAME="Ada Lovelace",
@@ -50,7 +49,6 @@ def test_settings_allows_queue_resume_to_be_registered_through_telegram() -> Non
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
         OPERATOR_USER_IDS="42",
-        APPLICATION_ALLOWED_DOMAINS="arbeitnow.com",
         APPLICATION_QUEUE_ENABLED="true",
         APPLICATION_AUTO_SUBMIT="true",
         APPLICATION_QUEUE_PROFILE_FULL_NAME="Ada Lovelace",
@@ -147,24 +145,6 @@ def test_settings_reads_linkedin_post_scraper_options() -> None:
     assert settings.linkedin_post_scraper_query == 'site:linkedin.com/posts "ищем" frontend'
     assert settings.linkedin_post_scraper_search_providers == ("bing_rss", "duckduckgo", "bing")
     assert settings.linkedin_post_scraper_results_wanted == 8
-
-
-def test_settings_reads_xcrawl_x_post_options() -> None:
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        ENABLE_XCRAWL_X_POSTS="true",
-        XCRAWL_API_KEY="xcrawl-test-key",
-        XCRAWL_X_HANDLES="@HiringAccount, hiringaccount, invalid-handle!, second_account",
-        XCRAWL_X_MAX_TWEETS="25",
-        XCRAWL_X_PAGES="2",
-    )
-
-    assert settings.enable_xcrawl_x_posts is True
-    assert settings.xcrawl_api_key == "xcrawl-test-key"
-    assert settings.xcrawl_x_handles == ("hiringaccount", "second_account")
-    assert settings.xcrawl_x_max_tweets == 25
-    assert settings.xcrawl_x_pages == 2
 
 
 def test_settings_limits_linkedin_post_age_to_ten_days() -> None:

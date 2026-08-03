@@ -2,21 +2,14 @@ from __future__ import annotations
 
 from tg_vacancy_bot.config import Settings
 
-from .adapters.arbeitnow import ArbeitnowAdapter
 from .adapters.linkedin_post_headless import LinkedInPostHeadlessAdapter
 from .adapters.linkedin_post_scraper import LinkedInPostScraperAdapter
 from .adapters.linkedin_post_search import LinkedInPostSearchAdapter, LinkedInPostSerperAdapter
-from .adapters.working_nomads import WorkingNomadsAdapter
-from .adapters.xcrawl_x_posts import XCrawlXPostsAdapter
 from .base import SourceAdapter
 
 
 def build_adapters(settings: Settings) -> list[SourceAdapter]:
     adapters: list[SourceAdapter] = []
-    if settings.enable_arbeitnow:
-        adapters.append(ArbeitnowAdapter())
-    if settings.enable_working_nomads:
-        adapters.append(WorkingNomadsAdapter())
     headless_requested = settings.enable_linkedin_post_headless
     headless_registered = (
         headless_requested
@@ -31,8 +24,6 @@ def build_adapters(settings: Settings) -> list[SourceAdapter]:
         adapters.append(LinkedInPostScraperAdapter(settings))
     if headless_registered:
         adapters.append(LinkedInPostHeadlessAdapter(settings))
-    if settings.enable_xcrawl_x_posts and settings.xcrawl_api_key and settings.xcrawl_x_handles:
-        adapters.append(XCrawlXPostsAdapter(settings))
     return adapters
 
 
@@ -69,11 +60,5 @@ def source_configuration_warnings(settings: Settings) -> list[str]:
         warnings.append(
             "LinkedIn Headless access is marked authorized but LINKEDIN_HEADLESS_PERMISSION_REFERENCE is empty; "
             "direct page reading remains disabled until the approval reference is recorded."
-        )
-    if settings.enable_xcrawl_x_posts and not settings.xcrawl_api_key:
-        warnings.append("XCrawl X Posts source is enabled but XCRAWL_API_KEY is missing.")
-    if settings.enable_xcrawl_x_posts and not settings.xcrawl_x_handles:
-        warnings.append(
-            "XCrawl X Posts source is enabled but XCRAWL_X_HANDLES has no valid X account handles."
         )
     return warnings

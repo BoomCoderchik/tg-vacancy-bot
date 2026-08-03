@@ -17,7 +17,6 @@ def queue_settings(tmp_path) -> Settings:
         TARGET_CHAT_ID="@target",
         OPERATOR_USER_IDS="42",
         DATABASE_PATH=str(tmp_path / "vacancies.sqlite3"),
-        APPLICATION_ALLOWED_DOMAINS="arbeitnow.com",
         APPLICATION_QUEUE_ENABLED="true",
         APPLICATION_AUTO_SUBMIT="true",
         APPLICATION_QUEUE_PROFILE_FULL_NAME="Ada Lovelace",
@@ -127,7 +126,7 @@ class ManualRequiredWorker:
         before_submit()
         return BrowserInspection(
             status="manual_required",
-            error="Arbeitnow application form has changed.",
+            error="No application adapter is registered for this site.",
         )
 
 
@@ -137,8 +136,8 @@ def test_queue_processes_callback_downloads_resume_and_submits(tmp_path) -> None
     vacancy = Vacancy(
         title="Python Engineer",
         description="Backend",
-        source="Arbeitnow",
-        url="https://www.arbeitnow.com/jobs/example",
+        source="LinkedIn Hiring Post Scraper",
+        url="https://www.linkedin.com/posts/example_hiring-python-engineer-activity-7483822807449600000-hQ_1",
     )
     store.mark_published(vacancy)
     bot = FakeBot([application_update(1, vacancy)])
@@ -169,8 +168,8 @@ def test_queue_reports_manual_reason_from_browser_worker(tmp_path) -> None:
     vacancy = Vacancy(
         title="Python Engineer",
         description="Backend",
-        source="Arbeitnow",
-        url="https://www.arbeitnow.com/jobs/example",
+        source="LinkedIn Hiring Post Scraper",
+        url="https://www.linkedin.com/posts/example_hiring-python-engineer-activity-7483822807449600000-hQ_1",
     )
     store.mark_published(vacancy)
     bot = FakeBot([application_update(1, vacancy)])
@@ -181,40 +180,8 @@ def test_queue_reports_manual_reason_from_browser_worker(tmp_path) -> None:
 
     assert result.manual_required == 1
     assert "Отклик подготовлен" in bot.messages[0]["text"]
-    assert "разметка формы Arbeitnow отличается" in bot.messages[1]["text"]
-    assert "Arbeitnow application form has changed" not in bot.messages[1]["text"]
-
-
-def test_queue_retries_legacy_arbeitnow_redirect_before_submit(tmp_path) -> None:
-    settings = queue_settings(tmp_path)
-    store = VacancyStore(settings.database_path)
-    vacancy = Vacancy(
-        title="Python Engineer",
-        description="Backend",
-        source="Arbeitnow",
-        url="https://www.arbeitnow.com/jobs/example",
-    )
-    store.mark_published(vacancy)
-    application, created = store.create_application(42, store.fingerprint(vacancy))
-    assert created is True
-    store.update_application_status(
-        application.application_id,
-        "manual_required",
-        "Arbeitnow redirected the application to an unsupported external site.",
-    )
-    bot = FakeBot([application_update(1, vacancy)])
-    worker = SubmittedWorker()
-
-    result = asyncio.run(
-        process_application_queue_once(settings, bot=bot, store=store, browser_worker=worker)
-    )
-
-    assert result.applications_processed == 1
-    assert result.submitted == 1
-    assert len(worker.calls) == 1
-    application, created = store.create_application(42, store.fingerprint(vacancy))
-    assert created is False
-    assert application.status == "submitted"
+    assert "для этого сайта ещё нет" in bot.messages[1]["text"]
+    assert "No application adapter is registered" not in bot.messages[1]["text"]
 
 
 def test_queue_does_not_retry_unverified_post_submit_result(tmp_path) -> None:
@@ -223,8 +190,8 @@ def test_queue_does_not_retry_unverified_post_submit_result(tmp_path) -> None:
     vacancy = Vacancy(
         title="Python Engineer",
         description="Backend",
-        source="Arbeitnow",
-        url="https://www.arbeitnow.com/jobs/example",
+        source="LinkedIn Hiring Post Scraper",
+        url="https://www.linkedin.com/posts/example_hiring-python-engineer-activity-7483822807449600000-hQ_1",
     )
     store.mark_published(vacancy)
     application, created = store.create_application(42, store.fingerprint(vacancy))
@@ -252,8 +219,8 @@ def test_queue_rejects_unauthorized_callback_without_browser(tmp_path) -> None:
     vacancy = Vacancy(
         title="Python Engineer",
         description="Backend",
-        source="Arbeitnow",
-        url="https://www.arbeitnow.com/jobs/example",
+        source="LinkedIn Hiring Post Scraper",
+        url="https://www.linkedin.com/posts/example_hiring-python-engineer-activity-7483822807449600000-hQ_1",
     )
     store.mark_published(vacancy)
     bot = FakeBot([application_update(1, vacancy, user_id=99)])
@@ -288,8 +255,8 @@ def test_queue_resume_document_replaces_manual_file_id_secret(tmp_path) -> None:
     vacancy = Vacancy(
         title="Python Engineer",
         description="Backend",
-        source="Arbeitnow",
-        url="https://www.arbeitnow.com/jobs/example",
+        source="LinkedIn Hiring Post Scraper",
+        url="https://www.linkedin.com/posts/example_hiring-python-engineer-activity-7483822807449600000-hQ_1",
     )
     store.mark_published(vacancy)
     bot = FakeBot(
@@ -342,8 +309,8 @@ def test_queue_without_resume_explains_how_to_upload_it(tmp_path) -> None:
     vacancy = Vacancy(
         title="Python Engineer",
         description="Backend",
-        source="Arbeitnow",
-        url="https://www.arbeitnow.com/jobs/example",
+        source="LinkedIn Hiring Post Scraper",
+        url="https://www.linkedin.com/posts/example_hiring-python-engineer-activity-7483822807449600000-hQ_1",
     )
     store.mark_published(vacancy)
     bot = FakeBot([application_update(1, vacancy)])
