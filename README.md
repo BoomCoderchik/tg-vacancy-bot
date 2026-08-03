@@ -2,7 +2,7 @@
 
 Telegram bot for collecting IT vacancies from forwarded messages and public job sources, then publishing them to a target Telegram channel in a compact card format.
 
-The planned profile and controlled application automation feature is documented in [`docs/application-automation-plan.md`](docs/application-automation-plan.md). The document contains the current implementation status, safety boundaries, staged architecture, and acceptance checks.
+The profile and queued-application foundations are documented in [`docs/application-queue.md`](docs/application-queue.md).
 
 ## What Works Now
 
@@ -13,7 +13,7 @@ The planned profile and controlled application automation feature is documented 
   - `copy`: copy the original message to the target channel after the same allowed-vacancy intake check.
 - Publishes only development/UI/UX/AI vacancies: backend, frontend, fullstack, UI/UX, LLM, AI, and clear software developer/engineer roles.
 - Stores message fingerprints in SQLite to avoid duplicates.
-- Includes Arbeitnow, Working Nomads, and opt-in LinkedIn hiring-post discovery. Arbeitnow supports verified form preparation; Working Nomads provides public vacancies with a manual employer-application link.
+- Includes opt-in LinkedIn hiring-post discovery through keyed search, free search-result scraping, and permission-gated headless public-post parsing.
 - Polls configured public sources in the background while the bot is running.
 
 ## Profile storage foundation
@@ -55,7 +55,7 @@ LINKEDIN_POST_MAX_AGE_HOURS=240
 
 The bot does not wait for manual forwarding in this mode. It polls real configured sources, publishes vacancies that are new to the bot, skips repeats through SQLite deduplication, and drops dated source vacancies older than `SOURCE_MAX_AGE_HOURS`. Vacancies from sources without a publication date are not assigned a fake date; they rely on source ordering, the publish limit, and deduplication.
 
-Sixty-second polling is near-real-time for ordinary job APIs. Truly instant publishing requires a source-provided webhook or stream.
+Sixty-second polling is near-real-time for the configured LinkedIn discovery providers. Truly instant publishing requires a source-provided webhook or stream.
 
 ## LinkedIn Hiring Post Discovery
 
@@ -87,20 +87,6 @@ This source reads public search results and keeps only real `linkedin.com/posts/
 
 The scraper searches public, globally indexed results. It keeps only results with a reliable publication date (from the search result or the LinkedIn activity ID) and rejects posts older than `LINKEDIN_POST_MAX_AGE_HOURS` (maximum 240 hours / 10 days) before they reach the common polling layer.
 The search depth is intentionally larger than the per-cycle publication budget: SQLite deduplication lets later polls publish the remaining fresh posts. Every source vacancy is localized to Russian before publication.
-
-## XCrawl X Posts
-
-To monitor selected public X accounts for suitable vacancies, configure XCrawl's real X User Tweets API:
-
-```dotenv
-ENABLE_XCRAWL_X_POSTS=true
-XCRAWL_API_KEY=
-XCRAWL_X_HANDLES=@account_one,@account_two
-XCRAWL_X_MAX_TWEETS=20
-XCRAWL_X_PAGES=1
-```
-
-`XCRAWL_X_HANDLES` is required because the API reads account timelines. The bot only keeps posts that meet the existing development/UI/UX/AI vacancy policy, gives each one a stable `x.com` post link for deduplication, and never logs in to X or bypasses protection. Put the same values in GitHub Actions secrets for scheduled polling; do not commit the key.
 
 ## Headless LinkedIn Hiring Post Parser
 
@@ -187,8 +173,8 @@ use:
 - `TARGET_CHAT_ID`
 - One localization key when `LOCALIZE_DESCRIPTIONS=true`: `OPENAI_API_KEY` for the default mode, or `GROQ_API_KEY` when `LOCALIZATION_PROVIDER=groq`.
 
-Optional source keys and toggles such as `SERPAPI_API_KEY`, `SERPER_API_KEY`, `XCRAWL_API_KEY`,
-`ENABLE_LINKEDIN_POST_*`, and `ENABLE_XCRAWL_X_POSTS` can also be configured as GitHub secrets. The workflow keeps `DATABASE_PATH` under
+Optional LinkedIn source keys and toggles such as `SERPAPI_API_KEY`, `SERPER_API_KEY`,
+and `ENABLE_LINKEDIN_POST_*` can also be configured as GitHub secrets. The workflow keeps `DATABASE_PATH` under
 `data/` and restores it with the GitHub Actions cache so source deduplication is
 preserved between scheduled runs.
 
@@ -206,7 +192,7 @@ factual result, and exits. Send a PDF/DOCX to the bot with the `/queue_resume` c
 register or replace the queue resume without copying its `file_id` into GitHub.
 This mode is opt-in and requires additional GitHub secrets. See
 [`docs/application-queue.md`](docs/application-queue.md) for setup, usage,
-privacy boundaries, expected delay, and the current JOIN/CAPTCHA limitation.
+privacy boundaries and expected delay.
 
 To check which sources are configured without publishing anything:
 
@@ -309,41 +295,24 @@ only a short vacancy ID in Telegram and resolves the original URL from SQLite;
 the button is intentionally unavailable for `FORWARDED_MODE=copy`, because a
 copied third-party message cannot safely receive the normalized card markup.
 After the button is processed, the bot sends the operator a persistent private
-`–û—Ç–∫–ª–∏–∫ –ø–æ–¥–≥–æ—Ç–æ–≤–ª–µ–Ω` message and then a factual result message. It says
-`–û—Ç–∫–ª–∏–∫ –æ—Ç–ø—Ä–∞–≤–ª–µ–Ω` only for a confirmed `submitted` status; prepared, manual,
+`ŒÚÍÎËÍ ÔÓ‰„ÓÚÓ‚ÎÂÌ` message and then a factual result message. It says
+`ŒÚÍÎËÍ ÓÚÔ‡‚ÎÂÌ` only for a confirmed `submitted` status; prepared, manual,
 incomplete-profile, cancelled, and failed attempts are explicitly reported as
 not sent. The operator must have opened the bot's private chat first so Telegram
 can deliver these notifications.
 
-## Arbeitnow application form
+## Application Queue
 
-The first supported form is Arbeitnow's inline application form on the public vacancy page. Put
-`APPLICATION_ALLOWED_DOMAINS=arbeitnow.com` in `.env`, complete `/profile` with a
-first and last name, email, and PDF/DOCX resume, then press `–û—Ç–∫–ª–∏–∫–Ω—É—Ç—å—Å—è` on an
-Arbeitnow card. The always-on bot fills only the verified fields and uploads the
-local resume, then stops before final submit. The opt-in GitHub Actions queue can
-submit only a verified direct Arbeitnow form and reports success only after the
-form disappears and Arbeitnow shows its explicit success message. The separate
-`company portal` link may redirect to JOIN, but the adapter does not use that link.
-Unknown forms, login, CAPTCHA, and 2FA still stop for manual action and are never
-reported as submitted.
+There are currently no source-specific automatic application form adapters. The queue remains for delayed callbacks and private resume storage, but unsupported forms are always reported as manual.
 
-## Working Nomads source
+## Removed Non-LinkedIn Sources
 
-Working Nomads is enabled by default through its public JSON feed:
+Automatic polling no longer registers non-LinkedIn job-board or social sources.
 
-```dotenv
-ENABLE_WORKING_NOMADS=true
-```
-
-The source needs no API key or Working Nomads account. Its `–û—Ç–∫–ª–∏–∫–Ω—É—Ç—å—Å—è` button
-stores the application attempt and sends the operator a link that redirects to
-the employer's actual form. The bot does not auto-fill or submit these varied
-external forms; a future adapter must be implemented and verified for each ATS
-or employer form separately.
+Only the LinkedIn post adapters described above can register as automatic public sources.
 
 ## LinkedIn Boundary
 
-This project permits three documented, opt-in LinkedIn paths: keyed Google Search-backed public hiring-post search through SerpApi or Serper, free public search-result scraping, and headless parsing of publicly available post pages found through Bing. It does not log in with a LinkedIn account, use proxies or anti-bot bypasses, invent vacancies, or publish fake fallback records when LinkedIn or a search provider blocks or returns no results.
+This project permits three documented, opt-in LinkedIn paths: keyed Google Search-backed public hiring-post search through SerpApi or Serper, free public search-result scraping, and headless parsing of publicly available post pages found through Bing. These are the only automatic public-source adapters. The bot does not log in with a LinkedIn account, use proxies or anti-bot bypasses, invent vacancies, or publish fake fallback records when LinkedIn or a search provider blocks or returns no results.
 
 LinkedIn links can also enter when an operator manually sends or forwards vacancy text containing a LinkedIn URL to the Telegram bot. In that case the normal forwarded-message parser can keep the URL and mark the vacancy source as `LinkedIn`.

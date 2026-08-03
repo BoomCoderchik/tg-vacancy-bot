@@ -1,4 +1,3 @@
-import asyncio
 from datetime import UTC, datetime
 
 import pytest
@@ -6,34 +5,17 @@ import pytest
 from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.sources import build_adapters, filter_it_vacancies, source_configuration_warnings
-from tg_vacancy_bot.sources.adapters.arbeitnow import ArbeitnowAdapter
 from tg_vacancy_bot.sources.adapters.linkedin_post_search import (
     _filter_recent_linkedin_posts,
     _result_to_vacancy as _search_result_to_vacancy,
 )
 from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import _rss_to_vacancies
-from tg_vacancy_bot.sources.adapters.working_nomads import WorkingNomadsAdapter
-from tg_vacancy_bot.sources.adapters.xcrawl_x_posts import XCrawlXPostsAdapter
 
 
-def test_build_adapters_registers_public_no_account_sources_by_default() -> None:
+def test_build_adapters_registers_no_non_linkedin_sources_by_default() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
-        ENABLE_LINKEDIN_POST_SEARCH=False,
-        ENABLE_LINKEDIN_POST_SCRAPER=False,
-        ENABLE_LINKEDIN_POST_HEADLESS=False,
-    )
-
-    assert [adapter.name for adapter in build_adapters(settings)] == ["Arbeitnow", "Working Nomads"]
-
-
-def test_build_adapters_allows_disabling_arbeitnow() -> None:
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        ENABLE_ARBEITNOW=False,
-        ENABLE_WORKING_NOMADS=False,
         ENABLE_LINKEDIN_POST_SEARCH=False,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
         ENABLE_LINKEDIN_POST_HEADLESS=False,
@@ -46,8 +28,6 @@ def test_build_adapters_keeps_opt_in_linkedin_scraper() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
-        ENABLE_ARBEITNOW=False,
-        ENABLE_WORKING_NOMADS=False,
         ENABLE_LINKEDIN_POST_SEARCH=False,
         ENABLE_LINKEDIN_POST_SCRAPER=True,
         ENABLE_LINKEDIN_POST_HEADLESS=False,
@@ -56,29 +36,10 @@ def test_build_adapters_keeps_opt_in_linkedin_scraper() -> None:
     assert [adapter.name for adapter in build_adapters(settings)] == ["LinkedIn Hiring Post Scraper"]
 
 
-def test_build_adapters_registers_xcrawl_x_posts_when_configured() -> None:
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        ENABLE_ARBEITNOW=False,
-        ENABLE_WORKING_NOMADS=False,
-        ENABLE_LINKEDIN_POST_SEARCH=False,
-        ENABLE_LINKEDIN_POST_SCRAPER=False,
-        ENABLE_LINKEDIN_POST_HEADLESS=False,
-        ENABLE_XCRAWL_X_POSTS=True,
-        XCRAWL_API_KEY="xcrawl-test-key",
-        XCRAWL_X_HANDLES="@hiringaccount",
-    )
-
-    assert [adapter.name for adapter in build_adapters(settings)] == ["XCrawl X Posts"]
-
-
 def test_build_adapters_keeps_headless_disabled_without_authorized_access() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
-        ENABLE_ARBEITNOW=False,
-        ENABLE_WORKING_NOMADS=False,
         ENABLE_LINKEDIN_POST_SEARCH=True,
         ENABLE_LINKEDIN_POST_SCRAPER=True,
         ENABLE_LINKEDIN_POST_HEADLESS=True,
@@ -93,8 +54,6 @@ def test_build_adapters_keeps_headless_disabled_without_permission_reference() -
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
-        ENABLE_ARBEITNOW=False,
-        ENABLE_WORKING_NOMADS=False,
         ENABLE_LINKEDIN_POST_SEARCH=False,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
         ENABLE_LINKEDIN_POST_HEADLESS=True,
@@ -110,8 +69,6 @@ def test_build_adapters_registers_only_headless_linkedin_pipeline_when_authorize
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
-        ENABLE_ARBEITNOW=False,
-        ENABLE_WORKING_NOMADS=False,
         ENABLE_LINKEDIN_POST_SEARCH=True,
         ENABLE_LINKEDIN_POST_SCRAPER=True,
         ENABLE_LINKEDIN_POST_HEADLESS=True,
@@ -124,124 +81,6 @@ def test_build_adapters_registers_only_headless_linkedin_pipeline_when_authorize
         "LinkedIn Hiring Posts (Headless)"
     ]
     assert not any("LinkedIn Hiring Posts source" in warning for warning in source_configuration_warnings(settings))
-
-
-def test_arbeitnow_adapter_maps_public_api_response(monkeypatch) -> None:
-    monkeypatch.setattr(
-        "tg_vacancy_bot.sources.adapters.arbeitnow.source_session",
-        lambda: _FakeSession(
-            {
-                "data": [
-                    {
-                        "title": "Senior Python Developer",
-                        "company_name": "Example Co",
-                        "location": "Berlin",
-                        "description": "<p>Build Python APIs with FastAPI.</p>",
-                        "tags": ["Python", "Remote"],
-                        "url": "https://www.arbeitnow.com/view/example",
-                        "created_at": 1783355102,
-                    }
-                ]
-            }
-        ),
-    )
-
-    vacancies = asyncio.run(ArbeitnowAdapter().fetch())
-
-    assert vacancies == [
-        Vacancy(
-            title="Senior Python Developer",
-            company="Example Co",
-            location="Berlin",
-            description="Build Python APIs with FastAPI.",
-            source="Arbeitnow",
-            url="https://www.arbeitnow.com/view/example",
-            stack=("Python", "Remote", "FastAPI"),
-            published_at=datetime(2026, 7, 6, 16, 25, 2, tzinfo=UTC),
-            raw_text="Build Python APIs with FastAPI.",
-        )
-    ]
-
-
-def test_working_nomads_adapter_maps_public_api_response(monkeypatch) -> None:
-    monkeypatch.setattr(
-        "tg_vacancy_bot.sources.adapters.working_nomads.source_session",
-        lambda: _FakeSession(
-            [
-                {
-                    "title": "Senior Python Developer",
-                    "company_name": "Example Co",
-                    "location": "Remote - Europe",
-                    "description": "<p>Build Python APIs with FastAPI.</p>",
-                    "tags": "python, backend",
-                    "url": "https://www.workingnomads.com/job/go/123/",
-                    "pub_date": "2026-07-10T09:24:39-04:00",
-                }
-            ]
-        ),
-    )
-
-    vacancies = asyncio.run(WorkingNomadsAdapter().fetch())
-
-    assert vacancies == [
-        Vacancy(
-            title="Senior Python Developer",
-            company="Example Co",
-            location="Remote - Europe",
-            description="Build Python APIs with FastAPI.",
-            source="Working Nomads",
-            url="https://www.workingnomads.com/job/go/123/",
-            stack=("python", "backend", "Python", "FastAPI"),
-            published_at=datetime(2026, 7, 10, 13, 24, 39, tzinfo=UTC),
-            raw_text="Build Python APIs with FastAPI.",
-        )
-    ]
-
-
-def test_xcrawl_x_posts_adapter_maps_real_api_shape(monkeypatch) -> None:
-    session = _FakePostSession(
-        {
-            "user": {"name": "Example Co", "screen_name": "hiringaccount"},
-            "tweets": [
-                {
-                    "id": "1234567890",
-                    "full_text": "We are hiring a Senior Python Developer to build FastAPI services.",
-                    "created_at": "Fri, 17 Jul 2026 10:00:00 GMT",
-                }
-            ],
-        }
-    )
-    monkeypatch.setattr("tg_vacancy_bot.sources.adapters.xcrawl_x_posts.source_session", lambda **_: session)
-    settings = Settings(
-        TELEGRAM_BOT_TOKEN="token",
-        TARGET_CHAT_ID="@target",
-        XCRAWL_API_KEY="xcrawl-test-key",
-        XCRAWL_X_HANDLES="@hiringaccount",
-    )
-
-    vacancies = asyncio.run(XCrawlXPostsAdapter(settings).fetch())
-
-    assert session.requests == [
-        {
-            "engine": "x_user_tweets",
-            "screen_name": "hiringaccount",
-            "max_tweets": 20,
-            "pages": 1,
-            "delay": 1,
-        }
-    ]
-    assert vacancies == [
-        Vacancy(
-            title="Senior Python Developer",
-            company="Example Co",
-            description="We are hiring a Senior Python Developer to build FastAPI services.",
-            source="XCrawl X Posts",
-            url="https://x.com/hiringaccount/status/1234567890",
-            stack=("Python", "FastAPI"),
-            published_at=datetime(2026, 7, 17, 10, 0, tzinfo=UTC),
-            raw_text="We are hiring a Senior Python Developer to build FastAPI services.",
-        )
-    ]
 
 
 def test_linkedin_scraper_maps_bing_rss_result() -> None:
@@ -332,43 +171,3 @@ def test_filter_it_vacancies_rejects_policy_excluded_roles(title: str, descripti
 
     assert filter_it_vacancies(vacancies) == []
 
-
-class _FakeResponse:
-    def __init__(self, json_data: dict) -> None:
-        self._json_data = json_data
-
-    async def __aenter__(self) -> "_FakeResponse":
-        return self
-
-    async def __aexit__(self, *args: object) -> None:
-        return None
-
-    def raise_for_status(self) -> None:
-        return None
-
-    async def json(self) -> dict:
-        return self._json_data
-
-
-class _FakeSession:
-    def __init__(self, json_data: dict) -> None:
-        self._response = _FakeResponse(json_data)
-
-    async def __aenter__(self) -> "_FakeSession":
-        return self
-
-    async def __aexit__(self, *args: object) -> None:
-        return None
-
-    def get(self, url: str) -> _FakeResponse:
-        return self._response
-
-
-class _FakePostSession(_FakeSession):
-    def __init__(self, json_data: dict) -> None:
-        super().__init__(json_data)
-        self.requests: list[dict] = []
-
-    def post(self, url: str, *, json: dict) -> _FakeResponse:
-        self.requests.append(json)
-        return self._response

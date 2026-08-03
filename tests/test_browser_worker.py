@@ -1,8 +1,6 @@
 import asyncio
 
 from tg_vacancy_bot.browser_worker import (
-    ARBEITNOW_FORM_SELECTOR,
-    ARBEITNOW_REQUIRED_SELECTORS,
     BrowserWorker,
     verified_submission_success,
 )
@@ -25,28 +23,15 @@ def test_browser_worker_accepts_subdomains_in_allowlist(tmp_path) -> None:
     assert worker._allowed("example.org") is False
 
 
-def test_browser_worker_requires_profile_data_before_opening_arbeitnow(tmp_path) -> None:
-    worker = BrowserWorker(str(tmp_path / "profile"), ("arbeitnow.com",), True, 1)
+def test_browser_worker_has_no_registered_application_adapter(tmp_path) -> None:
+    worker = BrowserWorker(str(tmp_path / "profile"), ("linkedin.com",), True, 1)
 
     result = asyncio.run(
-        worker.prepare_application("https://www.arbeitnow.com/jobs/example", OperatorProfile(operator_user_id=1), None)
+        worker.prepare_application("https://www.linkedin.com/posts/example", OperatorProfile(operator_user_id=1), None)
     )
 
-    assert result.status == "profile_missing"
-    assert result.missing_fields == ("full_name", "email", "resume")
-
-
-def test_browser_worker_uses_current_arbeitnow_inline_form_contract() -> None:
-    assert ARBEITNOW_FORM_SELECTOR == "#form_job_application"
-    assert ARBEITNOW_REQUIRED_SELECTORS == (
-        "#first_name",
-        "#last_name",
-        "#email",
-        "#cv_or_resume",
-        "#terms",
-        "#button_send_application",
-        "#div_success_message",
-    )
+    assert result.status == "unsupported_site"
+    assert result.error == "No application adapter is registered for this site."
 
 
 def test_browser_worker_requires_proof_before_reporting_submission() -> None:

@@ -1,6 +1,5 @@
 from functools import lru_cache
 from pathlib import Path
-import re
 from typing import Literal
 
 from pydantic import Field
@@ -26,8 +25,6 @@ DEFAULT_LINKEDIN_POST_SCRAPER_QUERY = (
     '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("ищем" OR "ищет" OR "нанимаем" OR "в команду") '
     '(разработчик OR инженер OR frontend OR backend OR fullstack OR react OR python)'
 )
-X_HANDLE_RE = re.compile(r"^[A-Za-z0-9_]{1,15}$")
-
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -57,16 +54,9 @@ class Settings(BaseSettings):
     source_max_age_hours: int = Field(default=48, alias="SOURCE_MAX_AGE_HOURS")
     localize_descriptions: bool = Field(default=False, alias="LOCALIZE_DESCRIPTIONS")
 
-    enable_arbeitnow: bool = Field(default=True, alias="ENABLE_ARBEITNOW")
-    enable_working_nomads: bool = Field(default=True, alias="ENABLE_WORKING_NOMADS")
     enable_linkedin_post_search: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SEARCH")
     enable_linkedin_post_scraper: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SCRAPER")
     enable_linkedin_post_headless: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_HEADLESS")
-    enable_xcrawl_x_posts: bool = Field(default=False, alias="ENABLE_XCRAWL_X_POSTS")
-    xcrawl_api_key: str = Field(default="", alias="XCRAWL_API_KEY")
-    xcrawl_x_handles_raw: str = Field(default="", alias="XCRAWL_X_HANDLES")
-    xcrawl_x_max_tweets: int = Field(default=20, alias="XCRAWL_X_MAX_TWEETS", gt=0, le=100)
-    xcrawl_x_pages: int = Field(default=1, alias="XCRAWL_X_PAGES", gt=0, le=10)
     linkedin_headless_access_authorized: bool = Field(
         default=False,
         alias="LINKEDIN_HEADLESS_ACCESS_AUTHORIZED",
@@ -201,15 +191,6 @@ class Settings(BaseSettings):
                 providers.append(provider)
         return tuple(providers or ("bing_rss", "duckduckgo", "bing"))
 
-    @property
-    def xcrawl_x_handles(self) -> tuple[str, ...]:
-        handles: list[str] = []
-        for value in self.xcrawl_x_handles_raw.split(","):
-            handle = value.strip().removeprefix("@").lower()
-            if handle and X_HANDLE_RE.fullmatch(handle) and handle not in handles:
-                handles.append(handle)
-        return tuple(handles)
-
     def require_runtime(self) -> None:
         missing = []
         if not self.telegram_bot_token:
@@ -236,8 +217,6 @@ class Settings(BaseSettings):
             missing.append("exactly one OPERATOR_USER_IDS value")
         if not self.application_auto_submit:
             missing.append("APPLICATION_AUTO_SUBMIT=true")
-        if "arbeitnow.com" not in self.application_allowed_domains:
-            missing.append("APPLICATION_ALLOWED_DOMAINS=arbeitnow.com")
         if len(self.application_queue_profile_full_name.strip().split()) < 2:
             missing.append("APPLICATION_QUEUE_PROFILE_FULL_NAME")
         if not self.application_queue_profile_email.strip():

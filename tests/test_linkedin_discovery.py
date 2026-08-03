@@ -179,8 +179,6 @@ def test_headless_keyed_discovery_preserves_candidate_without_date_or_snippet(mo
     monkeypatch.setattr(linkedin_post_headless, "LinkedInPostSearchAdapter", FakeSearchProvider)
     monkeypatch.setattr(linkedin_post_headless, "utcnow", lambda: current_time)
     settings = Settings(
-        ENABLE_ARBEITNOW=False,
-        ENABLE_WORKING_NOMADS=False,
         SERPAPI_API_KEY="test-key",
         SERPER_API_KEY="",
     )
@@ -207,8 +205,6 @@ def test_headless_keyed_discovery_deduplicates_urls_across_providers(monkeypatch
     monkeypatch.setattr(linkedin_post_headless, "LinkedInPostSearchAdapter", FakeProvider)
     monkeypatch.setattr(linkedin_post_headless, "LinkedInPostSerperAdapter", FakeProvider)
     settings = Settings(
-        ENABLE_ARBEITNOW=False,
-        ENABLE_WORKING_NOMADS=False,
         SERPAPI_API_KEY="serpapi-key",
         SERPER_API_KEY="serper-key",
         LINKEDIN_POST_HEADLESS_QUERY="custom query",

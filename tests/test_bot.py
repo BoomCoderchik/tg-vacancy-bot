@@ -22,10 +22,10 @@ def test_build_status_text_does_not_expose_bot_token() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="secret-token",
         TARGET_CHAT_ID="@target",
-        ENABLE_ARBEITNOW=False,
         OPERATOR_USER_IDS="",
         LOCALIZE_DESCRIPTIONS="true",
         ENABLE_LINKEDIN_POST_SEARCH=False,
+        ENABLE_LINKEDIN_POST_SCRAPER=False,
         ENABLE_LINKEDIN_POST_HEADLESS=False,
     )
 
@@ -36,9 +36,8 @@ def test_build_status_text_does_not_expose_bot_token() -> None:
     assert "Forwarded mode: normalize" in text
     assert "Operator allowlist: off" in text
     assert "Description localization: on" in text
-    assert "Arbeitnow=off" in text
-    assert "WorkingNomads=on" in text
     assert "LinkedInPosts=off" in text
+    assert "LinkedInPostScraper=off" in text
     assert "LinkedInHeadless=off" in text
 
 
@@ -152,12 +151,12 @@ def test_application_result_text_only_confirms_real_submission() -> None:
 def test_application_result_text_explains_manual_reason_safely() -> None:
     text = application_result_text(
         "manual_required",
-        error_description="Arbeitnow application form has changed.",
+        error_description="No application adapter is registered for this site.",
     )
 
     assert "Причина" in text
-    assert "разметка формы Arbeitnow отличается" in text
-    assert "Arbeitnow application form has changed" not in text
+    assert "для этого сайта ещё нет" in text
+    assert "No application adapter is registered" not in text
 
 
 def test_application_result_text_hides_unknown_runner_details() -> None:
@@ -211,7 +210,7 @@ def test_application_result_notification_is_sent_privately() -> None:
             42,
             "filled",
             "https://example.com/jobs/1",
-            error_description="Arbeitnow application form has changed.",
+            error_description="No application adapter is registered for this site.",
         )
     )
 

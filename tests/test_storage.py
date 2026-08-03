@@ -62,8 +62,8 @@ def test_store_reports_safe_application_queue_counts(tmp_path) -> None:
     vacancy = Vacancy(
         title="Python Engineer",
         description="Backend role",
-        source="Arbeitnow",
-        url="https://www.arbeitnow.com/jobs/example",
+        source="LinkedIn Hiring Post Scraper",
+        url="https://www.linkedin.com/posts/example_hiring-python-engineer-activity-7483822807449600000-hQ_1",
     )
     store.mark_published(vacancy)
     store.create_application(42, store.fingerprint(vacancy))
