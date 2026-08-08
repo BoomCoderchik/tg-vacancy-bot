@@ -156,11 +156,15 @@ use the included GitHub Actions scheduler:
 .github/workflows/scheduled-source-polling.yml
 ```
 
-It runs `tg-vacancy-bot poll-once` every 15 minutes and publishes only real,
-deduplicated vacancies to `TARGET_CHAT_ID`. This is the simplest no-server path
-for 15-minute polling. It is not a true always-on bot process, so forwarded
-Telegram messages are not handled while no server is running, and GitHub may
-delay scheduled jobs during platform load.
+It runs `python -m tg_vacancy_bot.app poll-once` every 15 minutes and publishes
+only real, deduplicated vacancies to `TARGET_CHAT_ID`. This is the simplest
+no-server path for 15-minute polling. It is not a true always-on bot process,
+so forwarded Telegram messages are not handled while no server is running, and
+GitHub may delay scheduled jobs during platform load.
+
+This workflow is limited to source parsing and publication. It sets
+`APPLICATION_QUEUE_ENABLED=false` and does not process application-button
+callbacks, even if an old repository secret with that name still exists.
 
 Required GitHub repository secrets:
 

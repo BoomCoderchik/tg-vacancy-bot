@@ -6,6 +6,11 @@ The queue stores delayed Telegram application-button callbacks and private `/que
 
 When `APPLICATION_QUEUE_ENABLED=false`, `tg-vacancy-bot process-applications-once` exits without reading Telegram updates.
 
+The included `.github/workflows/scheduled-source-polling.yml` workflow is for
+LinkedIn source parsing and Telegram publication only. It forces
+`APPLICATION_QUEUE_ENABLED=false`, so application callbacks need a separate
+operator-started command or a separate scheduler if this queue is used later.
+
 When enabled, the scheduled runner:
 
 - reads pending Telegram callback and private message updates;

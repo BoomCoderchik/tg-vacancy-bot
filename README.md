@@ -183,16 +183,12 @@ server against the same Telegram channel at the same time unless they share the
 same deduplication database. Otherwise, both schedulers can publish the same new
 vacancy before either one sees the other's SQLite state.
 
-The same workflow can process delayed `Откликнуться` callbacks without an
-always-on server. Telegram keeps the callback until a scheduled runner invokes
-`tg-vacancy-bot process-applications-once`; the runner downloads the configured
-resume by Telegram `file_id`, first sends the operator a private confirmation
-that the application is prepared, handles the application, sends a private
-factual result, and exits. Send a PDF/DOCX to the bot with the `/queue_resume` caption once to
-register or replace the queue resume without copying its `file_id` into GitHub.
-This mode is opt-in and requires additional GitHub secrets. See
-[`docs/application-queue.md`](docs/application-queue.md) for setup, usage,
-privacy boundaries and expected delay.
+The scheduled source-polling workflow is intentionally limited to source
+parsing and Telegram vacancy publication. It sets `APPLICATION_QUEUE_ENABLED`
+to `false` even if an old repository secret with that name exists, so the
+15-minute parser cannot accidentally drain Telegram callback updates or run the
+application queue. See [`docs/application-queue.md`](docs/application-queue.md)
+if you later decide to run application processing through a separate scheduler.
 
 To check which sources are configured without publishing anything:
 
