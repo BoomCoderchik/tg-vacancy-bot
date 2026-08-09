@@ -3,6 +3,7 @@ from pathlib import Path
 
 WORKFLOW = Path(".github/workflows/scheduled-source-polling.yml")
 OLD_WORKFLOW = Path(".github/workflows/poll-sources.yml")
+README = Path("README.md")
 
 
 def test_poll_sources_workflow_runs_every_15_minutes() -> None:
@@ -28,6 +29,10 @@ def test_poll_sources_workflow_preserves_dedupe_state() -> None:
     assert "DATABASE_PATH: data/vacancies.sqlite3" in text
     assert "key: vacancy-db-${{ github.run_id }}" in text
     assert "vacancy-db-" in text
+
+
+def test_package_readme_is_valid_utf8_for_pip_build() -> None:
+    README.read_text(encoding="utf-8")
 
 
 def test_poll_sources_workflow_defaults_optional_runtime_values() -> None:
