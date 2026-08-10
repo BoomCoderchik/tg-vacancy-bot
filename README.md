@@ -251,6 +251,19 @@ OPENAI_BASE_URL=
 
 This uses the real OpenAI API, or an OpenAI-compatible endpoint such as OpenRouter, for normalized cards from forwarded messages, `publish-message`, and all source polling. Source polling forces a localization attempt even when `LOCALIZE_DESCRIPTIONS=false`; that switch only affects manual-message flows. If the provider fails or its key is absent, source polling logs the error and publishes the real vacancy with its original description and link rather than dropping it.
 
+For a free OpenRouter setup, the currently tested configuration is:
+
+```dotenv
+LOCALIZE_DESCRIPTIONS=true
+LOCALIZATION_PROVIDER=openai
+OPENAI_API_KEY=sk-or-...
+OPENAI_BASE_URL=https://openrouter.ai/api/v1
+OPENAI_MODEL=nvidia/nemotron-3-super-120b-a12b:free
+OPENAI_FALLBACK_MODELS=openai/gpt-oss-20b:free,openrouter/free
+```
+
+This model chain was smoke-tested for Russian translation and two-sentence vacancy compression on 2026-08-10. The selected Super model receives a 420-token completion budget because its reasoning output shares the completion limit; other fallback models keep the standard 260-token budget. OpenRouter free-model availability and rate limits change; the paid `openai/gpt-4.1-mini` fallback is appended automatically after the configured free models and requires OpenRouter credits. If all localization attempts fail, source vacancies are still published with their original description and link.
+
 ### Free Groq localization mode
 
 For the scheduled parser's current load profile, Groq is the supported free option:

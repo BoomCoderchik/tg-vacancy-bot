@@ -11,6 +11,9 @@ from .models import Vacancy
 
 MAX_LOCALIZED_DESCRIPTION_CHARS = 700
 MAX_OUTPUT_TOKENS = 260
+MODEL_OUTPUT_TOKEN_LIMITS = {
+    "nvidia/nemotron-3-super-120b-a12b:free": 420,
+}
 CYRILLIC_RE = re.compile(r"[\u0400-\u04FF]")
 LETTER_RE = re.compile(r"[A-Za-z\u0400-\u04FF]")
 MIN_RUSSIAN_CYRILLIC_RATIO = 0.35
@@ -63,7 +66,7 @@ class OpenAIDescriptionLocalizer:
                         {"role": "system", "content": LOCALIZATION_INSTRUCTIONS},
                         {"role": "user", "content": description},
                     ],
-                    max_tokens=MAX_OUTPUT_TOKENS,
+                    max_tokens=MODEL_OUTPUT_TOKEN_LIMITS.get(model, MAX_OUTPUT_TOKENS),
                     temperature=0.2,
                 )
             except Exception as exc:

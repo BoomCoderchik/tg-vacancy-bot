@@ -10,7 +10,11 @@ from .access_control import parse_operator_user_ids
 
 OPENAI_RELIABLE_TRANSLATION_FALLBACK_MODEL = "gpt-4.1-mini"
 OPENROUTER_RELIABLE_TRANSLATION_FALLBACK_MODEL = "openai/gpt-4.1-mini"
-OPENROUTER_FREE_FALLBACK_MODELS = ("qwen/qwen3.6-plus:free", "openrouter/free")
+OPENROUTER_FREE_FALLBACK_MODELS = (
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "openai/gpt-oss-20b:free",
+    "openrouter/free",
+)
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 # Groq currently gives this model a substantially larger free request allowance
 # than the larger models. The replacement is kept in the fallback chain because

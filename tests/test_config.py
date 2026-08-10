@@ -214,7 +214,8 @@ def test_settings_uses_openrouter_free_fallback_models_by_default() -> None:
     )
 
     assert settings.openai_fallback_models == (
-        "qwen/qwen3.6-plus:free",
+        "nvidia/nemotron-3-super-120b-a12b:free",
+        "openai/gpt-oss-20b:free",
         "openrouter/free",
         "openai/gpt-4.1-mini",
     )

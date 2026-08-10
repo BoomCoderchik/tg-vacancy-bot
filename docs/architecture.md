@@ -175,9 +175,10 @@ Optional OpenAI localization:
 
 - `LOCALIZE_DESCRIPTIONS=true`.
 - `LOCALIZATION_PROVIDER=openai` (default) with `OPENAI_API_KEY` for the real OpenAI or OpenAI-compatible API.
-- `OPENAI_MODEL`, defaulting to `gpt-4.1-mini`.
+- `OPENAI_MODEL`, defaulting to `gpt-4.1-mini`. For the currently tested free OpenRouter path, use `nvidia/nemotron-3-super-120b-a12b:free`.
 - `OPENAI_FALLBACK_MODELS`, optional comma-separated fallback model list.
 - `OPENAI_BASE_URL`, optional. For OpenRouter, use `https://openrouter.ai/api/v1`.
+- When `OPENAI_BASE_URL` points to OpenRouter and no fallback list is configured, the bot tries `nvidia/nemotron-3-super-120b-a12b:free`, `openai/gpt-oss-20b:free`, and `openrouter/free`, then appends the paid `openai/gpt-4.1-mini` fallback.
 - `LOCALIZATION_PROVIDER=groq` with `GROQ_API_KEY` uses Groq's OpenAI-compatible API at `https://api.groq.com/openai/v1`.
 - Groq defaults to `llama-3.1-8b-instant` with `openai/gpt-oss-20b` as a fallback. `GROQ_MODEL` and `GROQ_FALLBACK_MODELS` allow model replacement without a code change.
 

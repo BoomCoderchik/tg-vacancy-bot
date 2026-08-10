@@ -123,6 +123,19 @@ def test_openai_localizer_requests_russian_compressed_description() -> None:
     assert request["max_tokens"] <= 300
 
 
+def test_openai_localizer_gives_nemotron_super_more_room_for_reasoning() -> None:
+    client = FakeOpenAIClient()
+    localizer = OpenAIDescriptionLocalizer(
+        api_key="test-key",
+        model="nvidia/nemotron-3-super-120b-a12b:free",
+        client=client,
+    )
+
+    asyncio.run(localizer.localize("Wir suchen einen Python Entwickler fuer Remote Backend Arbeit."))
+
+    assert client.chat.completions.request["max_tokens"] == 420
+
+
 def test_openai_localizer_uses_fallback_model_when_primary_returns_empty_text() -> None:
     client = EmptyThenGoodOpenAIClient()
     localizer = OpenAIDescriptionLocalizer(
