@@ -147,6 +147,31 @@ def test_settings_reads_linkedin_post_scraper_options() -> None:
     assert settings.linkedin_post_scraper_results_wanted == 8
 
 
+def test_settings_reads_linkedin_post_apify_options() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_LINKEDIN_POST_APIFY="true",
+        APIFY_API_TOKEN="apify-token",
+        LINKEDIN_POST_APIFY_ACTOR="harvestapi/linkedin-post-search",
+        LINKEDIN_POST_APIFY_SEARCH_QUERIES="Hiring frontend developer||Ищем backend разработчика",
+        LINKEDIN_POST_APIFY_POSTED_LIMIT="week",
+        LINKEDIN_POST_APIFY_MAX_POSTS="8",
+        LINKEDIN_POST_APIFY_TIMEOUT_SECONDS="120",
+    )
+
+    assert settings.enable_linkedin_post_apify is True
+    assert settings.apify_api_token == "apify-token"
+    assert settings.linkedin_post_apify_actor == "harvestapi/linkedin-post-search"
+    assert settings.linkedin_post_apify_search_queries == (
+        "Hiring frontend developer",
+        "Ищем backend разработчика",
+    )
+    assert settings.linkedin_post_apify_posted_limit == "week"
+    assert settings.linkedin_post_apify_max_posts == 8
+    assert settings.linkedin_post_apify_timeout_seconds == 120
+
+
 def test_settings_limits_linkedin_post_age_to_ten_days() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",

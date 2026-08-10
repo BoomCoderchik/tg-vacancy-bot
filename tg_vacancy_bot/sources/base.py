@@ -27,4 +27,5 @@ def html_to_text(value: str) -> str:
 
 def source_session(**kwargs) -> aiohttp.ClientSession:
     headers = {**DEFAULT_HEADERS, **kwargs.pop("headers", {})}
-    return aiohttp.ClientSession(timeout=REQUEST_TIMEOUT, headers=headers, **kwargs)
+    timeout = kwargs.pop("timeout", REQUEST_TIMEOUT)
+    return aiohttp.ClientSession(timeout=timeout, headers=headers, **kwargs)

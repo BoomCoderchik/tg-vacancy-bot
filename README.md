@@ -13,7 +13,7 @@ The profile and queued-application foundations are documented in [`docs/applicat
   - `copy`: copy the original message to the target channel after the same allowed-vacancy intake check.
 - Publishes only development/UI/UX/AI vacancies: backend, frontend, fullstack, UI/UX, LLM, AI, and clear software developer/engineer roles.
 - Stores message fingerprints in SQLite to avoid duplicates.
-- Includes opt-in LinkedIn hiring-post discovery through keyed search, free search-result scraping, and permission-gated headless public-post parsing.
+- Includes opt-in LinkedIn hiring-post discovery through keyed search, free search-result scraping, Apify post-body search, and permission-gated headless public-post parsing.
 - Polls configured public sources in the background while the bot is running.
 
 ## Profile storage foundation
@@ -87,6 +87,29 @@ This source reads public search results and keeps only real `linkedin.com/posts/
 
 The scraper searches public, globally indexed results. It keeps only results with a reliable publication date (from the search result or the LinkedIn activity ID) and rejects posts older than `LINKEDIN_POST_MAX_AGE_HOURS` (maximum 240 hours / 10 days) before they reach the common polling layer.
 The search depth is intentionally larger than the per-cycle publication budget: SQLite deduplication lets later polls publish the remaining fresh posts. Every source vacancy is localized to Russian before publication.
+
+## Apify LinkedIn Post-Body Search
+
+To read the full body of public LinkedIn posts and match hiring phrases inside
+the post itself, enable the Apify-backed source:
+
+```dotenv
+ENABLE_LINKEDIN_POST_APIFY=true
+APIFY_API_TOKEN=your_apify_token
+LINKEDIN_POST_APIFY_ACTOR=harvestapi/linkedin-post-search
+LINKEDIN_POST_APIFY_SEARCH_QUERIES=Hiring frontend developer||Hiring full stack developer||Hiring backend developer||Ищем frontend разработчика||Ищем backend разработчика
+LINKEDIN_POST_APIFY_POSTED_LIMIT=24h
+LINKEDIN_POST_APIFY_MAX_POSTS=25
+LINKEDIN_POST_APIFY_TIMEOUT_SECONDS=240
+```
+
+The adapter uses the external [HarvestAPI LinkedIn Post Search Actor](https://apify.com/harvestapi/linkedin-post-search), which currently documents keyword search without LinkedIn cookies or an account and returns post content, direct URLs, authors, and publication dates. It is a community-maintained, independent Actor and may charge for results; it is not an official LinkedIn API. The bot does not store LinkedIn credentials or publish fabricated records. Query entries are separated with `||` and must be no longer than 85 characters. Set `ENABLE_LINKEDIN_POST_APIFY=false` when the Apify token is unavailable.
+
+The source keeps a result only when the full body contains a hiring signal such as
+`hiring`, `looking for`, `ищем`, or `в команду`, plus a supported development role
+such as frontend, backend, full-stack, developer, engineer, разработчик, or
+инженер. It then passes the result through the existing freshness, IT-role,
+localization, publication-limit, and SQLite deduplication stages.
 
 ## Headless LinkedIn Hiring Post Parser
 

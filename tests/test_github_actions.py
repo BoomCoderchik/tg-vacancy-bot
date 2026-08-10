@@ -47,6 +47,8 @@ def test_poll_sources_workflow_defaults_optional_runtime_values() -> None:
     assert "Verify required localization configuration" not in text
     assert "ENABLE_LINKEDIN_POST_HEADLESS: ${{ secrets.ENABLE_LINKEDIN_POST_HEADLESS || 'false' }}" in text
     assert "ENABLE_LINKEDIN_POST_SCRAPER: ${{ secrets.ENABLE_LINKEDIN_POST_SCRAPER || 'false' }}" in text
+    assert "ENABLE_LINKEDIN_POST_APIFY: ${{ secrets.ENABLE_LINKEDIN_POST_APIFY || 'false' }}" in text
+    assert "APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}" in text
     assert "LINKEDIN_HEADLESS_ACCESS_AUTHORIZED: ${{ secrets.LINKEDIN_HEADLESS_ACCESS_AUTHORIZED || 'false' }}" in text
     assert "LINKEDIN_HEADLESS_PERMISSION_REFERENCE: ${{ secrets.LINKEDIN_HEADLESS_PERMISSION_REFERENCE }}" in text
     assert "LINKEDIN_POST_HEADLESS_QUERY: ${{ secrets.LINKEDIN_POST_HEADLESS_QUERY }}" in text

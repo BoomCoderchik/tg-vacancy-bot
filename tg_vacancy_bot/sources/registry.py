@@ -3,6 +3,7 @@ from __future__ import annotations
 from tg_vacancy_bot.config import Settings
 
 from .adapters.linkedin_post_headless import LinkedInPostHeadlessAdapter
+from .adapters.linkedin_post_apify import LinkedInPostApifyAdapter
 from .adapters.linkedin_post_scraper import LinkedInPostScraperAdapter
 from .adapters.linkedin_post_search import LinkedInPostSearchAdapter, LinkedInPostSerperAdapter
 from .base import SourceAdapter
@@ -22,6 +23,8 @@ def build_adapters(settings: Settings) -> list[SourceAdapter]:
         adapters.append(LinkedInPostSerperAdapter(settings))
     if not headless_requested and settings.enable_linkedin_post_scraper:
         adapters.append(LinkedInPostScraperAdapter(settings))
+    if not headless_requested and settings.enable_linkedin_post_apify and settings.apify_api_token:
+        adapters.append(LinkedInPostApifyAdapter(settings))
     if headless_registered:
         adapters.append(LinkedInPostHeadlessAdapter(settings))
     return adapters
@@ -42,6 +45,10 @@ def source_configuration_warnings(settings: Settings) -> list[str]:
     ):
         warnings.append(
             "LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY or SERPER_API_KEY is missing."
+        )
+    if settings.enable_linkedin_post_apify and not settings.apify_api_token:
+        warnings.append(
+            "LinkedIn Apify source is enabled but APIFY_API_TOKEN is missing."
         )
     if headless_registered and not (settings.serpapi_api_key or settings.serper_api_key):
         warnings.append(

@@ -25,6 +25,17 @@ DEFAULT_LINKEDIN_POST_SCRAPER_QUERY = (
     '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("ищем" OR "ищет" OR "нанимаем" OR "в команду") '
     '(разработчик OR инженер OR frontend OR backend OR fullstack OR react OR python)'
 )
+DEFAULT_LINKEDIN_POST_APIFY_SEARCH_QUERIES = (
+    "Hiring frontend developer",
+    "Hiring full stack developer",
+    "Hiring backend developer",
+    "Looking for frontend developer",
+    "Looking for full stack developer",
+    "Looking for backend developer",
+    "Ищем frontend разработчика",
+    "Ищем fullstack разработчика",
+    "Ищем backend разработчика",
+)
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -56,6 +67,31 @@ class Settings(BaseSettings):
 
     enable_linkedin_post_search: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SEARCH")
     enable_linkedin_post_scraper: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SCRAPER")
+    enable_linkedin_post_apify: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_APIFY")
+    apify_api_token: str = Field(default="", alias="APIFY_API_TOKEN")
+    linkedin_post_apify_actor: str = Field(
+        default="harvestapi/linkedin-post-search",
+        alias="LINKEDIN_POST_APIFY_ACTOR",
+    )
+    linkedin_post_apify_search_queries_raw: str = Field(
+        default="||".join(DEFAULT_LINKEDIN_POST_APIFY_SEARCH_QUERIES),
+        alias="LINKEDIN_POST_APIFY_SEARCH_QUERIES",
+    )
+    linkedin_post_apify_posted_limit: str = Field(
+        default="24h",
+        alias="LINKEDIN_POST_APIFY_POSTED_LIMIT",
+    )
+    linkedin_post_apify_max_posts: int = Field(
+        default=25,
+        alias="LINKEDIN_POST_APIFY_MAX_POSTS",
+        gt=0,
+    )
+    linkedin_post_apify_timeout_seconds: int = Field(
+        default=240,
+        alias="LINKEDIN_POST_APIFY_TIMEOUT_SECONDS",
+        gt=0,
+        le=300,
+    )
     enable_linkedin_post_headless: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_HEADLESS")
     linkedin_headless_access_authorized: bool = Field(
         default=False,
@@ -190,6 +226,15 @@ class Settings(BaseSettings):
             if provider and provider not in providers:
                 providers.append(provider)
         return tuple(providers or ("bing_rss", "duckduckgo", "bing"))
+
+    @property
+    def linkedin_post_apify_search_queries(self) -> tuple[str, ...]:
+        configured = tuple(
+            query.strip()
+            for query in self.linkedin_post_apify_search_queries_raw.split("||")
+            if query.strip()
+        )
+        return configured or DEFAULT_LINKEDIN_POST_APIFY_SEARCH_QUERIES
 
     def require_runtime(self) -> None:
         missing = []

@@ -83,6 +83,15 @@ def test_build_adapters_registers_only_headless_linkedin_pipeline_when_authorize
     assert not any("LinkedIn Hiring Posts source" in warning for warning in source_configuration_warnings(settings))
 
 
+def test_apify_adapter_requires_token_and_registers_when_enabled() -> None:
+    missing_token = Settings(ENABLE_LINKEDIN_POST_APIFY=True)
+    assert not any(adapter.name == "LinkedIn Hiring Posts (Apify)" for adapter in build_adapters(missing_token))
+    assert "APIFY_API_TOKEN is missing" in " ".join(source_configuration_warnings(missing_token))
+
+    configured = Settings(ENABLE_LINKEDIN_POST_APIFY=True, APIFY_API_TOKEN="test-token")
+    assert any(adapter.name == "LinkedIn Hiring Posts (Apify)" for adapter in build_adapters(configured))
+
+
 def test_linkedin_scraper_maps_bing_rss_result() -> None:
     rss = """
     <rss><channel><item>
