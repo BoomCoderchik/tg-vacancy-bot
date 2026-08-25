@@ -124,9 +124,12 @@ LINKEDIN_POST_HEADLESS_QUERY=
 LINKEDIN_POST_HEADLESS_RESULTS_WANTED=10
 LINKEDIN_POST_SEARCH_INTENTS_PER_CYCLE=6
 LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS=20
+LINKEDIN_HEADLESS_DISCOVERY_PAGES=3
 ```
 
-When `LINKEDIN_POST_HEADLESS_QUERY` is blank, the autonomous profile uses four explicit searches: two allowed role families (frontend and fullstack) in Russian and English, all phrased for junior or entry-level candidates. The whole profile is covered in a single cycle. Set a custom `||`-separated query list only when overriding that built-in profile intentionally.
+When `LINKEDIN_POST_HEADLESS_QUERY` is blank, the autonomous profile uses eight explicit searches: frontend and fullstack, each in junior/entry-level and internship/trainee variants, in Russian and English — all worldwide. The whole profile is covered within a couple of polling cycles. Set a custom `||`-separated query list only when overriding that built-in profile intentionally.
+
+Without a keyed provider the adapter performs its own free discovery through lightweight public search requests: Bing RSS first, then the DuckDuckGo HTML endpoint, then up to `LINKEDIN_HEADLESS_DISCOVERY_PAGES` (default 3) paginated Bing HTML result pages per selected intent. A protection or challenge screen ends that engine's attempt instead of being bypassed, short pauses separate requests, and Bing `/ck/a` redirect links are decoded to the real target URL. Discovery only collects candidate URLs; Playwright is reserved for reading the LinkedIn post pages themselves.
 
 It discovers globally indexed public posts without a country restriction. Each selected intent receives a balanced result quota; candidates from all selected families are then ordered by their verifiable publication-date hint before the browser-read limit is applied. SerpApi and Serper requests also use Google’s nearest supported recent-results window (`tbs=qdr:*`); the bot still verifies every date against the exact configured age limit. Search results are retained as raw URL candidates, so a missing search snippet or date no longer removes a link before the browser can inspect it. When the authorized headless pipeline is active, the standalone LinkedIn search and scraper adapters are not registered as parallel publishers.
 

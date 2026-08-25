@@ -53,6 +53,30 @@ DEFAULT_SEARCH_INTENTS: tuple[SearchIntent, ...] = (
         '"джуниор фулстек-разработчик" OR "junior fullstack-разработчик" '
         'OR "фулстек-разработчик без опыта" OR "стажер fullstack-разработчик"',
     ),
+    _intent(
+        "frontend",
+        "en",
+        '"Frontend Developer Intern" OR "Intern Frontend Developer" '
+        'OR "Frontend Developer Internship" OR "Trainee Frontend Developer"',
+    ),
+    _intent(
+        "frontend",
+        "ru",
+        '"стажировка фронтенд-разработчик" OR "фронтенд-разработчик стажировка" '
+        'OR "интерн фронтенд-разработчик" OR "trainee фронтенд-разработчик"',
+    ),
+    _intent(
+        "fullstack",
+        "en",
+        '"Fullstack Developer Intern" OR "Intern Fullstack Developer" '
+        'OR "Full Stack Developer Internship" OR "Trainee Full Stack Developer"',
+    ),
+    _intent(
+        "fullstack",
+        "ru",
+        '"стажировка фулстек-разработчик" OR "фулстек-разработчик стажировка" '
+        'OR "интерн фулстек-разработчик" OR "trainee fullstack-разработчик"',
+    ),
 )
 
 

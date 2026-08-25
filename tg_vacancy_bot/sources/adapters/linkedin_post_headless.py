@@ -1,23 +1,36 @@
 from __future__ import annotations
 
+import asyncio
+import base64
 import logging
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
-from urllib.parse import urlencode
+from xml.etree import ElementTree
 
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
 from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
-from tg_vacancy_bot.sources.base import SourceAdapter, html_to_text
-from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import _published_at_from_activity_id
+from tg_vacancy_bot.sources.base import SourceAdapter, html_to_text, source_session
+from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import (
+    BING_SEARCH_URL,
+    BROWSER_HEADERS,
+    SearchHtmlResult,
+    _clean_title,
+    _fetch_bing_rss,
+    _fetch_search_html,
+    _looks_like_search_challenge,
+    _published_at_for_result,
+    _published_at_from_activity_id,
+    _search_html_results,
+    _xml_child_text,
+)
 from tg_vacancy_bot.sources.adapters.linkedin_post_search import (
     LinkedInPostCandidate,
     LinkedInPostSearchAdapter,
     LinkedInPostSerperAdapter,
     _canonicalize_linkedin_post_url,
-    _published_at_for_result,
     _post_title,
     _stack_from_text,
 )
@@ -29,7 +42,8 @@ from tg_vacancy_bot.sources.linkedin_search_profile import (
 )
 
 
-BING_SEARCH_URL = "https://www.bing.com/search"
+BING_PAGE_STEP = 10
+SEARCH_PAGE_DELAY_SECONDS = 1.5
 logger = logging.getLogger(__name__)
 POST_TEXT_SELECTORS = (
     "article p.attributed-text-segment-list__content",
@@ -76,7 +90,7 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
         timeout_ms = self.settings.linkedin_post_headless_timeout_seconds * 1000
         urls = await self._discover_keyed_post_urls(limit)
         if not urls:
-            urls = await self._discover_bing_post_urls(limit, timeout_ms)
+            urls = await self._discover_free_post_urls(limit)
         if not urls:
             return []
 
@@ -160,30 +174,75 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
         )
         return _post_urls_from_candidates(prioritized, limit)
 
-    async def _discover_bing_post_urls(self, limit: int, timeout_ms: int) -> tuple[str, ...]:
-        urls: list[str] = []
-        async with async_playwright() as playwright:
-            browser = await playwright.chromium.launch(headless=True)
-            context = await browser.new_context(locale="en-US")
-            try:
-                search_page = await context.new_page()
-                search_page.set_default_timeout(timeout_ms)
-                all_intents = select_search_intents(self.settings.linkedin_post_headless_query)
-                intents = select_cycle_intents(
-                    all_intents,
-                    max_intents=self.settings.linkedin_post_search_intents_per_cycle,
-                    cycle_index=_search_cycle_index(utcnow()),
-                )
-                for intent in intents:
-                    for url in await _search_public_post_urls(search_page, intent.query):
-                        if url not in urls:
-                            urls.append(url)
-                        if len(urls) >= limit:
-                            return tuple(urls)
-            finally:
-                await context.close()
-                await browser.close()
-        return tuple(urls)
+    async def _discover_free_post_urls(self, limit: int) -> tuple[str, ...]:
+        """Discover public post URLs without a keyed search provider.
+
+        Lightweight HTTP providers are used for discovery: Bing RSS, DuckDuckGo
+        HTML, then paginated Bing HTML. The browser is reserved for reading
+        LinkedIn post pages themselves. A protection screen ends that
+        provider's attempt instead of being bypassed. Undated results stay in
+        the queue: the reader later derives a reliable date from the activity
+        ID or rejects the candidate.
+        """
+
+        if limit <= 0:
+            return ()
+        intents = select_cycle_intents(
+            select_search_intents(self.settings.linkedin_post_headless_query),
+            max_intents=self.settings.linkedin_post_search_intents_per_cycle,
+            cycle_index=_search_cycle_index(utcnow()),
+        )
+        seen_urls: set[str] = set()
+        dated_urls: list[tuple[datetime, str]] = []
+        undated_urls: list[str] = []
+
+        def collect(results: list[SearchHtmlResult]) -> None:
+            for result in results:
+                if len(seen_urls) >= limit:
+                    return
+                url = _canonicalize_linkedin_post_url(_decode_bing_redirect_url(result.link))
+                if not url or url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                published_at = _published_at_for_result(result.date_text, url)
+                if published_at is None:
+                    undated_urls.append(url)
+                else:
+                    dated_urls.append((published_at, url))
+
+        async with source_session(headers=BROWSER_HEADERS) as session:
+            for intent in intents:
+                if len(seen_urls) >= limit:
+                    break
+
+                try:
+                    rss_results = _rss_post_results(await _fetch_bing_rss(session, intent.query))
+                except Exception as exc:
+                    logger.warning("Bing RSS discovery failed: %s", type(exc).__name__)
+                    rss_results = []
+                collect(rss_results)
+
+                await asyncio.sleep(SEARCH_PAGE_DELAY_SECONDS)
+                html = await _fetch_provider_html(session, "duckduckgo", intent.query)
+                if html:
+                    collect(_search_html_results(BeautifulSoup(html, "html.parser")))
+
+                for page_index in range(max(1, self.settings.linkedin_headless_discovery_pages)):
+                    if len(seen_urls) >= limit:
+                        break
+                    await asyncio.sleep(SEARCH_PAGE_DELAY_SECONDS)
+                    html = await _fetch_bing_html(session, intent.query, first=1 + page_index * BING_PAGE_STEP)
+                    if not html or _looks_like_search_challenge(html):
+                        break
+                    before = len(seen_urls)
+                    collect(_search_html_results(BeautifulSoup(html, "html.parser")))
+                    if len(seen_urls) == before:
+                        break
+
+        ordered = [url for _, url in sorted(dated_urls, reverse=True)]
+        ordered_urls = set(ordered)
+        ordered.extend(url for url in undated_urls if url not in ordered_urls)
+        return tuple(ordered[:limit])
 
     async def _read_public_post(self, context, url: str, timeout_ms: int) -> Vacancy | None:
         page = await context.new_page()
@@ -217,20 +276,70 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
             await page.close()
 
 
-async def _search_public_post_urls(page, query: str) -> tuple[str, ...]:
-    search_url = f"{BING_SEARCH_URL}?{urlencode({'q': query, 'setlang': 'en'})}"
-    await page.goto(search_url, wait_until="domcontentloaded")
-    html = await page.content()
-    if _requires_manual_access(html):
-        return ()
-    soup = BeautifulSoup(html, "html.parser")
-    urls: list[str] = []
-    for anchor in soup.select("li.b_algo h2 a[href], a[href*='linkedin.com/posts/'], a[href*='linkedin.com/feed/update/']"):
-        href = str(anchor.get("href") or "").strip()
-        canonical = _canonicalize_linkedin_post_url(href)
-        if canonical and canonical not in urls:
-            urls.append(canonical)
-    return tuple(urls)
+async def _fetch_provider_html(session, provider: str, query: str) -> str:
+    """Fetch one search-result page; a protection screen yields no results."""
+
+    try:
+        html = await _fetch_search_html(session, provider, query)
+    except Exception as exc:
+        logger.warning("%s discovery fetch failed: %s", provider, type(exc).__name__)
+        return ""
+    if _looks_like_search_challenge(html):
+        logger.warning("%s discovery returned an anti-bot challenge; skipping", provider)
+        return ""
+    return html
+
+
+async def _fetch_bing_html(session, query: str, *, first: int) -> str:
+    try:
+        async with session.get(
+            BING_SEARCH_URL,
+            params={"q": query, "first": str(first), "setlang": "en"},
+        ) as response:
+            response.raise_for_status()
+            return await response.text()
+    except Exception as exc:
+        logger.warning("Bing HTML discovery fetch failed: %s", type(exc).__name__)
+        return ""
+
+
+def _rss_post_results(rss: str) -> list[SearchHtmlResult]:
+    """Keep raw RSS items as URL candidates even without title or snippet."""
+
+    if not (rss or "").strip():
+        return []
+    try:
+        root = ElementTree.fromstring(rss)
+    except ElementTree.ParseError:
+        return []
+    results: list[SearchHtmlResult] = []
+    for item in root.findall(".//item"):
+        results.append(
+            SearchHtmlResult(
+                title=_clean_title(_xml_child_text(item, "title")),
+                link=_xml_child_text(item, "link"),
+                snippet="",
+                date_text=_xml_child_text(item, "pubDate"),
+            )
+        )
+    return results
+
+
+def _decode_bing_redirect_url(href: str) -> str:
+    """Decode Bing ``/ck/a`` redirect wrappers into the real target URL."""
+
+    if "/ck/a" not in href:
+        return href
+    marker = "u=a1"
+    index = href.find(marker)
+    if index == -1:
+        return ""
+    payload = href[index + len(marker):].split("&", 1)[0]
+    padding = "=" * (-len(payload) % 4)
+    try:
+        return base64.urlsafe_b64decode(payload + padding).decode("utf-8", "ignore")
+    except (ValueError, UnicodeDecodeError):
+        return ""
 
 
 def _post_urls_from_candidates(

@@ -1,7 +1,9 @@
 import asyncio
+import base64
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from contextlib import asynccontextmanager
+from urllib.parse import urlencode
 
 import aiohttp
 import pytest
@@ -193,10 +195,13 @@ def test_headless_keyed_discovery_preserves_candidate_without_date_or_snippet(mo
         max_intents=6,
         cycle_index=linkedin_post_headless._search_cycle_index(current_time),
     )
-    expected_limits = fair_query_limits(5, expected_intents)
+    discovery_budget = max(5, len(expected_intents))
+    expected_limits = fair_query_limits(discovery_budget, expected_intents)
     assert urls == (POST_URL,)
     assert calls == [
-        (limit, intent.query) for limit, intent in zip(expected_limits, expected_intents, strict=True)
+        (limit, intent.query)
+        for limit, intent in zip(expected_limits, expected_intents, strict=True)
+        if limit > 0
     ]
 
 
@@ -597,3 +602,157 @@ def test_post_search_payload_retries_5xx_once_then_succeeds(monkeypatch) -> None
     assert payload == {"organic": []}
     assert session.calls == 2
     assert delays == [BACKOFF_DELAYS_SECONDS[0]]
+
+
+def _rss_feed(*items: str) -> str:
+    body = "".join(f"<item>{item}</item>" for item in items)
+    return f"<rss><channel>{body}</channel></rss>"
+
+
+def _bing_html_with_ck_links(*targets: str) -> str:
+    blocks = []
+    for index, target in enumerate(targets):
+        encoded = base64.urlsafe_b64encode(target.encode()).decode().rstrip("=")
+        href = f"https://www.bing.com/ck/a?!&&p=p{index}&u=a1{encoded}&ntb=1"
+        blocks.append(
+            f'<li class="b_algo"><h2><a href="{href}">Hiring</a></h2>'
+            "<div class='b_caption'><p>We are hiring a developer.</p></div></li>"
+        )
+    return f"<html><body><ol id='b_results'>{''.join(blocks)}</ol></body></html>"
+
+
+def test_decode_bing_redirect_url_returns_real_target() -> None:
+    target = "https://www.linkedin.com/posts/hiring_activity-7483822807449600000-abcd"
+    encoded = base64.urlsafe_b64encode(target.encode()).decode().rstrip("=")
+
+    assert (
+        linkedin_post_headless._decode_bing_redirect_url(
+            f"https://www.bing.com/ck/a?!&&p=xyz&u=a1{encoded}&ntb=1"
+        )
+        == target
+    )
+    assert (
+        linkedin_post_headless._decode_bing_redirect_url("https://www.linkedin.com/posts/direct")
+        == "https://www.linkedin.com/posts/direct"
+    )
+    assert linkedin_post_headless._decode_bing_redirect_url("https://www.bing.com/ck/a?p=1") == ""
+
+
+def test_rss_post_results_keep_raw_items_without_snippet_or_date() -> None:
+    feed = _rss_feed(
+        "<title>Hiring Junior Frontend Developer</title>"
+        "<link>https://www.linkedin.com/posts/alpha_activity-7483822807449600000-abcd</link>"
+        "<pubDate>Tue, 18 Aug 2026 10:00:00 GMT</pubDate>",
+        "<link>https://www.linkedin.com/posts/beta_activity-7483822807449600001-efgh</link>",
+    )
+
+    results = linkedin_post_headless._rss_post_results(feed)
+
+    assert [result.link for result in results] == [
+        "https://www.linkedin.com/posts/alpha_activity-7483822807449600000-abcd",
+        "https://www.linkedin.com/posts/beta_activity-7483822807449600001-efgh",
+    ]
+    assert results[0].date_text.startswith("Tue, 18 Aug 2026")
+    assert results[1].date_text == ""
+    assert linkedin_post_headless._rss_post_results("<not-rss>") == []
+
+
+class FakeSearchResponse:
+    def __init__(self, text: str) -> None:
+        self._text = text
+
+    async def __aenter__(self) -> "FakeSearchResponse":
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        return None
+
+    def raise_for_status(self) -> None:
+        return None
+
+    async def text(self) -> str:
+        return self._text
+
+
+class FakeSearchSession:
+    """Serves canned bodies by URL+params predicate, like real aiohttp calls."""
+
+    def __init__(self, routes: tuple[tuple[str, str], ...]) -> None:
+        self.routes = routes
+        self.calls: list[tuple[str, dict]] = []
+
+    def get(self, url: str, params: dict | None = None):
+        resolved_params = dict(params or {})
+        self.calls.append((url, resolved_params))
+        haystack = url + "?" + urlencode(resolved_params)
+        for marker, text in self.routes:
+            if marker in haystack:
+                return FakeSearchResponse(text)
+        return FakeSearchResponse("")
+
+
+def _free_discovery_settings() -> Settings:
+    return Settings(LINKEDIN_POST_HEADLESS_QUERY="", LINKEDIN_HEADLESS_DISCOVERY_PAGES="3")
+
+
+def test_discover_free_post_urls_collects_dedupes_and_prioritizes_dated(monkeypatch) -> None:
+    monkeypatch.setattr(linkedin_post_headless, "SEARCH_PAGE_DELAY_SECONDS", 0)
+    alpha = "https://www.linkedin.com/posts/alpha_activity-7483822807449600000-abcd"
+    beta = "https://www.linkedin.com/posts/beta_activity-7483822807449600001-efgh"
+    gamma = "https://de.linkedin.com/posts/gamma_activity-7483822807449600002-ijkl"
+    delta = "https://www.linkedin.com/posts/delta_activity-7483822807449600003-mnop"
+    ddg_html = (
+        "<html><body>"
+        "<a class='result__a' href='//duckduckgo.com/l/?uddg="
+        f"https%3A%2F%2Fwww.linkedin.com%2Fposts%2Fbeta_activity-7483822807449600001-efgh"
+        "'>dup</a>"
+        f"<a class='result__a' href='{gamma}'>new</a>"
+        "</body></html>"
+    )
+    session = FakeSearchSession(
+        (
+            ("format=rss", _rss_feed(
+                f"<title>Hiring Junior Frontend Developer</title><link>{alpha}</link>"
+                "<pubDate>Tue, 18 Aug 2026 10:00:00 GMT</pubDate>",
+                f"<link>{beta}</link>",
+            )),
+            ("duckduckgo", ddg_html),
+            ("first=11", ""),
+            ("bing.com/search", _bing_html_with_ck_links(delta)),
+        )
+    )
+    monkeypatch.setattr(linkedin_post_headless, "source_session", lambda **kwargs: _fake_session_context(session))
+
+    urls = asyncio.run(
+        linkedin_post_headless.LinkedInPostHeadlessAdapter(_free_discovery_settings())._discover_free_post_urls(limit=4)
+    )
+
+    canonical_gamma = "https://www.linkedin.com/posts/gamma_activity-7483822807449600002-ijkl"
+    # alpha carries the explicit RSS pubDate and wins; the other three share
+    # one activity-ID timestamp (the IDs differ below bit 22), so the stable
+    # URL-descending tie-break orders them.
+    assert urls == (alpha, canonical_gamma, delta, beta)
+
+
+def test_discover_free_post_urls_skips_challenge_provider(monkeypatch) -> None:
+    monkeypatch.setattr(linkedin_post_headless, "SEARCH_PAGE_DELAY_SECONDS", 0)
+    delta = "https://www.linkedin.com/posts/delta_activity-7483822807449600003-mnop"
+    session = FakeSearchSession(
+        (
+            ("format=rss", ""),
+            ("duckduckgo", "<html>unusual traffic from your computer network</html>"),
+            ("bing.com/search", _bing_html_with_ck_links(delta)),
+        )
+    )
+    monkeypatch.setattr(linkedin_post_headless, "source_session", lambda **kwargs: _fake_session_context(session))
+
+    urls = asyncio.run(
+        linkedin_post_headless.LinkedInPostHeadlessAdapter(_free_discovery_settings())._discover_free_post_urls(limit=4)
+    )
+
+    assert urls == (delta,)
+
+
+@asynccontextmanager
+async def _fake_session_context(session: FakeSearchSession):
+    yield session
