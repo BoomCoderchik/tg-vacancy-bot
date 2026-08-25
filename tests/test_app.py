@@ -190,9 +190,35 @@ def test_preview_sources_prints_filtered_candidates_without_publishing(capsys, m
     output = capsys.readouterr().out
     assert "Source preview" in output
     assert "LinkedIn Hiring Posts: fetched=2 filtered=1" in output
+    assert "LinkedIn Hiring Posts: rejected=1" in output
+    assert "- [rejected:no_frontend_fullstack_role] Sales Manager" in output
     assert "Ищем Junior Front-End Developer" in output
     assert "https://www.linkedin.com/posts/example" in output
-    assert "Sales Manager" not in output
+    assert "https://www.linkedin.com/posts/sales" not in output
+
+
+def test_preview_sources_limits_rejection_samples_to_five(capsys, monkeypatch) -> None:
+    settings = Settings(TELEGRAM_BOT_TOKEN="token", TARGET_CHAT_ID="@target")
+
+    class FakeAdapter:
+        name = "Fake"
+
+        async def fetch(self):
+            return [
+                Vacancy(title=f"Sales Manager {index}", description="B2B sales role.", source=self.name)
+                for index in range(7)
+            ]
+
+    monkeypatch.setattr("tg_vacancy_bot.app.get_settings", lambda: settings)
+    monkeypatch.setattr("tg_vacancy_bot.app.build_adapters", lambda _: [FakeAdapter()])
+
+    main(["preview-sources"])
+
+    output = capsys.readouterr().out
+    assert "Fake: rejected=7" in output
+    assert output.count("[rejected:") == 5
+    assert "[rejected:no_frontend_fullstack_role] Sales Manager 4" in output
+    assert "[rejected:no_frontend_fullstack_role] Sales Manager 5" not in output
 
 
 def test_preview_sources_supports_source_filter_and_limit(capsys, monkeypatch) -> None:
@@ -225,8 +251,9 @@ def test_preview_sources_supports_source_filter_and_limit(capsys, monkeypatch) -
     output = capsys.readouterr().out
     assert "First:" not in output
     assert "Second: fetched=2 filtered=1" in output
+    assert "Second: rejected=1" in output
+    assert "- [rejected:no_frontend_fullstack_role] Backend Developer" in output
     assert "Junior Frontend Developer" in output
-    assert "Backend Developer" not in output
 
 
 def test_preview_sources_shows_configuration_warning_when_adapter_is_missing(

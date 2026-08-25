@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import re
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -19,6 +20,7 @@ from tg_vacancy_bot.sources.freshness import filter_fresh_vacancies
 SERPAPI_SEARCH_URL = "https://serpapi.com/search.json"
 SERPER_SEARCH_URL = "https://google.serper.dev/search"
 SERPER_MAX_RESULTS_PER_REQUEST = 10
+BACKOFF_DELAYS_SECONDS = (2.0, 4.0)
 POST_URL_MARKERS = ("linkedin.com/posts/", "linkedin.com/feed/update/")
 POST_PATH_PREFIXES = ("/posts/", "/feed/update/")
 ACTIVITY_ID_PATTERN = re.compile(r"activity-(\d{15,20})(?:[-/?#]|$)", re.IGNORECASE)
@@ -305,28 +307,63 @@ def _canonicalize_linkedin_post_url(link: str) -> str:
     return canonical
 
 
+def _is_retryable_provider_error(error: LinkedInSearchProviderError) -> bool:
+    """Return True only for transient provider failures: 429, 5xx, network errors."""
+
+    if error.failure_type:
+        return True
+    status = error.status_code
+    return status is not None and (status == 429 or status >= 500)
+
+
+async def _request_with_backoff(
+    attempt: Callable[[], Awaitable[Mapping[str, Any]]],
+) -> Mapping[str, Any]:
+    """Run one search request with bounded retries on transient failures.
+
+    The attempt callable must already convert raw transport failures into
+    :class:`LinkedInSearchProviderError`; non-retryable failures re-raise
+    immediately and the final failure propagates unchanged.
+    """
+
+    for delay in BACKOFF_DELAYS_SECONDS:
+        try:
+            return await attempt()
+        except LinkedInSearchProviderError as exc:
+            if not _is_retryable_provider_error(exc):
+                raise
+            await asyncio.sleep(delay)
+    return await attempt()
+
+
 async def _get_search_payload(session, url: str, *, params: Mapping[str, Any]) -> Mapping[str, Any]:
-    try:
-        async with session.get(url, params=params) as response:
-            response.raise_for_status()
-            payload = await response.json()
-    except aiohttp.ClientResponseError as exc:
-        raise LinkedInSearchProviderError(exc.status) from None
-    except aiohttp.ClientError as exc:
-        raise LinkedInSearchProviderError(failure_type=type(exc).__name__) from None
-    return payload if isinstance(payload, Mapping) else {}
+    async def attempt() -> Mapping[str, Any]:
+        try:
+            async with session.get(url, params=params) as response:
+                response.raise_for_status()
+                payload = await response.json()
+        except aiohttp.ClientResponseError as exc:
+            raise LinkedInSearchProviderError(exc.status) from None
+        except aiohttp.ClientError as exc:
+            raise LinkedInSearchProviderError(failure_type=type(exc).__name__) from None
+        return payload if isinstance(payload, Mapping) else {}
+
+    return await _request_with_backoff(attempt)
 
 
 async def _post_search_payload(session, url: str, *, payload: Mapping[str, Any]) -> Mapping[str, Any]:
-    try:
-        async with session.post(url, json=payload) as response:
-            response.raise_for_status()
-            response_payload = await response.json()
-    except aiohttp.ClientResponseError as exc:
-        raise LinkedInSearchProviderError(exc.status) from None
-    except aiohttp.ClientError as exc:
-        raise LinkedInSearchProviderError(failure_type=type(exc).__name__) from None
-    return response_payload if isinstance(response_payload, Mapping) else {}
+    async def attempt() -> Mapping[str, Any]:
+        try:
+            async with session.post(url, json=payload) as response:
+                response.raise_for_status()
+                response_payload = await response.json()
+        except aiohttp.ClientResponseError as exc:
+            raise LinkedInSearchProviderError(exc.status) from None
+        except aiohttp.ClientError as exc:
+            raise LinkedInSearchProviderError(failure_type=type(exc).__name__) from None
+        return response_payload if isinstance(response_payload, Mapping) else {}
+
+    return await _request_with_backoff(attempt)
 
 
 def _post_title(search_title: str, snippet: str) -> str:

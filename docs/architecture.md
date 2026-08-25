@@ -119,6 +119,7 @@
 
 - `tg_vacancy_bot/storage.py`
   - SQLite deduplication by stable vacancy fingerprint.
+  - URL-based fingerprints are canonicalized first (`models.canonical_identity_url`): scheme/host lowercased, fragment dropped, tracking parameters (utm_*, fbclid, gclid, and similar) removed, trailing path slash stripped — so the same vacancy arriving from different sources with URL variants deduplicates once.
 
 - `tg_vacancy_bot/formatting.py`
   - Telegram HTML card formatting.
@@ -168,7 +169,7 @@ The bot depends on real Telegram access:
 
 Optional source credentials:
 
-- LinkedIn hiring-post search is controlled by `ENABLE_LINKEDIN_POST_SEARCH=false` by default and requires `SERPAPI_API_KEY` or `SERPER_API_KEY`.
+- LinkedIn hiring-post search is controlled by `ENABLE_LINKEDIN_POST_SEARCH=false` by default and requires `SERPAPI_API_KEY` or `SERPER_API_KEY`. Keyed search requests retry transient failures (HTTP 429, 5xx, network errors) with a bounded exponential backoff of two retries (2s, 4s); other client errors fail immediately, and the final failure still reports only the safe status class.
 - Free LinkedIn hiring-post scraping is controlled by `ENABLE_LINKEDIN_POST_SCRAPER=false` by default and does not require an API key. `LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS` defaults to `bing_rss,duckduckgo,bing` so the scraper first consumes Bing's RSS output, then falls back to public HTML result providers when RSS returns no usable LinkedIn posts. HTML providers that return anti-bot challenges are skipped; the scraper does not bypass CAPTCHA or protection pages.
 - Apify LinkedIn post-body search is controlled by `ENABLE_LINKEDIN_POST_APIFY=false` by default and requires `APIFY_API_TOKEN`. The default Actor is `harvestapi/linkedin-post-search`; it accepts `||`-separated queries no longer than 85 characters, uses a 24-hour Actor-side window, and reads the returned `content`, URL, author, and date. The adapter rejects entries without a reliable date or without both a hiring intent and a supported development role before the common filters run. Apify is an independent hosted provider, not an official LinkedIn API, and may incur usage charges.
 - Headless LinkedIn post parsing is controlled by `ENABLE_LINKEDIN_POST_HEADLESS=false` by default. It uses Playwright and does not use a LinkedIn account, proxy, or protection bypass. Direct reading additionally requires `LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=true` and a non-empty `LINKEDIN_HEADLESS_PERMISSION_REFERENCE` that records documented LinkedIn permission or an approved access path. Without that gate the adapter is not registered. It uses `SERPAPI_API_KEY` or `SERPER_API_KEY` for reliable link discovery; without a key, Bing discovery is best effort.
