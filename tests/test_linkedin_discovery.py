@@ -7,13 +7,15 @@ import aiohttp
 import pytest
 
 from tg_vacancy_bot.config import Settings
-from tg_vacancy_bot.sources.adapters import linkedin_post_headless
+from tg_vacancy_bot.sources.adapters import linkedin_post_headless, linkedin_post_search
 from tg_vacancy_bot.sources.adapters.linkedin_post_headless import LinkedInPostHeadlessAdapter
 from tg_vacancy_bot.sources.adapters.linkedin_post_search import (
+    BACKOFF_DELAYS_SECONDS,
     LinkedInPostCandidate,
     _canonicalize_linkedin_post_url,
     _get_search_payload,
     _google_recency_filter,
+    _post_search_payload,
     _result_to_candidate,
     LinkedInSearchProviderError,
     LinkedInPostSearchAdapter,
@@ -442,3 +444,156 @@ def test_search_provider_error_does_not_expose_api_key() -> None:
     assert exc_info.value.status_code == 401
     assert exc_info.value.failure_type == ""
     assert exc_info.value.__suppress_context__ is True
+
+
+def _client_response_error(status: int) -> aiohttp.ClientResponseError:
+    return aiohttp.ClientResponseError(
+        request_info=SimpleNamespace(real_url="https://serpapi.com/search.json"),
+        history=(),
+        status=status,
+        message="provider rejected request",
+    )
+
+
+class _JsonResponse:
+    def __init__(self, payload: object) -> None:
+        self._payload = payload
+
+    async def __aenter__(self) -> "_JsonResponse":
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        return None
+
+    def raise_for_status(self) -> None:
+        return None
+
+    async def json(self) -> object:
+        return self._payload
+
+
+class ScriptedSession:
+    """Session replaying scripted outcomes in order for GET and POST calls."""
+
+    def __init__(self, *outcomes: object) -> None:
+        self.outcomes = list(outcomes)
+        self.calls = 0
+
+    def get(self, url: str, *, params: dict | None = None):
+        return self._next()
+
+    def post(self, url: str, *, json: dict | None = None):
+        return self._next()
+
+    def _next(self):
+        self.calls += 1
+        outcome = self.outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return _JsonResponse(outcome)
+
+
+def _record_backoff_sleep(monkeypatch) -> list[float]:
+    delays: list[float] = []
+
+    async def fake_sleep(delay: float) -> None:
+        delays.append(delay)
+
+    monkeypatch.setattr(linkedin_post_search, "asyncio", SimpleNamespace(sleep=fake_sleep))
+    return delays
+
+
+def test_get_search_payload_retries_429_twice_then_succeeds(monkeypatch) -> None:
+    delays = _record_backoff_sleep(monkeypatch)
+    session = ScriptedSession(
+        _client_response_error(429),
+        _client_response_error(429),
+        {"organic_results": []},
+    )
+
+    payload = asyncio.run(
+        _get_search_payload(
+            session,
+            "https://serpapi.com/search.json",
+            params={"api_key": "test-key"},
+        )
+    )
+
+    assert payload == {"organic_results": []}
+    assert session.calls == 3
+    assert delays == list(BACKOFF_DELAYS_SECONDS)
+
+
+def test_get_search_payload_raises_after_three_429_responses(monkeypatch) -> None:
+    delays = _record_backoff_sleep(monkeypatch)
+    session = ScriptedSession(
+        _client_response_error(429),
+        _client_response_error(429),
+        _client_response_error(429),
+    )
+
+    with pytest.raises(LinkedInSearchProviderError) as exc_info:
+        asyncio.run(
+            _get_search_payload(
+                session,
+                "https://serpapi.com/search.json",
+                params={"api_key": "test-key"},
+            )
+        )
+
+    assert exc_info.value.status_code == 429
+    assert exc_info.value.failure_type == ""
+    assert session.calls == 3
+    assert delays == list(BACKOFF_DELAYS_SECONDS)
+
+
+def test_get_search_payload_does_not_retry_client_4xx_errors(monkeypatch) -> None:
+    delays = _record_backoff_sleep(monkeypatch)
+    session = ScriptedSession(_client_response_error(400))
+
+    with pytest.raises(LinkedInSearchProviderError) as exc_info:
+        asyncio.run(
+            _get_search_payload(
+                session,
+                "https://serpapi.com/search.json",
+                params={"api_key": "test-key"},
+            )
+        )
+
+    assert exc_info.value.status_code == 400
+    assert session.calls == 1
+    assert delays == []
+
+
+def test_get_search_payload_retries_network_errors_then_succeeds(monkeypatch) -> None:
+    delays = _record_backoff_sleep(monkeypatch)
+    session = ScriptedSession(
+        aiohttp.ClientError("connection reset"),
+        aiohttp.ClientError("connection reset"),
+        {"organic_results": []},
+    )
+
+    payload = asyncio.run(
+        _get_search_payload(session, "https://serpapi.com/search.json", params={"q": "test"})
+    )
+
+    assert payload == {"organic_results": []}
+    assert session.calls == 3
+    assert delays == list(BACKOFF_DELAYS_SECONDS)
+
+
+def test_post_search_payload_retries_5xx_once_then_succeeds(monkeypatch) -> None:
+    delays = _record_backoff_sleep(monkeypatch)
+    session = ScriptedSession(_client_response_error(503), {"organic": []})
+
+    payload = asyncio.run(
+        _post_search_payload(
+            session,
+            "https://google.serper.dev/search",
+            payload={"q": "test"},
+        )
+    )
+
+    assert payload == {"organic": []}
+    assert session.calls == 2
+    assert delays == [BACKOFF_DELAYS_SECONDS[0]]
