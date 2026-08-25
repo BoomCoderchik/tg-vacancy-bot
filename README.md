@@ -225,6 +225,8 @@ To fetch configured sources and preview filtered candidates without publishing a
 tg-vacancy-bot preview-sources --source "LinkedIn Hiring Posts" --limit 5
 ```
 
+The preview also shows how many candidates the vacancy filter rejected and up to five sample rejections with their policy reason, for example `- [rejected:no_junior_level_evidence] Senior Frontend Developer`, so search queries can be tuned safely before publication.
+
 When `SOURCE_POLL_INTERVAL_SECONDS` is greater than `0`, `tg-vacancy-bot run` also polls configured public sources in the background while it listens for forwarded messages.
 `SOURCE_MAX_PUBLISH_PER_POLL` limits how many source vacancies can be published in one polling cycle, which prevents first-run flooding. Source polling always attempts to localize descriptions before publication; if the provider fails, it logs the failure and publishes the original description and vacancy link instead.
 
