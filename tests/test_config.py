@@ -102,6 +102,7 @@ def test_settings_reads_linkedin_post_headless_options() -> None:
         LINKEDIN_POST_HEADLESS_RESULTS_WANTED="7",
         LINKEDIN_POST_SEARCH_INTENTS_PER_CYCLE="8",
         LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS="25",
+        LINKEDIN_HEADLESS_DISCOVERY_PAGES="5",
     )
 
     assert settings.enable_linkedin_post_headless is True
@@ -111,6 +112,7 @@ def test_settings_reads_linkedin_post_headless_options() -> None:
     assert settings.linkedin_post_headless_results_wanted == 7
     assert settings.linkedin_post_search_intents_per_cycle == 8
     assert settings.linkedin_post_headless_timeout_seconds == 25
+    assert settings.linkedin_headless_discovery_pages == 5
 
 
 def test_settings_reads_linkedin_post_search_options() -> None:

@@ -26,6 +26,17 @@ def test_default_profile_covers_named_families_in_russian_and_english() -> None:
         assert {intent.language for intent in DEFAULT_SEARCH_INTENTS if intent.family == family} == {"en", "ru"}
 
 
+def test_default_profile_covers_junior_and_internship_levels() -> None:
+    junior_markers = ("junior", "entry level", "без опыта", "джуниор")
+    internship_markers = ("intern", "trainee", "стажировка", "интерн")
+
+    assert len(DEFAULT_SEARCH_INTENTS) == 8
+    for family in EXPECTED_FAMILIES:
+        queries = [intent.query.lower() for intent in DEFAULT_SEARCH_INTENTS if intent.family == family]
+        assert any(any(marker in query for marker in junior_markers) for query in queries)
+        assert any(any(marker in query for marker in internship_markers) for query in queries)
+
+
 def test_default_queries_have_site_hiring_and_explicit_role_constraints() -> None:
     explicit_role_terms = {
         "developer",
@@ -107,14 +118,18 @@ def test_fair_query_limits_returns_empty_for_no_intents() -> None:
 
 
 def test_select_cycle_intents_rotates_through_full_profile() -> None:
-    first = select_cycle_intents(DEFAULT_SEARCH_INTENTS, max_intents=2, cycle_index=0)
-    second = select_cycle_intents(DEFAULT_SEARCH_INTENTS, max_intents=2, cycle_index=1)
+    half_window = (len(DEFAULT_SEARCH_INTENTS) + 1) // 2
+    first = select_cycle_intents(DEFAULT_SEARCH_INTENTS, max_intents=half_window, cycle_index=0)
+    second = select_cycle_intents(DEFAULT_SEARCH_INTENTS, max_intents=half_window, cycle_index=1)
 
     assert first + second == DEFAULT_SEARCH_INTENTS
 
 
 def test_select_cycle_intents_handles_wraparound_and_bounds() -> None:
-    intents = DEFAULT_SEARCH_INTENTS + DEFAULT_SEARCH_INTENTS[:1]
+    intents = tuple(
+        SearchIntent(family=f"family-{index}", language="en", query="q")
+        for index in range(5)
+    )
 
     assert select_cycle_intents(intents, max_intents=3, cycle_index=1) == (
         intents[3],

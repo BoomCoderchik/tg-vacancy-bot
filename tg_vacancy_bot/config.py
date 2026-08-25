@@ -146,6 +146,15 @@ class Settings(BaseSettings):
         alias="LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS",
         gt=0,
     )
+    # Free-discovery depth for the headless adapter: number of Bing result
+    # pages per intent before the DuckDuckGo HTML fallback. Higher values read
+    # more public search pages; every page still skips protection screens.
+    linkedin_headless_discovery_pages: int = Field(
+        default=3,
+        alias="LINKEDIN_HEADLESS_DISCOVERY_PAGES",
+        ge=1,
+        le=6,
+    )
     localization_max_per_poll: int = Field(default=12, alias="LOCALIZATION_MAX_PER_POLL")
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4.1-mini", alias="OPENAI_MODEL")

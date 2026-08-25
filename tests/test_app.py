@@ -113,7 +113,7 @@ def test_diagnose_linkedin_can_force_default_profile(capsys, monkeypatch) -> Non
 
     output = capsys.readouterr().out
     assert "stage=discovery status=misconfigured" in output
-    assert "profile_intents=4/4" in output
+    assert "profile_intents=6/8" in output
 
 
 def test_check_sources_reports_registered_linkedin_post_search_without_exposing_key(
