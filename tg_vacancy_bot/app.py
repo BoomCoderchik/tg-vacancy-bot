@@ -22,6 +22,7 @@ from .linkedin_diagnostics import collect_linkedin_diagnostics, format_linkedin_
 from .preview import parse_publishable_message, preview_message_card_async
 from .publisher import TelegramPublisher
 from .sources import build_adapters, filter_it_vacancies, source_configuration_warnings
+from .sources.filters import evaluate_vacancy_policy
 from .sources.freshness import filter_fresh_vacancies
 from .storage import VacancyStore
 from .telegram_check import check_telegram_access, format_check_result
@@ -247,6 +248,14 @@ async def preview_sources(settings, source_name: str | None = None, limit: int =
             current_time=datetime.now(UTC),
         )
         lines.append(f"{adapter.name}: fetched={len(vacancies)} filtered={len(filtered)}")
+        decisions = [
+            (vacancy, evaluate_vacancy_policy(" ".join([vacancy.title, vacancy.description])))
+            for vacancy in vacancies
+        ]
+        rejections = [(vacancy, decision) for vacancy, decision in decisions if not decision.allowed]
+        lines.append(f"{adapter.name}: rejected={len(rejections)}")
+        for vacancy, decision in rejections[:5]:
+            lines.append(f"- [rejected:{decision.reason}] {vacancy.title}")
         for vacancy in filtered[:per_source_limit]:
             lines.append(f"- {vacancy.title}")
             if vacancy.url:
