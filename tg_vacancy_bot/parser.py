@@ -54,6 +54,11 @@ TECH_KEYWORDS = [
     "LLM",
 ]
 
+_STACK_PATTERNS = {
+    item: re.compile(rf"(?<![\w#.]){re.escape(item)}(?![\w#])", re.IGNORECASE)
+    for item in TECH_KEYWORDS
+}
+
 STACK_EVIDENCE_TERMS = [
     "build",
     "develop",
@@ -90,13 +95,20 @@ TITLE_HINT_RE = re.compile(
 )
 
 LOCATION_RE = re.compile(
-    r"(remote|удаленн?о|удалённ?о|hybrid|onsite|relocation|europe|usa|us|uk|germany|poland|cyprus|serbia|armenia|georgia|казахстан|европа|сша)",
+    r"\b(remote|удаленн?о|удалённ?о|hybrid|onsite|relocation|europe|usa|us|uk|germany|poland|cyprus|serbia|armenia|georgia|казахстан|европа|сша)\b",
     re.IGNORECASE,
 )
 
 SALARY_RE = re.compile(
-    r"((?:\$|€|£)\s?\d[\d\s,.]*(?:\s?-\s?(?:\$|€|£)?\s?\d[\d\s,.]*)?|"
-    r"\d[\d\s,.]*\s?(?:usd|eur|gbp|rub|₽|k|тыс\.?)(?:\s?-\s?\d[\d\s,.]*\s?(?:usd|eur|gbp|rub|₽|k|тыс\.?))?)",
+    r"("
+    r"(?:\$|€|£)\s?\d[\d\s,.]*(?:\s?-\s?(?:\$|€|£)?\s?\d[\d\s,.]*)?"
+    r"|от\s?\d[\d\s,.]*\s?(?:k|к|тыс\.?)?\s?(?:\$|€|£|usd|eur|gbp|rub|руб\.?|₽)?\s?до\s?"
+    r"\d[\d\s,.]*\s?(?:k|к|тыс\.?)?\s?(?:\$|€|£|usd|eur|gbp|rub|руб\.?|₽)"
+    r"|\d[\d\s,.]*\s?(?:k|к|тыс\.?)?\s?(?:\$|€|£|usd|eur|gbp|rub|руб\.?|₽)?\s?-\s?"
+    r"\d[\d\s,.]*\s?(?:k|к|тыс\.?)?\s?(?:\$|€|£|usd|eur|gbp|rub|руб\.?|₽)"
+    r"|\d[\d\s,.]*\s?(?:k|к|тыс\.?)\s?(?:\$|€|£|usd|eur|gbp|rub|руб\.?|₽)?"
+    r"|\d[\d\s,.]*\s?(?:\$|€|£|usd|eur|gbp|rub|руб\.?|₽)"
+    r")",
     re.IGNORECASE,
 )
 
@@ -124,9 +136,9 @@ def extract_urls(text: str) -> list[str]:
 
 def extract_stack(text: str) -> tuple[str, ...]:
     found: list[str] = []
-    lower = text.lower()
+    source = text or ""
     for item in TECH_KEYWORDS:
-        if item.lower() in lower and item not in found:
+        if item not in found and _STACK_PATTERNS[item].search(source):
             found.append(item)
     sql_specific = {"PostgreSQL", "MySQL"}
     if "SQL" in found and any(item in found for item in sql_specific):
@@ -187,11 +199,15 @@ def is_empty_description_label(line: str) -> bool:
 def guess_title(text: str) -> str:
     lines = [line.strip(" -•\t") for line in text.splitlines() if line.strip()]
     for line in lines[:8]:
-        if len(line) <= 90 and TITLE_HINT_RE.search(line):
+        match = TITLE_HINT_RE.search(line)
+        if not match or len(line) > 90:
+            continue
+        hint = " ".join(match.group("title").split())
+        if len(hint) >= 10 or hint.lower() != " ".join(line.split()).lower():
             return line
 
     match = TITLE_HINT_RE.search(text)
-    if match:
+    if match and len(" ".join(match.group("title").split())) >= 10:
         return " ".join(match.group("title").split())
 
     for line in lines[:5]:
