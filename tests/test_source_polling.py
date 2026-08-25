@@ -32,7 +32,11 @@ class FakeAdapter:
 
     async def fetch(self) -> list[Vacancy]:
         return [
-            Vacancy(title=f"Python Engineer {index}", description="Remote Python role", source=self.name)
+            Vacancy(
+                title=f"Junior Frontend Developer {index}",
+                description="We are hiring a junior frontend developer. React.",
+                source=self.name,
+            )
             for index in range(5)
         ]
 
@@ -106,7 +110,7 @@ def test_poll_sources_once_publishes_original_when_localization_fails(monkeypatc
 
     assert published == 5
     assert len(bot.sent_messages) == 5
-    assert "Remote Python role" in bot.sent_messages[0]
+    assert "We are hiring a junior frontend developer. React." in bot.sent_messages[0]
 
 
 def test_poll_sources_once_publishes_original_when_localization_key_is_missing(monkeypatch) -> None:
@@ -119,7 +123,7 @@ def test_poll_sources_once_publishes_original_when_localization_key_is_missing(m
     published = asyncio.run(poll_sources_once(bot, settings, FakeStore()))
 
     assert published == 5
-    assert "Remote Python role" in bot.sent_messages[0]
+    assert "We are hiring a junior frontend developer. React." in bot.sent_messages[0]
 
 
 def test_poll_sources_once_skips_stale_published_vacancies(monkeypatch) -> None:

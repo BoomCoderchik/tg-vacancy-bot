@@ -21,6 +21,7 @@ from tg_vacancy_bot.sources.adapters.linkedin_post_search import (
 )
 from tg_vacancy_bot.sources.linkedin_search_profile import (
     DEFAULT_SEARCH_INTENTS,
+    fair_query_limits,
     select_cycle_intents,
 )
 
@@ -190,8 +191,11 @@ def test_headless_keyed_discovery_preserves_candidate_without_date_or_snippet(mo
         max_intents=6,
         cycle_index=linkedin_post_headless._search_cycle_index(current_time),
     )
+    expected_limits = fair_query_limits(5, expected_intents)
     assert urls == (POST_URL,)
-    assert calls == [(1, intent.query) for intent in expected_intents]
+    assert calls == [
+        (limit, intent.query) for limit, intent in zip(expected_limits, expected_intents, strict=True)
+    ]
 
 
 def test_headless_keyed_discovery_deduplicates_urls_across_providers(monkeypatch) -> None:

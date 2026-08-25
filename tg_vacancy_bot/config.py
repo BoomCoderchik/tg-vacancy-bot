@@ -23,22 +23,20 @@ GROQ_FREE_TRANSLATION_MODEL = "llama-3.1-8b-instant"
 GROQ_FREE_TRANSLATION_FALLBACK_MODELS = ("openai/gpt-oss-20b",)
 DEFAULT_LINKEDIN_POST_SCRAPER_QUERY = (
     '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR "we\'re hiring" OR hiring) '
-    '(frontend OR backend OR fullstack OR "software developer" OR "software engineer" OR react OR python) || '
+    '("junior frontend developer" OR "junior front-end developer" OR "junior fullstack developer" '
+    'OR "junior full-stack developer" OR "intern frontend developer" OR "trainee frontend developer") || '
     '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("looking for" OR "join our team" OR "open role") '
-    '(developer OR engineer OR frontend OR backend OR fullstack OR react OR python) || '
+    '(frontend OR "front-end" OR fullstack OR "full-stack") ("junior" OR intern OR trainee OR "entry level") || '
     '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("ищем" OR "ищет" OR "нанимаем" OR "в команду") '
-    '(разработчик OR инженер OR frontend OR backend OR fullstack OR react OR python)'
+    '(фронтенд OR фронтенд-разработчик OR фулстек OR фулстек-разработчик) (джуниор OR стажер OR "без опыта")'
 )
 DEFAULT_LINKEDIN_POST_APIFY_SEARCH_QUERIES = (
-    "Hiring frontend developer",
-    "Hiring full stack developer",
-    "Hiring backend developer",
-    "Looking for frontend developer",
-    "Looking for full stack developer",
-    "Looking for backend developer",
-    "Ищем frontend разработчика",
-    "Ищем fullstack разработчика",
-    "Ищем backend разработчика",
+    "Hiring junior frontend developer",
+    "Hiring junior full stack developer",
+    "Looking for junior frontend developer",
+    "Ищем джуниор фронтенд разработчика",
+    "Ищем джуниор фулстек разработчика",
+    "Ищем стажера фронтенд разработчика",
 )
 
 class Settings(BaseSettings):
@@ -115,9 +113,9 @@ class Settings(BaseSettings):
             '(site:linkedin.com/posts OR site:linkedin.com/feed/update) '
             '("we are hiring" OR "we\'re hiring" OR hiring OR "looking for" OR "join our team" OR "open role" OR '
             '"ищем" OR "ищет" OR "нанимаем" OR "в команду") '
-            '(frontend OR "front-end" OR backend OR fullstack OR "full-stack" OR "software developer" OR '
-            '"software engineer" OR developer OR engineer OR react OR python OR designer OR "AI engineer" OR '
-            '"ML engineer" OR "LLM engineer" OR разработчик OR инженер)'
+            '("junior frontend developer" OR "junior front-end developer" OR "junior frontend engineer" OR '
+            '"junior fullstack developer" OR "junior full-stack developer" OR "junior full stack engineer" OR '
+            '"intern frontend developer" OR "trainee fullstack developer" OR frontend OR fullstack)'
         ),
         alias="LINKEDIN_POST_SEARCH_QUERY",
     )

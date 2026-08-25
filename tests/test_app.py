@@ -113,7 +113,7 @@ def test_diagnose_linkedin_can_force_default_profile(capsys, monkeypatch) -> Non
 
     output = capsys.readouterr().out
     assert "stage=discovery status=misconfigured" in output
-    assert "profile_intents=6/24" in output
+    assert "profile_intents=4/4" in output
 
 
 def test_check_sources_reports_registered_linkedin_post_search_without_exposing_key(
@@ -209,7 +209,11 @@ def test_preview_sources_supports_source_filter_and_limit(capsys, monkeypatch) -
 
         async def fetch(self):
             return [
-                Vacancy(title="Frontend Developer", description="React role.", source=self.name),
+                Vacancy(
+                    title="Junior Frontend Developer",
+                    description="We are hiring a junior frontend developer. React role.",
+                    source=self.name,
+                ),
                 Vacancy(title="Backend Developer", description="Python role.", source=self.name),
             ]
 
@@ -220,8 +224,8 @@ def test_preview_sources_supports_source_filter_and_limit(capsys, monkeypatch) -
 
     output = capsys.readouterr().out
     assert "First:" not in output
-    assert "Second: fetched=2 filtered=2" in output
-    assert "Frontend Developer" in output
+    assert "Second: fetched=2 filtered=1" in output
+    assert "Junior Frontend Developer" in output
     assert "Backend Developer" not in output
 
 
@@ -271,7 +275,11 @@ def test_poll_once_respects_global_publish_limit(monkeypatch, tmp_path) -> None:
 
         async def fetch(self):
             return [
-                Vacancy(title=f"Python Engineer {index}", description="Remote Python role", source="Fake")
+                Vacancy(
+                    title=f"Junior Frontend Developer {index}",
+                    description="We are hiring a junior frontend developer. React.",
+                    source="Fake",
+                )
                 for index in range(5)
             ]
 
@@ -319,7 +327,11 @@ def test_poll_once_skips_vacancy_when_localization_fails(monkeypatch, tmp_path) 
         async def fetch(self):
             return [
                 Vacancy(title="UI/UX Designer", description="Design ecommerce flows.", source="Fake"),
-                Vacancy(title="Python Engineer", description="Remote Python role", source="Fake"),
+                Vacancy(
+                    title="Junior Frontend Developer",
+                    description="We are hiring a junior frontend developer. React.",
+                    source="Fake",
+                ),
             ]
 
     class FakePublisher:
@@ -328,7 +340,7 @@ def test_poll_once_skips_vacancy_when_localization_fails(monkeypatch, tmp_path) 
 
         async def publish_new(self, vacancies):
             attempted.extend(vacancies)
-            if vacancies[0].title == "UI/UX Designer":
+            if vacancies[0].title == "Junior Frontend Developer":
                 raise RuntimeError("OpenAI returned an empty localized description.")
             return len(vacancies)
 
@@ -343,7 +355,7 @@ def test_poll_once_skips_vacancy_when_localization_fails(monkeypatch, tmp_path) 
 
     asyncio.run(poll_once())
 
-    assert [vacancy.title for vacancy in attempted] == ["UI/UX Designer", "Python Engineer"]
+    assert [vacancy.title for vacancy in attempted] == ["Junior Frontend Developer"]
 
 
 def test_poll_once_warns_when_linkedin_posts_enabled_without_search_provider_key(
