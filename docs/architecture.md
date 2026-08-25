@@ -63,7 +63,7 @@
   - Supports opt-in, globally scoped LinkedIn hiring-post search with `ENABLE_LINKEDIN_POST_SEARCH`, `SERPAPI_API_KEY` or `SERPER_API_KEY`, `LINKEDIN_POST_SEARCH_QUERY`, and `LINKEDIN_POST_SEARCH_RESULTS_WANTED`.
   - Supports opt-in, globally scoped free LinkedIn hiring-post scraping with `ENABLE_LINKEDIN_POST_SCRAPER`, `LINKEDIN_POST_SCRAPER_QUERY`, `LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS`, and `LINKEDIN_POST_SCRAPER_RESULTS_WANTED`.
   - Supports opt-in Apify-backed LinkedIn post-body search with `ENABLE_LINKEDIN_POST_APIFY`, `APIFY_API_TOKEN`, `LINKEDIN_POST_APIFY_ACTOR`, `LINKEDIN_POST_APIFY_SEARCH_QUERIES`, `LINKEDIN_POST_APIFY_POSTED_LIMIT`, `LINKEDIN_POST_APIFY_MAX_POSTS`, and `LINKEDIN_POST_APIFY_TIMEOUT_SECONDS`.
-  - Supports opt-in, globally scoped headless parsing of publicly available LinkedIn posts with `ENABLE_LINKEDIN_POST_HEADLESS`, `LINKEDIN_HEADLESS_ACCESS_AUTHORIZED`, `LINKEDIN_HEADLESS_PERMISSION_REFERENCE`, `LINKEDIN_POST_HEADLESS_QUERY`, `LINKEDIN_POST_HEADLESS_RESULTS_WANTED`, `LINKEDIN_POST_SEARCH_INTENTS_PER_CYCLE`, and `LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS`. A blank query activates 24 built-in Russian/English intents across 12 allowed role families. The rotating window defaults to six intents per 15-minute cycle, covering the full profile each hour. SerpApi and Serper requests use Google’s closest supported recency window before raw URL candidates reach the exact freshness decision. Direct page reading remains disabled unless both the authorization flag and a documented permission reference are present. Every automatic LinkedIn adapter requires a reliable publication date before publication and enforces `LINKEDIN_POST_MAX_AGE_HOURS` with a hard maximum of 240 hours / 10 days.
+   - Supports opt-in, globally scoped headless parsing of publicly available LinkedIn posts with `ENABLE_LINKEDIN_POST_HEADLESS`, `LINKEDIN_HEADLESS_ACCESS_AUTHORIZED`, `LINKEDIN_HEADLESS_PERMISSION_REFERENCE`, `LINKEDIN_POST_HEADLESS_QUERY`, `LINKEDIN_POST_HEADLESS_RESULTS_WANTED`, `LINKEDIN_POST_SEARCH_INTENTS_PER_CYCLE`, and `LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS`. A blank query activates the built-in Russian/English intents across the two allowed role families (frontend and fullstack), phrased for junior or entry-level candidates. SerpApi and Serper requests use Google’s closest supported recency window before raw URL candidates reach the exact freshness decision. Direct page reading remains disabled unless both the authorization flag and a documented permission reference are present. Every automatic LinkedIn adapter requires a reliable publication date before publication and enforces `LINKEDIN_POST_MAX_AGE_HOURS` with a hard maximum of 240 hours / 10 days.
 
 - `tg_vacancy_bot/access_control.py`
   - Parses operator allowlists and checks whether a sender may publish through the bot.
@@ -135,25 +135,27 @@ The full, maintained category matrix and implementation plan live in
 Update that document first when the channel's vacancy policy changes, then
 reflect the stabilized behavior here.
 
-The publication policy is development-first. Backend, frontend, fullstack,
-mobile, GameDev, ML/LLM/AI, blockchain/Web3, UI/UX, Software Architect,
-Technical Lead, DevSecOps, Automation QA, and explicitly developer/programmer
-enterprise roles may be published.
+The publication policy is narrow by design. A post may be published only when
+it really seeks Junior-level Frontend or Fullstack developers. The unified
+check in `tg_vacancy_bot/sources/filters.py` requires all of:
 
-DevOps/SRE/Cloud, database administration, network/sysadmin/support, manual QA,
-SDET, AppSec, Embedded/firmware/IoT/robotics, Data Analyst/BI, ordinary and
-technical product/project roles, Solution Architect, Engineering Manager,
-general design, Technical Writer, Implementation Engineer, Solutions
-Consultant, and consulting or implementation roles are excluded.
+- a hiring signal (`hiring`, `looking for`, `join our team`, `open role`,
+  `ищем`, `нанимаем`, `вакансия`, ...);
+- explicit frontend or fullstack role evidence (`frontend`, `front-end`,
+  `фронтенд`, `fullstack`, `full-stack`, `фулстек`, ...);
+- junior or entry-level evidence (`junior`, `intern`, `trainee`, `стажер`,
+  `entry-level`, `без опыта`, ...).
+
+Posts are rejected when a non-junior seniority level (`senior`, `middle`,
+`lead`, ...) is attached directly to a frontend/fullstack role, when the text
+advertises courses, bootcamps, or mentorship instead of a job, or when any of
+the required signals above is missing. Every decision carries a diagnostic
+reason that is covered by tests.
 
 The same policy applies to source adapters, forwarded messages, `copy` mode,
 background polling, and preview commands. Role evidence must come from the
-actual vacancy role or explicit technical responsibilities; a technology name
-or a word such as `developer` appearing only in company or product
-description is not sufficient. There are no filters by geography, work format,
-salary, language, citizenship, work authorization, or employment type; valid
-internships, trainee, freelance, contract, part-time, and unpaid roles remain
-eligible.
+actual vacancy role; there are no filters by geography, work format, salary,
+language, citizenship, work authorization, or employment type.
 
 ## External Services
 

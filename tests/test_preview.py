@@ -14,17 +14,17 @@ class FakeLocalizer:
 def test_preview_message_card_formats_vacancy() -> None:
     card = preview_message_card(
         """
-Senior Backend Engineer
+Junior Frontend Developer
 Location: Remote
-Stack: Python, FastAPI
-Description: Hiring for a backend role.
+Stack: React, TypeScript
+Description: Hiring for a junior frontend role.
 https://www.linkedin.com/posts/example
 """
     )
 
     assert "IT Job Board" not in card
-    assert "Senior Backend Engineer" in card
-    assert "Python, FastAPI" in card
+    assert "Junior Frontend Developer" in card
+    assert "React, TypeScript" in card
 
 
 def test_preview_message_card_rejects_non_vacancy() -> None:
@@ -43,10 +43,10 @@ def test_preview_message_card_async_localizes_description() -> None:
     card = asyncio.run(
         preview_message_card_async(
             """
-Senior Backend Engineer
+Junior Frontend Developer
 Location: Remote
-Stack: Python, FastAPI
-Description: Hiring for a backend role.
+Stack: React, TypeScript
+Description: Hiring for a junior frontend role.
 https://www.linkedin.com/posts/example
 """,
             settings,
@@ -55,20 +55,22 @@ https://www.linkedin.com/posts/example
     )
 
     assert "Коротко: backend роль с Python." in card
-    assert "Hiring for a backend role." not in card
+    assert "Hiring for a junior frontend role." not in card
 
 
 def test_parse_publishable_message_returns_vacancy() -> None:
-    vacancy = parse_publishable_message("Hiring Python Engineer. Stack: Python. Remote role.")
+    vacancy = parse_publishable_message(
+        "Hiring Junior Frontend Developer. Stack: React. Remote role."
+    )
 
-    assert "Python Engineer" in vacancy.title
+    assert "Frontend Developer" in vacancy.title
     assert vacancy.source == "Telegram"
-    assert "Python" in vacancy.stack
+    assert "React" in vacancy.stack
 
 
 def test_parse_publishable_message_treats_linkedin_url_as_regular_vacancy() -> None:
     vacancy = parse_publishable_message(
-        "We're hiring a React developer to join our team. "
+        "We're hiring a Junior Frontend developer to join our team. "
         "https://www.linkedin.com/feed/update/urn:li:activity:123/"
     )
 

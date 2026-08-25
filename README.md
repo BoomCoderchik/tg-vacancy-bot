@@ -11,7 +11,7 @@ The profile and queued-application foundations are documented in [`docs/applicat
 - Supports two forwarded-message modes:
   - `normalize`: parse text and publish a clean vacancy card.
   - `copy`: copy the original message to the target channel after the same allowed-vacancy intake check.
-- Publishes only development/UI/UX/AI vacancies: backend, frontend, fullstack, UI/UX, LLM, AI, and clear software developer/engineer roles.
+- Publishes only posts that really seek Junior Frontend or Fullstack developers: each post needs a hiring signal, explicit frontend/fullstack role evidence, and a junior or entry-level marker.
 - Stores message fingerprints in SQLite to avoid duplicates.
 - Includes opt-in LinkedIn hiring-post discovery through keyed search, free search-result scraping, Apify post-body search, and permission-gated headless public-post parsing.
 - Polls configured public sources in the background while the bot is running.
@@ -66,7 +66,7 @@ ENABLE_LINKEDIN_POST_SEARCH=true
 SERPAPI_API_KEY=
 # Or use Serper instead of SerpApi:
 SERPER_API_KEY=
-LINKEDIN_POST_SEARCH_QUERY=(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR "we're hiring" OR hiring OR "looking for" OR "join our team" OR "open role" OR "ищем" OR "ищет" OR "нанимаем" OR "в команду") (frontend OR "front-end" OR backend OR fullstack OR "full-stack" OR "software developer" OR "software engineer" OR developer OR engineer OR react OR python OR designer OR "AI engineer" OR "ML engineer" OR "LLM engineer" OR разработчик OR инженер)
+LINKEDIN_POST_SEARCH_QUERY=(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR "we're hiring" OR hiring OR "looking for" OR "join our team" OR "open role" OR "ищем" OR "ищет" OR "нанимаем" OR "в команду") ("junior frontend developer" OR "junior front-end developer" OR "junior frontend engineer" OR "junior fullstack developer" OR "junior full-stack developer" OR "junior full stack engineer" OR "intern frontend developer" OR "trainee fullstack developer" OR frontend OR fullstack)
 LINKEDIN_POST_SEARCH_RESULTS_WANTED=10
 ```
 
@@ -78,7 +78,7 @@ To avoid paid search APIs, enable the free scraper source:
 
 ```dotenv
 ENABLE_LINKEDIN_POST_SCRAPER=true
-LINKEDIN_POST_SCRAPER_QUERY=(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR "we're hiring" OR hiring) (frontend OR backend OR fullstack OR "software developer" OR "software engineer" OR react OR python) || (site:linkedin.com/posts OR site:linkedin.com/feed/update) ("looking for" OR "join our team" OR "open role") (developer OR engineer OR frontend OR backend OR fullstack OR react OR python) || (site:linkedin.com/posts OR site:linkedin.com/feed/update) ("ищем" OR "ищет" OR "нанимаем" OR "в команду") (разработчик OR инженер OR frontend OR backend OR fullstack OR react OR python)
+LINKEDIN_POST_SCRAPER_QUERY=(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR "we're hiring" OR hiring) ("junior frontend developer" OR "junior front-end developer" OR "junior fullstack developer" OR "junior full-stack developer" OR "intern frontend developer" OR "trainee frontend developer") || (site:linkedin.com/posts OR site:linkedin.com/feed/update) ("looking for" OR "join our team" OR "open role") (frontend OR "front-end" OR fullstack OR "full-stack") ("junior" OR intern OR trainee OR "entry level") || (site:linkedin.com/posts OR site:linkedin.com/feed/update) ("ищем" OR "ищет" OR "нанимаем" OR "в команду") (фронтенд OR фронтенд-разработчик OR фулстек OR фулстек-разработчик) (джуниор OR стажер OR "без опыта")
 LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS=bing_rss,duckduckgo,bing
 LINKEDIN_POST_SCRAPER_RESULTS_WANTED=100
 ```
@@ -126,7 +126,7 @@ LINKEDIN_POST_SEARCH_INTENTS_PER_CYCLE=6
 LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS=20
 ```
 
-When `LINKEDIN_POST_HEADLESS_QUERY` is blank, the autonomous profile uses 24 explicit searches: 12 allowed role families in Russian and English. Six intents run per 15-minute cycle by default, so the whole profile is covered each hour without spending the search quota on 24 requests every cycle. Set a custom `||`-separated query list only when overriding that built-in profile intentionally.
+When `LINKEDIN_POST_HEADLESS_QUERY` is blank, the autonomous profile uses four explicit searches: two allowed role families (frontend and fullstack) in Russian and English, all phrased for junior or entry-level candidates. The whole profile is covered in a single cycle. Set a custom `||`-separated query list only when overriding that built-in profile intentionally.
 
 It discovers globally indexed public posts without a country restriction. Each selected intent receives a balanced result quota; candidates from all selected families are then ordered by their verifiable publication-date hint before the browser-read limit is applied. SerpApi and Serper requests also use Google’s nearest supported recent-results window (`tbs=qdr:*`); the bot still verifies every date against the exact configured age limit. Search results are retained as raw URL candidates, so a missing search snippet or date no longer removes a link before the browser can inspect it. When the authorized headless pipeline is active, the standalone LinkedIn search and scraper adapters are not registered as parallel publishers.
 

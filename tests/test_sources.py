@@ -133,28 +133,38 @@ def test_linkedin_search_uses_activity_id_when_provider_date_is_missing(monkeypa
 
 def test_filter_it_vacancies_rejects_courses() -> None:
     vacancies = [
-        Vacancy(title="Python Developer", description="Remote backend role", source="Test"),
-        Vacancy(title="Python course", description="Bootcamp for beginners", source="Test"),
+        Vacancy(
+            title="Junior Frontend Developer",
+            description="We are hiring a junior frontend developer. React.",
+            source="Test",
+        ),
+        Vacancy(title="Frontend course", description="Bootcamp for juniors", source="Test"),
     ]
 
-    assert [vacancy.title for vacancy in filter_it_vacancies(vacancies)] == ["Python Developer"]
+    assert [vacancy.title for vacancy in filter_it_vacancies(vacancies)] == ["Junior Frontend Developer"]
 
 
-def test_filter_it_vacancies_allows_only_supported_roles() -> None:
+def test_filter_it_vacancies_allows_only_junior_frontend_fullstack() -> None:
     vacancies = [
+        Vacancy(
+            title="Junior Frontend Developer",
+            description="We are hiring a junior frontend developer to build React UI.",
+            source="Test",
+        ),
+        Vacancy(
+            title="Trainee Fullstack Developer",
+            description="Join our team as a trainee fullstack developer. Python and React.",
+            source="Test",
+        ),
+        Vacancy(title="Senior Frontend Developer", description="Hiring a senior frontend engineer.", source="Test"),
         Vacancy(title="Backend Engineer", description="Python API role", source="Test"),
-        Vacancy(title="Trainee Frontend Developer", description="Build React UI", source="Test"),
         Vacancy(title="Automation QA Engineer", description="Automate tests with Playwright", source="Test"),
-        Vacancy(title="DevSecOps Engineer", description="Build secure CI checks", source="Test"),
-        Vacancy(title="Product Designer", description="Design systems and UX", source="Test"),
         Vacancy(title="Product Manager", description="Software roadmap role", source="Test"),
     ]
 
     assert [vacancy.title for vacancy in filter_it_vacancies(vacancies)] == [
-        "Backend Engineer",
-        "Trainee Frontend Developer",
-        "Automation QA Engineer",
-        "DevSecOps Engineer",
+        "Junior Frontend Developer",
+        "Trainee Fullstack Developer",
     ]
 
 

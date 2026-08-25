@@ -36,7 +36,7 @@ Automatic polling is limited to LinkedIn hiring posts.
 
 Every automatic source must produce real LinkedIn post URLs and real vacancy text. The bot does not log in to LinkedIn, store account cookies, create fake identities, perform CAPTCHA bypasses, publish placeholder vacancies, or invent fallback records. The Apify adapter is an explicitly enabled external hosted source; it sends only configured search input and reads the Actor's structured output. The selected Actor is independent from LinkedIn, so review its current terms, pricing, and behavior before enabling it.
 
-Every automatic LinkedIn vacancy needs a reliable publication date and must pass `LINKEDIN_POST_MAX_AGE_HOURS`, capped at 240 hours. All source vacancies pass through the common development/UI/UX/AI vacancy filter, freshness filter, localization boundary, publication limit, and SQLite deduplication before Telegram publication.
+Every automatic LinkedIn vacancy needs a reliable publication date and must pass `LINKEDIN_POST_MAX_AGE_HOURS`, capped at 240 hours. All source vacancies pass through the common Junior Frontend/Fullstack vacancy filter, freshness filter, localization boundary, publication limit, and SQLite deduplication before Telegram publication.
 
 LinkedIn links can also enter through manual Telegram messages or forwards. Those messages use the normal forwarded-message parser and intake policy.
 

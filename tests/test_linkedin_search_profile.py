@@ -15,18 +15,8 @@ from tg_vacancy_bot.sources.linkedin_search_profile import (
 
 
 EXPECTED_FAMILIES = {
-    "backend-software",
     "frontend",
     "fullstack",
-    "mobile",
-    "ml-ai-llm",
-    "gamedev",
-    "automation-qa",
-    "devsecops",
-    "blockchain",
-    "enterprise-developer",
-    "software-architecture-lead",
-    "ui-ux",
 }
 
 
@@ -117,16 +107,14 @@ def test_fair_query_limits_returns_empty_for_no_intents() -> None:
 
 
 def test_select_cycle_intents_rotates_through_full_profile() -> None:
-    first = select_cycle_intents(DEFAULT_SEARCH_INTENTS, max_intents=6, cycle_index=0)
-    second = select_cycle_intents(DEFAULT_SEARCH_INTENTS, max_intents=6, cycle_index=1)
-    third = select_cycle_intents(DEFAULT_SEARCH_INTENTS, max_intents=6, cycle_index=2)
-    fourth = select_cycle_intents(DEFAULT_SEARCH_INTENTS, max_intents=6, cycle_index=3)
+    first = select_cycle_intents(DEFAULT_SEARCH_INTENTS, max_intents=2, cycle_index=0)
+    second = select_cycle_intents(DEFAULT_SEARCH_INTENTS, max_intents=2, cycle_index=1)
 
-    assert first + second + third + fourth == DEFAULT_SEARCH_INTENTS
+    assert first + second == DEFAULT_SEARCH_INTENTS
 
 
 def test_select_cycle_intents_handles_wraparound_and_bounds() -> None:
-    intents = DEFAULT_SEARCH_INTENTS[:5]
+    intents = DEFAULT_SEARCH_INTENTS + DEFAULT_SEARCH_INTENTS[:1]
 
     assert select_cycle_intents(intents, max_intents=3, cycle_index=1) == (
         intents[3],

@@ -3,16 +3,40 @@ import pytest
 from tg_vacancy_bot.intake import looks_like_vacancy_message
 
 
-def test_vacancy_message_with_stack_and_hiring_terms_is_accepted() -> None:
-    text = "We are hiring a Senior Backend Engineer. Stack: Python, FastAPI, PostgreSQL. Remote role."
+def test_junior_frontend_message_is_accepted() -> None:
+    text = "We are hiring a Junior Frontend Developer. Stack: React, TypeScript, Next.js. Remote role."
 
     assert looks_like_vacancy_message(text) is True
 
 
-def test_linkedin_job_like_message_is_accepted() -> None:
-    text = "New developer role: https://www.linkedin.com/posts/example senior react engineer"
+def test_russian_junior_fullstack_message_is_accepted() -> None:
+    text = "Ищем джуниор фулстек-разработчика в команду. Стек: Python, Django, React. Удаленно."
 
     assert looks_like_vacancy_message(text) is True
+
+
+def test_trainee_frontend_internship_message_is_accepted() -> None:
+    text = "Internship open role: Trainee Front-End Developer. HTML, CSS, JavaScript. We welcome beginners."
+
+    assert looks_like_vacancy_message(text) is True
+
+
+def test_senior_frontend_message_is_rejected() -> None:
+    text = "We are hiring a Senior Frontend Engineer. Stack: React, GraphQL. Remote role."
+
+    assert looks_like_vacancy_message(text) is False
+
+
+def test_middle_fullstack_with_junior_wording_is_rejected() -> None:
+    text = "Junior-friendly product team is hiring a Middle Fullstack Developer. React and Node.js."
+
+    assert looks_like_vacancy_message(text) is False
+
+
+def test_junior_backend_message_is_rejected() -> None:
+    text = "We are hiring a Junior Backend Developer. Stack: Python, FastAPI, PostgreSQL. Remote role."
+
+    assert looks_like_vacancy_message(text) is False
 
 
 def test_non_development_it_role_is_rejected() -> None:
@@ -25,7 +49,6 @@ def test_non_development_it_role_is_rejected() -> None:
     "text",
     [
         "We are hiring an Engineering Manager to lead backend developers.",
-        "Open role: Technical PM for a Python developer platform.",
         "Vacancy: SDET for automated browser testing.",
         "Looking for an Implementation Engineer to write scripts and integrations.",
     ],
