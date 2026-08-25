@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
+from urllib.parse import urlsplit, urlunsplit
 
 
 ResultType = Literal["vacancy"]
@@ -8,6 +9,31 @@ ApplicationStatus = Literal[
     "created", "queued", "loading", "submitting", "parsed", "profile_missing", "unsupported_site", "filled",
     "manual_required", "awaiting_confirmation", "submitted", "failed", "cancelled",
 ]
+
+_TRACKING_QUERY_PARAMS = frozenset({"fbclid", "gclid", "mc_cid", "mc_eid", "igshid", "si"})
+
+
+def canonical_identity_url(url: str) -> str:
+    cleaned = url.strip()
+    try:
+        parts = urlsplit(cleaned)
+    except ValueError:
+        return cleaned.lower()
+    if not parts.scheme or not parts.netloc:
+        return cleaned.lower()
+    userinfo, at_sign, host_port = parts.netloc.rpartition("@")
+    netloc = f"{userinfo}{at_sign}{host_port.lower()}" if at_sign else host_port.lower()
+    path = parts.path
+    if len(path) > 1 and path.endswith("/"):
+        path = path[:-1]
+    kept_params = []
+    for chunk in parts.query.split("&"):
+        if not chunk:
+            continue
+        name = chunk.split("=", 1)[0].lower()
+        if not name.startswith("utm_") and name not in _TRACKING_QUERY_PARAMS:
+            kept_params.append(chunk)
+    return urlunsplit((parts.scheme, netloc, path, "&".join(kept_params), ""))
 
 
 @dataclass(frozen=True)
@@ -29,7 +55,7 @@ class Vacancy:
     @property
     def identity_source(self) -> str:
         if self.url:
-            return self.url.strip().lower()
+            return canonical_identity_url(self.url.strip())
         parts = [self.title, self.company or "", self.location or "", self.description[:240]]
         return "|".join(part.strip().lower() for part in parts if part)
 
