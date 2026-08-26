@@ -681,10 +681,20 @@ class FakeSearchSession:
     def __init__(self, routes: tuple[tuple[str, str], ...]) -> None:
         self.routes = routes
         self.calls: list[tuple[str, dict]] = []
+        self.post_calls: list[tuple[str, dict]] = []
 
     def get(self, url: str, params: dict | None = None):
         resolved_params = dict(params or {})
         self.calls.append((url, resolved_params))
+        return self._resolve(url, resolved_params)
+
+    def post(self, url: str, params: dict | None = None, data: dict | None = None):
+        resolved = dict(params or {})
+        resolved.update(data or {})
+        self.post_calls.append((url, resolved))
+        return self._resolve(url, resolved)
+
+    def _resolve(self, url: str, resolved_params: dict):
         haystack = url + "?" + urlencode(resolved_params)
         for marker, text in self.routes:
             if marker in haystack:
@@ -985,8 +995,9 @@ def test_fetch_paces_sequential_post_reads(monkeypatch) -> None:
     asyncio.run(adapter.fetch())
 
     assert read_urls == [POST_URL, second_url]
-    # Exactly one pacing pause sits between the two sequential reads.
-    assert delays == [0.0]
+    # Each phase (HTTP-first pass, then the browser fallback for the pending
+    # candidates) paces its sequential reads with one inter-candidate pause.
+    assert delays == [0.0, 0.0]
 
 
 def test_fetch_publishes_search_snippet_when_guest_read_is_blocked(monkeypatch) -> None:

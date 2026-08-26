@@ -205,7 +205,10 @@ async def _fetch_search_html(session, provider: str, query: str) -> str:
         async with session.get(MOJEEK_SEARCH_URL, params={"q": query}) as response:
             response.raise_for_status()
             return await response.text()
-    async with session.get(DUCKDUCKGO_HTML_SEARCH_URL, params={"q": query}) as response:
+    # DuckDuckGo serves the same public HTML form endpoint over POST, while
+    # datacenter GET requests to it are regularly answered with an anomaly
+    # screen. The POST form is the documented query path of that page.
+    async with session.post(DUCKDUCKGO_HTML_SEARCH_URL, data={"q": query}) as response:
         response.raise_for_status()
         return await response.text()
 
