@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import re
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -17,11 +18,10 @@ from tg_vacancy_bot.sources.freshness import filter_fresh_vacancies
 
 
 SERPAPI_SEARCH_URL = "https://serpapi.com/search.json"
-SERPER_SEARCH_URL = "https://google.serper.dev/search"
-SERPER_MAX_RESULTS_PER_REQUEST = 10
+BACKOFF_DELAYS_SECONDS = (2.0, 4.0)
 POST_URL_MARKERS = ("linkedin.com/posts/", "linkedin.com/feed/update/")
 POST_PATH_PREFIXES = ("/posts/", "/feed/update/")
-ACTIVITY_ID_PATTERN = re.compile(r"activity-(\d{15,20})(?:[-/?#]|$)", re.IGNORECASE)
+ACTIVITY_ID_PATTERN = re.compile(r"activity[-:](\d{15,20})(?:[-:/?#]|$)", re.IGNORECASE)
 HASHTAG_PATTERN = re.compile(r"(?<!\w)#[\w.+-]+", re.UNICODE)
 ROLE_TERM_PATTERN = re.compile(
     r"\b(?P<role>"
@@ -140,71 +140,6 @@ class LinkedInPostSearchAdapter(SourceAdapter):
         return candidates
 
 
-class LinkedInPostSerperAdapter(SourceAdapter):
-    name = "LinkedIn Hiring Posts (Serper)"
-
-    def __init__(self, settings: Settings) -> None:
-        self.settings = settings
-
-    async def fetch(self) -> list[Vacancy]:
-        candidates = await self.discover()
-        vacancies = [
-            vacancy
-            for candidate in candidates
-            if (vacancy := _candidate_to_vacancy(candidate)) is not None
-        ]
-        return _filter_recent_linkedin_posts(vacancies, self.settings.linkedin_post_max_age_hours)
-
-    async def discover(self, *, limit: int | None = None) -> list[LinkedInPostCandidate]:
-        wanted = max(
-            self.settings.linkedin_post_search_results_wanted if limit is None else limit,
-            0,
-        )
-        headers = {"X-API-KEY": self.settings.serper_api_key, "Content-Type": "application/json"}
-        candidates: list[LinkedInPostCandidate] = []
-        seen_urls: set[str] = set()
-        async with source_session(headers=headers) as session:
-            for query in _search_queries(self.settings.linkedin_post_search_query):
-                page = 1
-                while len(candidates) < wanted:
-                    request_limit = min(SERPER_MAX_RESULTS_PER_REQUEST, wanted - len(candidates))
-                    payload = {
-                        "q": query,
-                        "num": request_limit,
-                        "hl": "ru",
-                        "tbs": _google_recency_filter(self.settings.linkedin_post_max_age_hours),
-                    }
-                    if page > 1:
-                        payload["page"] = page
-                    response_payload = await _post_search_payload(
-                        session,
-                        SERPER_SEARCH_URL,
-                        payload=payload,
-                    )
-
-                    results = response_payload.get("organic", [])
-                    if not isinstance(results, list):
-                        break
-                    for result in results:
-                        if not isinstance(result, Mapping):
-                            continue
-                        candidate = _result_to_candidate(
-                            result,
-                            provider=self.name,
-                            query=query,
-                        )
-                        if candidate is None or candidate.url in seen_urls:
-                            continue
-                        seen_urls.add(candidate.url)
-                        candidates.append(candidate)
-                        if len(candidates) >= wanted:
-                            break
-                    if len(results) < request_limit:
-                        break
-                    page += 1
-        return candidates
-
-
 def _result_to_vacancy(
     result: Mapping[str, Any],
     *,
@@ -305,28 +240,48 @@ def _canonicalize_linkedin_post_url(link: str) -> str:
     return canonical
 
 
+def _is_retryable_provider_error(error: LinkedInSearchProviderError) -> bool:
+    """Return True only for transient provider failures: 429, 5xx, network errors."""
+
+    if error.failure_type:
+        return True
+    status = error.status_code
+    return status is not None and (status == 429 or status >= 500)
+
+
+async def _request_with_backoff(
+    attempt: Callable[[], Awaitable[Mapping[str, Any]]],
+) -> Mapping[str, Any]:
+    """Run one search request with bounded retries on transient failures.
+
+    The attempt callable must already convert raw transport failures into
+    :class:`LinkedInSearchProviderError`; non-retryable failures re-raise
+    immediately and the final failure propagates unchanged.
+    """
+
+    for delay in BACKOFF_DELAYS_SECONDS:
+        try:
+            return await attempt()
+        except LinkedInSearchProviderError as exc:
+            if not _is_retryable_provider_error(exc):
+                raise
+            await asyncio.sleep(delay)
+    return await attempt()
+
+
 async def _get_search_payload(session, url: str, *, params: Mapping[str, Any]) -> Mapping[str, Any]:
-    try:
-        async with session.get(url, params=params) as response:
-            response.raise_for_status()
-            payload = await response.json()
-    except aiohttp.ClientResponseError as exc:
-        raise LinkedInSearchProviderError(exc.status) from None
-    except aiohttp.ClientError as exc:
-        raise LinkedInSearchProviderError(failure_type=type(exc).__name__) from None
-    return payload if isinstance(payload, Mapping) else {}
+    async def attempt() -> Mapping[str, Any]:
+        try:
+            async with session.get(url, params=params) as response:
+                response.raise_for_status()
+                payload = await response.json()
+        except aiohttp.ClientResponseError as exc:
+            raise LinkedInSearchProviderError(exc.status) from None
+        except aiohttp.ClientError as exc:
+            raise LinkedInSearchProviderError(failure_type=type(exc).__name__) from None
+        return payload if isinstance(payload, Mapping) else {}
 
-
-async def _post_search_payload(session, url: str, *, payload: Mapping[str, Any]) -> Mapping[str, Any]:
-    try:
-        async with session.post(url, json=payload) as response:
-            response.raise_for_status()
-            response_payload = await response.json()
-    except aiohttp.ClientResponseError as exc:
-        raise LinkedInSearchProviderError(exc.status) from None
-    except aiohttp.ClientError as exc:
-        raise LinkedInSearchProviderError(failure_type=type(exc).__name__) from None
-    return response_payload if isinstance(response_payload, Mapping) else {}
+    return await _request_with_backoff(attempt)
 
 
 def _post_title(search_title: str, snippet: str) -> str:

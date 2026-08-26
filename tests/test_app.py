@@ -68,8 +68,10 @@ def test_check_sources_reports_missing_linkedin_post_search_provider_key(capsys,
         ENABLE_JOBSCOLLIDER=False,
         ENABLE_LINKEDIN_POST_SEARCH=True,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
+        ENABLE_LINKEDIN_POST_HEADLESS=False,
+        LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=False,
+        LINKEDIN_HEADLESS_PERMISSION_REFERENCE="",
         SERPAPI_API_KEY="",
-        SERPER_API_KEY="",
     )
     monkeypatch.setattr("tg_vacancy_bot.app.get_settings", lambda: settings)
 
@@ -78,7 +80,7 @@ def test_check_sources_reports_missing_linkedin_post_search_provider_key(capsys,
     output = capsys.readouterr().out
     assert "Source configuration" in output
     assert "Warnings:\n" in output
-    assert "WARNING: LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY or SERPER_API_KEY is missing." in output
+    assert "WARNING: LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY is missing." in output
     assert "Registered adapters: none" in output
 
 
@@ -87,15 +89,19 @@ def test_diagnose_linkedin_runs_without_runtime_or_publisher(capsys, monkeypatch
         TELEGRAM_BOT_TOKEN="",
         TARGET_CHAT_ID="",
         SERPAPI_API_KEY="",
-        SERPER_API_KEY="",
     )
     monkeypatch.setattr("tg_vacancy_bot.app.get_settings", lambda: settings)
+
+    async def fake_free_results(session, provider: str, query: str):
+        return []
+
+    monkeypatch.setattr("tg_vacancy_bot.linkedin_diagnostics._fetch_free_search_results", fake_free_results)
 
     main(["diagnose-linkedin", "--limit", "3", "--show-limit", "0"])
 
     output = capsys.readouterr().out
     assert "LinkedIn diagnostics" in output
-    assert "stage=discovery status=misconfigured" in output
+    assert "stage=discovery status=no_results" in output
     assert "unique=0" in output
 
 
@@ -104,16 +110,20 @@ def test_diagnose_linkedin_can_force_default_profile(capsys, monkeypatch) -> Non
         TELEGRAM_BOT_TOKEN="",
         TARGET_CHAT_ID="",
         SERPAPI_API_KEY="",
-        SERPER_API_KEY="",
         LINKEDIN_POST_HEADLESS_QUERY="custom query",
     )
     monkeypatch.setattr("tg_vacancy_bot.app.get_settings", lambda: settings)
 
+    async def fake_free_results(session, provider: str, query: str):
+        return []
+
+    monkeypatch.setattr("tg_vacancy_bot.linkedin_diagnostics._fetch_free_search_results", fake_free_results)
+
     main(["diagnose-linkedin", "--use-default-profile", "--show-limit", "0"])
 
     output = capsys.readouterr().out
-    assert "stage=discovery status=misconfigured" in output
-    assert "profile_intents=6/24" in output
+    assert "stage=discovery status=no_results" in output
+    assert "profile_intents=6/8" in output
 
 
 def test_check_sources_reports_registered_linkedin_post_search_without_exposing_key(
@@ -190,9 +200,35 @@ def test_preview_sources_prints_filtered_candidates_without_publishing(capsys, m
     output = capsys.readouterr().out
     assert "Source preview" in output
     assert "LinkedIn Hiring Posts: fetched=2 filtered=1" in output
+    assert "LinkedIn Hiring Posts: rejected=1" in output
+    assert "- [rejected:no_frontend_fullstack_role] Sales Manager" in output
     assert "Ищем Junior Front-End Developer" in output
     assert "https://www.linkedin.com/posts/example" in output
-    assert "Sales Manager" not in output
+    assert "https://www.linkedin.com/posts/sales" not in output
+
+
+def test_preview_sources_limits_rejection_samples_to_five(capsys, monkeypatch) -> None:
+    settings = Settings(TELEGRAM_BOT_TOKEN="token", TARGET_CHAT_ID="@target")
+
+    class FakeAdapter:
+        name = "Fake"
+
+        async def fetch(self):
+            return [
+                Vacancy(title=f"Sales Manager {index}", description="B2B sales role.", source=self.name)
+                for index in range(7)
+            ]
+
+    monkeypatch.setattr("tg_vacancy_bot.app.get_settings", lambda: settings)
+    monkeypatch.setattr("tg_vacancy_bot.app.build_adapters", lambda _: [FakeAdapter()])
+
+    main(["preview-sources"])
+
+    output = capsys.readouterr().out
+    assert "Fake: rejected=7" in output
+    assert output.count("[rejected:") == 5
+    assert "[rejected:no_frontend_fullstack_role] Sales Manager 4" in output
+    assert "[rejected:no_frontend_fullstack_role] Sales Manager 5" not in output
 
 
 def test_preview_sources_supports_source_filter_and_limit(capsys, monkeypatch) -> None:
@@ -209,7 +245,11 @@ def test_preview_sources_supports_source_filter_and_limit(capsys, monkeypatch) -
 
         async def fetch(self):
             return [
-                Vacancy(title="Frontend Developer", description="React role.", source=self.name),
+                Vacancy(
+                    title="Junior Frontend Developer",
+                    description="We are hiring a junior frontend developer. React role.",
+                    source=self.name,
+                ),
                 Vacancy(title="Backend Developer", description="Python role.", source=self.name),
             ]
 
@@ -220,9 +260,10 @@ def test_preview_sources_supports_source_filter_and_limit(capsys, monkeypatch) -
 
     output = capsys.readouterr().out
     assert "First:" not in output
-    assert "Second: fetched=2 filtered=2" in output
-    assert "Frontend Developer" in output
-    assert "Backend Developer" not in output
+    assert "Second: fetched=2 filtered=1" in output
+    assert "Second: rejected=1" in output
+    assert "- [rejected:no_frontend_fullstack_role] Backend Developer" in output
+    assert "Junior Frontend Developer" in output
 
 
 def test_preview_sources_shows_configuration_warning_when_adapter_is_missing(
@@ -242,8 +283,10 @@ def test_preview_sources_shows_configuration_warning_when_adapter_is_missing(
         ENABLE_JOBSCOLLIDER=False,
         ENABLE_LINKEDIN_POST_SEARCH=True,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
+        ENABLE_LINKEDIN_POST_HEADLESS=False,
+        LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=False,
+        LINKEDIN_HEADLESS_PERMISSION_REFERENCE="",
         SERPAPI_API_KEY="",
-        SERPER_API_KEY="",
     )
     monkeypatch.setattr("tg_vacancy_bot.app.get_settings", lambda: settings)
 
@@ -251,7 +294,7 @@ def test_preview_sources_shows_configuration_warning_when_adapter_is_missing(
 
     output = capsys.readouterr().out
     assert "Source preview" in output
-    assert "WARNING: LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY or SERPER_API_KEY is missing." in output
+    assert "WARNING: LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY is missing." in output
     assert "No matching registered adapters." in output
 
 
@@ -271,7 +314,11 @@ def test_poll_once_respects_global_publish_limit(monkeypatch, tmp_path) -> None:
 
         async def fetch(self):
             return [
-                Vacancy(title=f"Python Engineer {index}", description="Remote Python role", source="Fake")
+                Vacancy(
+                    title=f"Junior Frontend Developer {index}",
+                    description="We are hiring a junior frontend developer. React.",
+                    source="Fake",
+                )
                 for index in range(5)
             ]
 
@@ -319,7 +366,11 @@ def test_poll_once_skips_vacancy_when_localization_fails(monkeypatch, tmp_path) 
         async def fetch(self):
             return [
                 Vacancy(title="UI/UX Designer", description="Design ecommerce flows.", source="Fake"),
-                Vacancy(title="Python Engineer", description="Remote Python role", source="Fake"),
+                Vacancy(
+                    title="Junior Frontend Developer",
+                    description="We are hiring a junior frontend developer. React.",
+                    source="Fake",
+                ),
             ]
 
     class FakePublisher:
@@ -328,7 +379,7 @@ def test_poll_once_skips_vacancy_when_localization_fails(monkeypatch, tmp_path) 
 
         async def publish_new(self, vacancies):
             attempted.extend(vacancies)
-            if vacancies[0].title == "UI/UX Designer":
+            if vacancies[0].title == "Junior Frontend Developer":
                 raise RuntimeError("OpenAI returned an empty localized description.")
             return len(vacancies)
 
@@ -343,7 +394,7 @@ def test_poll_once_skips_vacancy_when_localization_fails(monkeypatch, tmp_path) 
 
     asyncio.run(poll_once())
 
-    assert [vacancy.title for vacancy in attempted] == ["UI/UX Designer", "Python Engineer"]
+    assert [vacancy.title for vacancy in attempted] == ["Junior Frontend Developer"]
 
 
 def test_poll_once_warns_when_linkedin_posts_enabled_without_search_provider_key(
@@ -365,8 +416,10 @@ def test_poll_once_warns_when_linkedin_posts_enabled_without_search_provider_key
         ENABLE_JOBSCOLLIDER=False,
         ENABLE_LINKEDIN_POST_SEARCH=True,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
+        ENABLE_LINKEDIN_POST_HEADLESS=False,
+        LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=False,
+        LINKEDIN_HEADLESS_PERMISSION_REFERENCE="",
         SERPAPI_API_KEY="",
-        SERPER_API_KEY="",
     )
 
     class FakePublisher:
@@ -387,4 +440,4 @@ def test_poll_once_warns_when_linkedin_posts_enabled_without_search_provider_key
     with caplog.at_level(logging.WARNING):
         asyncio.run(poll_once())
 
-    assert "LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY or SERPER_API_KEY is missing." in caplog.text
+    assert "LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY is missing." in caplog.text

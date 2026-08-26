@@ -30,124 +30,52 @@ def _intent(family: str, language: str, roles: str) -> SearchIntent:
 
 DEFAULT_SEARCH_INTENTS: tuple[SearchIntent, ...] = (
     _intent(
-        "backend-software",
-        "en",
-        '"Backend Developer" OR "Backend Engineer" OR "Software Developer" OR "Software Engineer"',
-    ),
-    _intent(
-        "backend-software",
-        "ru",
-        '"бэкенд-разработчик" OR "backend-разработчик" OR "разработчик ПО" OR "программный инженер"',
-    ),
-    _intent(
         "frontend",
         "en",
-        '"Frontend Developer" OR "Front-End Developer" OR "Frontend Engineer" OR "Front-End Engineer"',
+        '"Junior Frontend Developer" OR "Junior Front-End Developer" OR "Junior Frontend Engineer" '
+        'OR "Entry Level Frontend Developer" OR "Intern Frontend Developer"',
     ),
     _intent(
         "frontend",
         "ru",
-        '"фронтенд-разработчик" OR "frontend-разработчик" OR "фронтенд-инженер"',
+        '"джуниор фронтенд-разработчик" OR "junior frontend-разработчик" '
+        'OR "фронтенд-разработчик без опыта" OR "стажер фронтенд-разработчик"',
     ),
     _intent(
         "fullstack",
         "en",
-        '"Fullstack Developer" OR "Full-Stack Developer" OR "Fullstack Engineer" OR "Full-Stack Engineer"',
+        '"Junior Fullstack Developer" OR "Junior Full-Stack Developer" OR "Junior Full Stack Engineer" '
+        'OR "Entry Level Fullstack Developer" OR "Intern Fullstack Developer"',
     ),
     _intent(
         "fullstack",
         "ru",
-        '"фулстек-разработчик" OR "fullstack-разработчик" OR "фулстек-инженер"',
+        '"джуниор фулстек-разработчик" OR "junior fullstack-разработчик" '
+        'OR "фулстек-разработчик без опыта" OR "стажер fullstack-разработчик"',
     ),
     _intent(
-        "mobile",
+        "frontend",
         "en",
-        '"Mobile Developer" OR "Mobile Engineer" OR "iOS Developer" OR "Android Developer" OR "Flutter Developer" OR "React Native Developer"',
+        '"Frontend Developer Intern" OR "Intern Frontend Developer" '
+        'OR "Frontend Developer Internship" OR "Trainee Frontend Developer"',
     ),
     _intent(
-        "mobile",
+        "frontend",
         "ru",
-        '"мобильный разработчик" OR "iOS-разработчик" OR "Android-разработчик" OR "Flutter-разработчик"',
+        '"стажировка фронтенд-разработчик" OR "фронтенд-разработчик стажировка" '
+        'OR "интерн фронтенд-разработчик" OR "trainee фронтенд-разработчик"',
     ),
     _intent(
-        "ml-ai-llm",
+        "fullstack",
         "en",
-        '"Machine Learning Engineer" OR "ML Engineer" OR "AI Engineer" OR "AI Developer" OR "LLM Engineer"',
+        '"Fullstack Developer Intern" OR "Intern Fullstack Developer" '
+        'OR "Full Stack Developer Internship" OR "Trainee Full Stack Developer"',
     ),
     _intent(
-        "ml-ai-llm",
+        "fullstack",
         "ru",
-        '"инженер машинного обучения" OR "ML-инженер" OR "AI-инженер" OR "AI-разработчик" OR "LLM-инженер"',
-    ),
-    _intent(
-        "gamedev",
-        "en",
-        '"Game Developer" OR "Game Engineer" OR "Gameplay Developer" OR "Gameplay Programmer"',
-    ),
-    _intent(
-        "gamedev",
-        "ru",
-        '"разработчик игр" OR "игровой разработчик" OR "геймплей-программист"',
-    ),
-    _intent(
-        "automation-qa",
-        "en",
-        '"QA Automation Engineer" OR "Automation QA Engineer" OR "Test Automation Engineer"',
-    ),
-    _intent(
-        "automation-qa",
-        "ru",
-        '"инженер по автоматизации тестирования" OR "QA automation инженер" OR "автоматизатор тестирования"',
-    ),
-    _intent(
-        "devsecops",
-        "en",
-        '"DevSecOps Engineer" OR "DevSecOps Developer"',
-    ),
-    _intent(
-        "devsecops",
-        "ru",
-        '"DevSecOps-инженер" OR "инженер DevSecOps"',
-    ),
-    _intent(
-        "blockchain",
-        "en",
-        '"Blockchain Developer" OR "Blockchain Engineer" OR "Smart Contract Developer"',
-    ),
-    _intent(
-        "blockchain",
-        "ru",
-        '"блокчейн-разработчик" OR "блокчейн-инженер" OR "разработчик смарт-контрактов"',
-    ),
-    _intent(
-        "enterprise-developer",
-        "en",
-        '"Enterprise Developer" OR "Java Developer" OR "Python Developer" OR "Go Developer" OR "Node.js Developer" OR "Software Programmer"',
-    ),
-    _intent(
-        "enterprise-developer",
-        "ru",
-        '"корпоративный разработчик" OR "Java-разработчик" OR "Python-разработчик" OR "Go-разработчик" OR "программист"',
-    ),
-    _intent(
-        "software-architecture-lead",
-        "en",
-        '"Software Architect" OR "Technical Lead" OR "Tech Lead"',
-    ),
-    _intent(
-        "software-architecture-lead",
-        "ru",
-        '"архитектор ПО" OR "программный архитектор" OR "технический лидер" OR "техлид"',
-    ),
-    _intent(
-        "ui-ux",
-        "en",
-        '"UI/UX Designer" OR "UX/UI Designer" OR "UI Designer" OR "UX Designer"',
-    ),
-    _intent(
-        "ui-ux",
-        "ru",
-        '"UI/UX-дизайнер" OR "UX/UI-дизайнер" OR "дизайнер интерфейсов" OR "UX-дизайнер"',
+        '"стажировка фулстек-разработчик" OR "фулстек-разработчик стажировка" '
+        'OR "интерн фулстек-разработчик" OR "trainee fullstack-разработчик"',
     ),
 )
 

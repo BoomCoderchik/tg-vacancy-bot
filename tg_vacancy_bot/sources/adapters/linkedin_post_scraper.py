@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import logging
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -22,7 +24,10 @@ from tg_vacancy_bot.sources.adapters.linkedin_post_search import (
 )
 
 
+logger = logging.getLogger(__name__)
 DUCKDUCKGO_HTML_SEARCH_URL = "https://html.duckduckgo.com/html/"
+DUCKDUCKGO_LITE_SEARCH_URL = "https://lite.duckduckgo.com/lite/"
+MOJEEK_SEARCH_URL = "https://www.mojeek.com/search"
 BING_SEARCH_URL = "https://www.bing.com/search"
 BING_RSS_SEARCH_URL = "https://www.bing.com/search"
 BROWSER_HEADERS = {
@@ -33,7 +38,7 @@ BROWSER_HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
 }
-ACTIVITY_ID_PATTERN = re.compile(r"activity-(\d{15,20})(?:[-/?#]|$)", re.IGNORECASE)
+ACTIVITY_ID_PATTERN = re.compile(r"activity[-:](\d{15,20})(?:[-:/?#]|$)", re.IGNORECASE)
 
 
 def utcnow() -> datetime:
@@ -59,6 +64,7 @@ class LinkedInPostScraperAdapter(SourceAdapter):
         vacancies: list[Vacancy] = []
         seen_urls: set[str] = set()
         challenged_providers: set[str] = set()
+        failed_providers: set[str] = set()
         attempted_providers: set[str] = set()
         async with source_session(headers=BROWSER_HEADERS) as session:
             for query in _search_queries(self.settings.linkedin_post_scraper_query):
@@ -68,30 +74,45 @@ class LinkedInPostScraperAdapter(SourceAdapter):
                     if len(vacancies) >= limit:
                         break
                     attempted_providers.add(provider)
-                    if provider == "bing_rss":
-                        rss = await _fetch_bing_rss(session, query)
+                    try:
+                        if provider == "bing_rss":
+                            rss = await _fetch_bing_rss(session, query)
+                            vacancies.extend(
+                                _rss_to_vacancies(
+                                    rss,
+                                    limit=limit - len(vacancies),
+                                    seen_urls=seen_urls,
+                                )
+                            )
+                            continue
+                        html = await _fetch_search_html(session, provider, query)
+                        if _looks_like_search_challenge(html):
+                            challenged_providers.add(provider)
+                            continue
                         vacancies.extend(
-                            _rss_to_vacancies(
-                                rss,
+                            _html_to_vacancies(
+                                html,
                                 limit=limit - len(vacancies),
                                 seen_urls=seen_urls,
                             )
                         )
-                        continue
-                    html = await _fetch_search_html(session, provider, query)
-                    if _looks_like_search_challenge(html):
-                        challenged_providers.add(provider)
-                        continue
-                    vacancies.extend(
-                        _html_to_vacancies(
-                            html,
-                            limit=limit - len(vacancies),
-                            seen_urls=seen_urls,
-                        )
+                    except Exception as exc:
+                        # One blocked or failing provider must not kill the whole
+                        # polling cycle; the remaining providers still run.
+                        failed_providers.add(provider)
+                        logger.warning("%s search fetch failed: %s", provider, type(exc).__name__)
+        if not vacancies and attempted_providers:
+            if challenged_providers | failed_providers == attempted_providers:
+                details = []
+                if challenged_providers:
+                    details.append(
+                        "anti-bot challenges: " + ", ".join(sorted(challenged_providers))
                     )
-        if not vacancies and challenged_providers and challenged_providers == attempted_providers:
-            providers = ", ".join(sorted(challenged_providers))
-            raise RuntimeError(f"Public search HTML providers returned anti-bot challenges: {providers}.")
+                if failed_providers:
+                    details.append("request failures: " + ", ".join(sorted(failed_providers)))
+                raise RuntimeError(
+                    "Public search providers returned no usable results (" + "; ".join(details) + ")."
+                )
         return filter_fresh_vacancies(
             vacancies,
             max_age_hours=self.settings.linkedin_post_max_age_hours,
@@ -176,6 +197,14 @@ async def _fetch_search_html(session, provider: str, query: str) -> str:
         async with session.get(BING_SEARCH_URL, params={"q": query, "setlang": "en"}) as response:
             response.raise_for_status()
             return await response.text()
+    if provider == "duckduckgo_lite":
+        async with session.get(DUCKDUCKGO_LITE_SEARCH_URL, params={"q": query}) as response:
+            response.raise_for_status()
+            return await response.text()
+    if provider == "mojeek":
+        async with session.get(MOJEEK_SEARCH_URL, params={"q": query}) as response:
+            response.raise_for_status()
+            return await response.text()
     async with session.get(DUCKDUCKGO_HTML_SEARCH_URL, params={"q": query}) as response:
         response.raise_for_status()
         return await response.text()
@@ -195,6 +224,7 @@ def _looks_like_search_challenge(html: str) -> bool:
         or "anomaly.js" in lower
         or "captcha" in lower
         or "unusual traffic" in lower
+        or "automated queries" in lower
     )
 
 
@@ -227,6 +257,21 @@ def _search_html_results(soup: BeautifulSoup) -> list[SearchHtmlResult]:
         )
         _append_result(results, seen_links, result)
 
+    for container in soup.select("ul.results-standard li"):
+        # Mojeek result layout: <li><h2><a href>title</a></h2><p class="s">.
+        if not isinstance(container, Tag):
+            continue
+        anchor = container.select_one("h2 a[href], a[href]")
+        if not isinstance(anchor, Tag):
+            continue
+        result = SearchHtmlResult(
+            title=_clean_title(html_to_text(str(anchor))),
+            link=str(anchor.get("href") or ""),
+            snippet=_snippet_for_container(container),
+            date_text="",
+        )
+        _append_result(results, seen_links, result)
+
     if results:
         return results
 
@@ -254,13 +299,31 @@ def _append_result(results: list[SearchHtmlResult], seen_links: set[str], result
 def _normalize_result_url(href: str) -> str:
     if not href:
         return ""
-    parsed = urlparse(href)
+    decoded = _decode_bing_redirect_url(href)
+    parsed = urlparse(decoded)
     if parsed.path == "/l/":
         target = parse_qs(parsed.query).get("uddg", [""])[0]
         return unquote(target).strip()
-    if href.startswith("//"):
-        return f"https:{href}"
-    return href.strip()
+    if decoded.startswith("//"):
+        return f"https:{decoded}"
+    return decoded.strip()
+
+
+def _decode_bing_redirect_url(href: str) -> str:
+    """Decode Bing ``/ck/a`` redirect wrappers into the real target URL."""
+
+    if "/ck/a" not in href:
+        return href
+    marker = "u=a1"
+    index = href.find(marker)
+    if index == -1:
+        return ""
+    payload = href[index + len(marker):].split("&", 1)[0]
+    padding = "=" * (-len(payload) % 4)
+    try:
+        return base64.urlsafe_b64decode(payload + padding).decode("utf-8", "ignore")
+    except (ValueError, UnicodeDecodeError):
+        return ""
 
 
 def _snippet_for_anchor(anchor: Tag) -> str:
@@ -280,7 +343,7 @@ def _snippet_for_anchor(anchor: Tag) -> str:
 
 
 def _snippet_for_container(container: Tag) -> str:
-    for selector in (".b_caption p", ".b_snippet", ".result__snippet", ".result-snippet", "p"):
+    for selector in (".b_caption p", ".b_snippet", ".result__snippet", ".result-snippet", "p.s", "p"):
         candidate = container.select_one(selector)
         if candidate is None:
             continue

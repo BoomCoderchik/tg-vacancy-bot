@@ -1,3 +1,5 @@
+import asyncio
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
 import pytest
@@ -5,11 +7,16 @@ import pytest
 from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.sources import build_adapters, filter_it_vacancies, source_configuration_warnings
+from tg_vacancy_bot.sources.adapters import linkedin_post_scraper
 from tg_vacancy_bot.sources.adapters.linkedin_post_search import (
     _filter_recent_linkedin_posts,
     _result_to_vacancy as _search_result_to_vacancy,
 )
-from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import _rss_to_vacancies
+from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import (
+    LinkedInPostScraperAdapter,
+    _html_to_vacancies,
+    _rss_to_vacancies,
+)
 
 
 def test_build_adapters_registers_no_non_linkedin_sources_by_default() -> None:
@@ -44,7 +51,7 @@ def test_build_adapters_keeps_headless_disabled_without_authorized_access() -> N
         ENABLE_LINKEDIN_POST_SCRAPER=True,
         ENABLE_LINKEDIN_POST_HEADLESS=True,
         LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=False,
-        SERPER_API_KEY="search-key",
+        SERPAPI_API_KEY="search-key",
     )
 
     assert build_adapters(settings) == []
@@ -59,7 +66,7 @@ def test_build_adapters_keeps_headless_disabled_without_permission_reference() -
         ENABLE_LINKEDIN_POST_HEADLESS=True,
         LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=True,
         LINKEDIN_HEADLESS_PERMISSION_REFERENCE="",
-        SERPER_API_KEY="search-key",
+        SERPAPI_API_KEY="search-key",
     )
 
     assert build_adapters(settings) == []
@@ -74,7 +81,7 @@ def test_build_adapters_registers_only_headless_linkedin_pipeline_when_authorize
         ENABLE_LINKEDIN_POST_HEADLESS=True,
         LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=True,
         LINKEDIN_HEADLESS_PERMISSION_REFERENCE="linkedin-approval-123",
-        SERPER_API_KEY="search-key",
+        SERPAPI_API_KEY="search-key",
     )
 
     assert [adapter.name for adapter in build_adapters(settings)] == [
@@ -84,11 +91,22 @@ def test_build_adapters_registers_only_headless_linkedin_pipeline_when_authorize
 
 
 def test_apify_adapter_requires_token_and_registers_when_enabled() -> None:
-    missing_token = Settings(ENABLE_LINKEDIN_POST_APIFY=True)
+    missing_token = Settings(
+        ENABLE_LINKEDIN_POST_APIFY=True,
+        ENABLE_LINKEDIN_POST_HEADLESS=False,
+        LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=False,
+        LINKEDIN_HEADLESS_PERMISSION_REFERENCE="",
+    )
     assert not any(adapter.name == "LinkedIn Hiring Posts (Apify)" for adapter in build_adapters(missing_token))
     assert "APIFY_API_TOKEN is missing" in " ".join(source_configuration_warnings(missing_token))
 
-    configured = Settings(ENABLE_LINKEDIN_POST_APIFY=True, APIFY_API_TOKEN="test-token")
+    configured = Settings(
+        ENABLE_LINKEDIN_POST_APIFY=True,
+        APIFY_API_TOKEN="test-token",
+        ENABLE_LINKEDIN_POST_HEADLESS=False,
+        LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=False,
+        LINKEDIN_HEADLESS_PERMISSION_REFERENCE="",
+    )
     assert any(adapter.name == "LinkedIn Hiring Posts (Apify)" for adapter in build_adapters(configured))
 
 
@@ -120,7 +138,7 @@ def test_linkedin_search_uses_activity_id_when_provider_date_is_missing(monkeypa
         "date": "",
     }
 
-    vacancy = _search_result_to_vacancy(result, source="LinkedIn Hiring Posts (Serper)")
+    vacancy = _search_result_to_vacancy(result, source="LinkedIn Hiring Posts")
 
     assert vacancy is not None
     assert vacancy.published_at == datetime(2026, 7, 17, 10, 0, tzinfo=UTC)
@@ -131,30 +149,146 @@ def test_linkedin_search_uses_activity_id_when_provider_date_is_missing(monkeypa
     assert _filter_recent_linkedin_posts([vacancy], max_age_hours=48) == [vacancy]
 
 
+def test_linkedin_scraper_continues_after_provider_failure(monkeypatch) -> None:
+    activity_id = int(datetime.now(UTC).timestamp() * 1000) << 22
+    alpha = f"https://www.linkedin.com/posts/alpha_hiring-frontend-activity-{activity_id}-abcd"
+    settings = Settings(
+        LINKEDIN_POST_SCRAPER_QUERY="site:linkedin.com/posts hiring",
+        LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS="bing_rss,duckduckgo",
+        LINKEDIN_POST_SCRAPER_RESULTS_WANTED=10,
+        LINKEDIN_POST_MAX_AGE_HOURS=240,
+    )
+
+    async def failing_rss(session, query):
+        raise RuntimeError("bing rss unavailable")
+
+    html = (
+        "<html><body>"
+        f"<a class='result__a' href='{alpha}'>Hiring Junior Frontend Developer</a>"
+        "<div class='result__snippet'>We are hiring a junior frontend developer.</div>"
+        "</body></html>"
+    )
+
+    async def working_html(session, provider, query):
+        return html
+
+    monkeypatch.setattr(linkedin_post_scraper, "_fetch_bing_rss", failing_rss)
+    monkeypatch.setattr(linkedin_post_scraper, "_fetch_search_html", working_html)
+
+    vacancies = asyncio.run(LinkedInPostScraperAdapter(settings).fetch())
+
+    assert len(vacancies) == 1
+    assert vacancies[0].url == alpha
+
+
+def test_linkedin_scraper_raises_when_every_provider_fails(monkeypatch) -> None:
+    settings = Settings(
+        LINKEDIN_POST_SCRAPER_QUERY="site:linkedin.com/posts hiring",
+        LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS="bing_rss,duckduckgo",
+        LINKEDIN_POST_SCRAPER_RESULTS_WANTED=10,
+    )
+
+    async def failing_rss(session, query):
+        raise RuntimeError("bing rss unavailable")
+
+    async def failing_html(session, provider, query):
+        raise RuntimeError(f"{provider} unavailable")
+
+    monkeypatch.setattr(linkedin_post_scraper, "_fetch_bing_rss", failing_rss)
+    monkeypatch.setattr(linkedin_post_scraper, "_fetch_search_html", failing_html)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        asyncio.run(LinkedInPostScraperAdapter(settings).fetch())
+
+    assert "no usable results" in str(exc_info.value)
+
+
+def test_linkedin_scraper_parses_mojeek_results() -> None:
+    activity_id = int(datetime.now(UTC).timestamp() * 1000) << 22
+    url = f"https://www.linkedin.com/posts/hiring_activity-{activity_id}-abcd"
+    html = (
+        "<html><body><ul class='results-standard'><li>"
+        f"<h2><a href='{url}'>Hiring update from ABC Corp</a></h2>"
+        "<p class='s'>We are hiring a junior frontend developer to build React UI.</p>"
+        "</li></ul></body></html>"
+    )
+
+    vacancies = _html_to_vacancies(html, limit=5)
+
+    assert len(vacancies) == 1
+    assert vacancies[0].url == url
+    assert "frontend" in vacancies[0].title.lower()
+
+
+def test_linkedin_scraper_treats_mojeek_block_page_as_challenge() -> None:
+    from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import _looks_like_search_challenge
+
+    assert _looks_like_search_challenge(
+        "<html>Sorry your network appears to be sending automated queries</html>"
+    )
+
+
+def test_linkedin_scraper_decodes_bing_ck_a_redirect_links() -> None:
+    import base64
+
+    from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import _normalize_result_url
+
+    target = "https://www.linkedin.com/posts/hiring_activity-7483822807449600000-abcd"
+    encoded = base64.urlsafe_b64encode(target.encode()).decode().rstrip("=")
+    wrapped = f"https://www.bing.com/ck/a?!&&p=abc&u=a1{encoded}&ntb=1"
+
+    assert _normalize_result_url(wrapped) == target
+    assert _normalize_result_url(target) == target
+
+
+def test_published_at_from_activity_id_supports_feed_update_urn_form() -> None:
+    from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import _published_at_from_activity_id
+
+    hyphen = _published_at_from_activity_id(
+        "https://www.linkedin.com/posts/x_activity-7483822807449600000-y"
+    )
+    urn = _published_at_from_activity_id(
+        "https://www.linkedin.com/feed/update/urn:li:activity:7483822807449600000/"
+    )
+
+    assert hyphen is not None
+    assert urn == hyphen
+
+
 def test_filter_it_vacancies_rejects_courses() -> None:
     vacancies = [
-        Vacancy(title="Python Developer", description="Remote backend role", source="Test"),
-        Vacancy(title="Python course", description="Bootcamp for beginners", source="Test"),
+        Vacancy(
+            title="Junior Frontend Developer",
+            description="We are hiring a junior frontend developer. React.",
+            source="Test",
+        ),
+        Vacancy(title="Frontend course", description="Bootcamp for juniors", source="Test"),
     ]
 
-    assert [vacancy.title for vacancy in filter_it_vacancies(vacancies)] == ["Python Developer"]
+    assert [vacancy.title for vacancy in filter_it_vacancies(vacancies)] == ["Junior Frontend Developer"]
 
 
-def test_filter_it_vacancies_allows_only_supported_roles() -> None:
+def test_filter_it_vacancies_allows_only_junior_frontend_fullstack() -> None:
     vacancies = [
+        Vacancy(
+            title="Junior Frontend Developer",
+            description="We are hiring a junior frontend developer to build React UI.",
+            source="Test",
+        ),
+        Vacancy(
+            title="Trainee Fullstack Developer",
+            description="Join our team as a trainee fullstack developer. Python and React.",
+            source="Test",
+        ),
+        Vacancy(title="Senior Frontend Developer", description="Hiring a senior frontend engineer.", source="Test"),
         Vacancy(title="Backend Engineer", description="Python API role", source="Test"),
-        Vacancy(title="Trainee Frontend Developer", description="Build React UI", source="Test"),
         Vacancy(title="Automation QA Engineer", description="Automate tests with Playwright", source="Test"),
-        Vacancy(title="DevSecOps Engineer", description="Build secure CI checks", source="Test"),
-        Vacancy(title="Product Designer", description="Design systems and UX", source="Test"),
         Vacancy(title="Product Manager", description="Software roadmap role", source="Test"),
     ]
 
     assert [vacancy.title for vacancy in filter_it_vacancies(vacancies)] == [
-        "Backend Engineer",
-        "Trainee Frontend Developer",
-        "Automation QA Engineer",
-        "DevSecOps Engineer",
+        "Junior Frontend Developer",
+        "Trainee Fullstack Developer",
     ]
 
 

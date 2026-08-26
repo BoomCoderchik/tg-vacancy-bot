@@ -1,59 +1,10 @@
 from __future__ import annotations
 
-from urllib.parse import urlparse
-
-from .parser import extract_stack, extract_urls
-from .sources.filters import looks_like_development_vacancy
-
-
-JOB_TERMS = [
-    "hiring",
-    "job",
-    "vacancy",
-    "role",
-    "position",
-    "looking for",
-    "we are looking",
-    "ищем",
-    "вакансия",
-    "нужен",
-    "нужна",
-    "требуется",
-]
-
-VACANCY_DOMAINS = [
-    "linkedin.com",
-    "remotive.com",
-    "remoteok.com",
-    "jooble.org",
-    "adzuna.com",
-    "news.ycombinator.com",
-]
+from .sources.filters import evaluate_vacancy_policy
 
 
 def looks_like_vacancy_message(text: str) -> bool:
     normalized = " ".join((text or "").split())
     if len(normalized) < 24:
         return False
-
-    lower = normalized.lower()
-    if looks_like_development_vacancy(normalized):
-        return True
-    if (
-        extract_stack(normalized)
-        and any(term in lower for term in JOB_TERMS)
-        and looks_like_development_vacancy(normalized)
-    ):
-        return True
-    if (
-        any(term in lower for term in JOB_TERMS)
-        and any(_is_vacancy_domain(url) for url in extract_urls(normalized))
-        and looks_like_development_vacancy(normalized)
-    ):
-        return True
-    return False
-
-
-def _is_vacancy_domain(url: str) -> bool:
-    host = urlparse(url).netloc.lower().removeprefix("www.")
-    return any(domain in host for domain in VACANCY_DOMAINS)
+    return evaluate_vacancy_policy(normalized).allowed

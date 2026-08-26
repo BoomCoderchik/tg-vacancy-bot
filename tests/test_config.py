@@ -102,6 +102,7 @@ def test_settings_reads_linkedin_post_headless_options() -> None:
         LINKEDIN_POST_HEADLESS_RESULTS_WANTED="7",
         LINKEDIN_POST_SEARCH_INTENTS_PER_CYCLE="8",
         LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS="25",
+        LINKEDIN_HEADLESS_DISCOVERY_PAGES="5",
     )
 
     assert settings.enable_linkedin_post_headless is True
@@ -111,6 +112,7 @@ def test_settings_reads_linkedin_post_headless_options() -> None:
     assert settings.linkedin_post_headless_results_wanted == 7
     assert settings.linkedin_post_search_intents_per_cycle == 8
     assert settings.linkedin_post_headless_timeout_seconds == 25
+    assert settings.linkedin_headless_discovery_pages == 5
 
 
 def test_settings_reads_linkedin_post_search_options() -> None:
@@ -119,14 +121,12 @@ def test_settings_reads_linkedin_post_search_options() -> None:
         TARGET_CHAT_ID="@target",
         ENABLE_LINKEDIN_POST_SEARCH="true",
         SERPAPI_API_KEY="serp-key",
-        SERPER_API_KEY="serper-key",
         LINKEDIN_POST_SEARCH_QUERY='site:linkedin.com/posts "Ищем" frontend',
         LINKEDIN_POST_SEARCH_RESULTS_WANTED="8",
     )
 
     assert settings.enable_linkedin_post_search is True
     assert settings.serpapi_api_key == "serp-key"
-    assert settings.serper_api_key == "serper-key"
     assert settings.linkedin_post_search_query == 'site:linkedin.com/posts "Ищем" frontend'
     assert settings.linkedin_post_search_results_wanted == 8
 
@@ -145,6 +145,18 @@ def test_settings_reads_linkedin_post_scraper_options() -> None:
     assert settings.linkedin_post_scraper_query == 'site:linkedin.com/posts "ищем" frontend'
     assert settings.linkedin_post_scraper_search_providers == ("bing_rss", "duckduckgo", "bing")
     assert settings.linkedin_post_scraper_results_wanted == 8
+
+
+def test_settings_defaults_to_all_free_scraping_providers() -> None:
+    settings = Settings()
+
+    assert settings.linkedin_post_scraper_search_providers == (
+        "bing_rss",
+        "duckduckgo",
+        "bing",
+        "duckduckgo_lite",
+        "mojeek",
+    )
 
 
 def test_settings_reads_linkedin_post_apify_options() -> None:
