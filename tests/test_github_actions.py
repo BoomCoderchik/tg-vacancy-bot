@@ -1,9 +1,40 @@
 from pathlib import Path
 
+import yaml
+
 
 WORKFLOW = Path(".github/workflows/scheduled-source-polling.yml")
+DIAGNOSTIC_WORKFLOW = Path(".github/workflows/diagnose-linkedin.yml")
 OLD_WORKFLOW = Path(".github/workflows/poll-sources.yml")
 README = Path("README.md")
+
+
+def _load_workflow(path: Path) -> dict:
+    return yaml.safe_load(path.read_text(encoding="utf-8"))
+
+
+def test_scheduled_polling_workflow_is_valid_yaml() -> None:
+    parsed = _load_workflow(WORKFLOW)
+
+    assert parsed["name"] == "Scheduled vacancy source polling"
+    env = parsed["jobs"]["poll"]["env"]
+    # A glued YAML line would silently merge two env entries; make sure every
+    # documented key survives parsing as its own entry.
+    for key in (
+        "ENABLE_LINKEDIN_JOBS_GUEST",
+        "LINKEDIN_POST_APIFY_ACTOR",
+        "SERPAPI_API_KEY",
+        "ENABLE_LINKEDIN_POST_HEADLESS",
+    ):
+        assert key in env
+
+
+def test_diagnostic_workflow_is_valid_yaml_and_dispatchable() -> None:
+    parsed = _load_workflow(DIAGNOSTIC_WORKFLOW)
+
+    # PyYAML parses an unquoted ``on:`` key as boolean True.
+    triggers = parsed.get("on", parsed.get(True, {}))
+    assert "workflow_dispatch" in triggers
 
 
 def test_poll_sources_workflow_runs_every_15_minutes() -> None:
