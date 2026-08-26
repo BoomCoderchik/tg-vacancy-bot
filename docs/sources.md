@@ -23,7 +23,7 @@ Automatic polling is limited to LinkedIn hiring posts.
   - Opt-in with `ENABLE_LINKEDIN_POST_HEADLESS=true`.
   - Requires `LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=true` and a non-empty
     `LINKEDIN_HEADLESS_PERMISSION_REFERENCE`.
-  - Uses Playwright to read public LinkedIn post pages discovered through configured search providers or, without a keyed provider, through lightweight public search requests: Bing RSS, DuckDuckGo HTML, then paginated Bing HTML (`LINKEDIN_HEADLESS_DISCOVERY_PAGES`, default 3). Protection screens end that engine's attempt instead of being bypassed.
+  - Uses Playwright to read public LinkedIn post pages discovered through configured search providers or, without a keyed provider, through lightweight public search requests: Bing RSS, DuckDuckGo HTML, then paginated Bing HTML (`LINKEDIN_HEADLESS_DISCOVERY_PAGES`, default 3). When HTTP discovery produced no candidates, Bing result pages are read inside the same clean browser context. Protection screens and unexpected redirect domains end that engine's attempt instead of being bypassed.
   - The built-in search profile covers frontend and fullstack in junior/entry-level and internship/trainee variants in Russian and English.
   - When this adapter is registered, the standalone LinkedIn search and scraper adapters are suppressed as parallel publishers.
 
