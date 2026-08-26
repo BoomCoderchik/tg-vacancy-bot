@@ -753,6 +753,189 @@ def test_discover_free_post_urls_skips_challenge_provider(monkeypatch) -> None:
     assert urls == (delta,)
 
 
+class FakeBrowserPage:
+    """Scripted Playwright page: each goto consumes one canned response."""
+
+    def __init__(self, responses: list[tuple[str, str]]) -> None:
+        self.responses = responses
+        self.calls: list[str] = []
+        self.url = "https://www.bing.com/"
+
+    def set_default_timeout(self, timeout_ms: int) -> None:
+        return None
+
+    async def goto(self, url: str, wait_until: str | None = None, timeout: int | None = None):
+        self.calls.append(url)
+        index = min(len(self.calls) - 1, len(self.responses) - 1)
+        final_url, html = self.responses[index]
+        self.url = final_url or url
+        return html
+
+    async def content(self) -> str:
+        index = min(len(self.calls) - 1, len(self.responses) - 1)
+        return self.responses[index][1]
+
+    async def close(self) -> None:
+        return None
+
+
+class FakeBrowserContext:
+    def __init__(self, page: FakeBrowserPage) -> None:
+        self.page = page
+
+    async def new_page(self) -> FakeBrowserPage:
+        return self.page
+
+    async def close(self) -> None:
+        return None
+
+
+def _single_intent_settings() -> Settings:
+    return Settings(
+        LINKEDIN_POST_HEADLESS_QUERY="site:linkedin.com/posts test",
+        LINKEDIN_HEADLESS_DISCOVERY_PAGES="3",
+    )
+
+
+def test_discover_browser_post_urls_collects_dedupes_and_stops_paginating(monkeypatch) -> None:
+    monkeypatch.setattr(linkedin_post_headless, "SEARCH_PAGE_DELAY_SECONDS", 0)
+    alpha = "https://www.linkedin.com/posts/alpha_activity-7483822807449600000-abcd"
+    page = FakeBrowserPage(
+        [
+            ("", _bing_html_with_ck_links(alpha)),
+            ("", _bing_html_with_ck_links(alpha)),  # repeat page: no new urls
+            ("", _bing_html_with_ck_links(alpha)),
+        ]
+    )
+
+    urls = asyncio.run(
+        LinkedInPostHeadlessAdapter(_single_intent_settings())._discover_browser_post_urls(
+            FakeBrowserContext(page),
+            limit=4,
+        )
+    )
+
+    assert urls == (alpha,)
+    # The second result page repeated the same URL, so pagination stopped
+    # before the third page request.
+    assert len(page.calls) == 2
+    assert all(call.startswith("https://www.bing.com/search?") for call in page.calls)
+    assert "first=1&setlang=en" in page.calls[0]
+    assert "first=11&setlang=en" in page.calls[1]
+
+
+def test_discover_browser_post_urls_skips_challenge_page(monkeypatch) -> None:
+    monkeypatch.setattr(linkedin_post_headless, "SEARCH_PAGE_DELAY_SECONDS", 0)
+    delta = "https://www.linkedin.com/posts/delta_activity-7483822807449600003-mnop"
+    challenge_then_success = Settings(
+        LINKEDIN_POST_HEADLESS_QUERY="site:linkedin.com/posts one || site:linkedin.com/posts two",
+        LINKEDIN_HEADLESS_DISCOVERY_PAGES="3",
+    )
+    page = FakeBrowserPage(
+        [
+            ("", "<html>unusual traffic from your computer network</html>"),
+            ("", _bing_html_with_ck_links(delta)),
+        ]
+    )
+
+    urls = asyncio.run(
+        LinkedInPostHeadlessAdapter(challenge_then_success)._discover_browser_post_urls(
+            FakeBrowserContext(page),
+            limit=4,
+        )
+    )
+
+    assert urls == (delta,)
+    # Intent one hit the challenge and stopped. Intent two read its first
+    # result page, then requested page two which repeated the same URL and
+    # stopped pagination.
+    assert len(page.calls) == 3
+
+
+def test_discover_browser_post_urls_skips_off_domain_redirect(monkeypatch) -> None:
+    monkeypatch.setattr(linkedin_post_headless, "SEARCH_PAGE_DELAY_SECONDS", 0)
+    off_domain_then_empty = Settings(
+        LINKEDIN_POST_HEADLESS_QUERY="site:linkedin.com/posts one || site:linkedin.com/posts two",
+        LINKEDIN_HEADLESS_DISCOVERY_PAGES="3",
+    )
+    page = FakeBrowserPage(
+        [
+            ("https://login.example.com/redirect", "<html>sign in</html>"),
+            ("", ""),
+        ]
+    )
+
+    urls = asyncio.run(
+        LinkedInPostHeadlessAdapter(off_domain_then_empty)._discover_browser_post_urls(
+            FakeBrowserContext(page),
+            limit=4,
+        )
+    )
+
+    assert urls == ()
+
+
+def test_fetch_falls_back_to_browser_discovery(monkeypatch) -> None:
+    settings = Settings(
+        ENABLE_LINKEDIN_POST_HEADLESS=True,
+        LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=True,
+        LINKEDIN_HEADLESS_PERMISSION_REFERENCE="test-reference",
+    )
+    adapter = LinkedInPostHeadlessAdapter(settings)
+
+    async def empty_keyed(limit: int):
+        return ()
+
+    async def empty_free(limit: int):
+        return ()
+
+    discovered: list[tuple[object, int]] = []
+
+    async def browser_discovery(context, limit: int):
+        discovered.append((context, limit))
+        return (POST_URL,)
+
+    read_urls: list[str] = []
+
+    async def fake_read(context, url: str, timeout_ms: int):
+        read_urls.append(url)
+        return None
+
+    monkeypatch.setattr(adapter, "_discover_keyed_post_urls", empty_keyed)
+    monkeypatch.setattr(adapter, "_discover_free_post_urls", empty_free)
+    monkeypatch.setattr(adapter, "_discover_browser_post_urls", browser_discovery)
+    monkeypatch.setattr(adapter, "_read_public_post", fake_read)
+    monkeypatch.setattr(linkedin_post_headless, "async_playwright", _fake_playwright_factory)
+
+    vacancies = asyncio.run(adapter.fetch())
+
+    assert vacancies == []
+    assert len(discovered) == 1
+    assert isinstance(discovered[0][0], FakeBrowserContext)
+    assert read_urls == [POST_URL]
+
+
+async def _fake_noop() -> None:
+    return None
+
+
+@asynccontextmanager
+async def _fake_playwright_factory():
+    yield SimpleNamespace(
+        chromium=SimpleNamespace(
+            launch=_fake_launch,
+        )
+    )
+
+
+async def _fake_launch(headless: bool):
+    return SimpleNamespace(new_context=_fake_new_context, close=_fake_noop)
+
+
+async def _fake_new_context(locale: str):
+    return FakeBrowserContext(FakeBrowserPage([]))
+
+
 @asynccontextmanager
 async def _fake_session_context(session: FakeSearchSession):
     yield session
