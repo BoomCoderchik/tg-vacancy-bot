@@ -259,7 +259,7 @@ def test_settings_adds_reliable_openai_translation_fallback() -> None:
     assert settings.openai_fallback_models == ("gpt-4.1-mini",)
 
 
-def test_settings_uses_groq_free_translation_configuration() -> None:
+def test_settings_uses_groq_default_translation_configuration() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
@@ -270,7 +270,7 @@ def test_settings_uses_groq_free_translation_configuration() -> None:
     assert settings.localization_api_key == "groq-test-key"
     assert settings.localization_api_key_name == "GROQ_API_KEY"
     assert settings.localization_base_url == "https://api.groq.com/openai/v1"
-    assert settings.localization_model == "llama-3.1-8b-instant"
+    assert settings.localization_model == "openai/gpt-oss-120b"
     assert settings.localization_fallback_models == ("openai/gpt-oss-20b",)
 
 

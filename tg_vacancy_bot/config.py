@@ -16,11 +16,14 @@ OPENROUTER_FREE_FALLBACK_MODELS = (
     "openrouter/free",
 )
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
-# Groq currently gives this model a substantially larger free request allowance
-# than the larger models. The replacement is kept in the fallback chain because
-# Groq can change model availability without changing our client.
-GROQ_FREE_TRANSLATION_MODEL = "llama-3.1-8b-instant"
-GROQ_FREE_TRANSLATION_FALLBACK_MODELS = ("openai/gpt-oss-20b",)
+# Groq's current flagship production model: the strongest available quality
+# for Russian translation and compression, and Groq's own recommended
+# replacement for the retired Llama 3.3 70B / Llama 3.1 8B models.
+# GPT-OSS models reason before answering; the localization client gives them
+# an enlarged completion budget and low reasoning effort (see
+# description_localization.py).
+GROQ_DEFAULT_TRANSLATION_MODEL = "openai/gpt-oss-120b"
+GROQ_DEFAULT_TRANSLATION_FALLBACK_MODELS = ("openai/gpt-oss-20b",)
 DEFAULT_LINKEDIN_POST_SCRAPER_QUERY = (
     '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR "we\'re hiring" OR hiring) '
     '("junior frontend developer" OR "junior front-end developer" OR "junior fullstack developer" '
@@ -189,7 +192,7 @@ class Settings(BaseSettings):
     openai_base_url: str = Field(default="", alias="OPENAI_BASE_URL")
     localization_provider: Literal["openai", "groq"] = Field(default="openai", alias="LOCALIZATION_PROVIDER")
     groq_api_key: str = Field(default="", alias="GROQ_API_KEY")
-    groq_model: str = Field(default=GROQ_FREE_TRANSLATION_MODEL, alias="GROQ_MODEL")
+    groq_model: str = Field(default=GROQ_DEFAULT_TRANSLATION_MODEL, alias="GROQ_MODEL")
     groq_fallback_models_raw: str = Field(default="", alias="GROQ_FALLBACK_MODELS")
 
     @property
@@ -232,7 +235,7 @@ class Settings(BaseSettings):
             configured = tuple(
                 model.strip() for model in self.groq_fallback_models_raw.split(",") if model.strip()
             )
-            return unique_models(configured or GROQ_FREE_TRANSLATION_FALLBACK_MODELS)
+            return unique_models(configured or GROQ_DEFAULT_TRANSLATION_FALLBACK_MODELS)
         return self.openai_fallback_models
 
     @property
