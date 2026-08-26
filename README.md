@@ -141,6 +141,20 @@ tg-vacancy-bot diagnose-linkedin --use-default-profile --limit 10 --show-limit 5
 
 Without `SERPAPI_API_KEY`, the report probes every configured free public search provider per selected intent and shows which engines answer, return empty results, or fail with a safe error class (for example, `Http429` or `TimeoutError`), so search-engine blockages are visible without any API key. It never launches Playwright, creates a Telegram publisher, writes publication state, prints search snippets, or exposes API keys. To verify the full free pipeline end to end without publishing, run `tg-vacancy-bot preview-sources --source "LinkedIn Hiring Posts (Headless)"`.
 
+## Guest LinkedIn Job Listings Parser
+
+Search engines rate-limit datacenter and flagged IPs, so discovery through them can return no rows even when LinkedIn itself is fully reachable. For that reason the bot also supports reading LinkedIn's own public guest job listings, which need no account, no API key, and no protection bypass:
+
+```dotenv
+ENABLE_LINKEDIN_JOBS_GUEST=true
+LINKEDIN_JOBS_GUEST_KEYWORDS=junior frontend developer||junior fullstack developer||intern frontend developer||trainee fullstack developer||джуниор фронтенд разработчик||стажер фронтенд разработчик
+LINKEDIN_JOBS_GUEST_RESULTS_WANTED=30
+```
+
+The adapter searches LinkedIn's logged-out job-search endpoint for each `||`-separated keyword within the configured freshness window (`LINKEDIN_POST_MAX_AGE_HOURS`), keeps only listings whose title already carries junior-level and frontend/fullstack evidence, then reads each public job page politely (paced, jittered requests) to extract the real posting text. Every vacancy still passes the common Junior Frontend/Fullstack policy filter, freshness filter, localization boundary, publication limit, and SQLite deduplication before publication.
+
+This path works from any IP that can reach LinkedIn directly, including GitHub Actions runners, which makes it the most reliable automatic source. It reads public pages only: no login, cookies, proxies, or CAPTCHA handling are involved.
+
 Direct page reading is fail-closed: both `LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=true` and a non-empty `LINKEDIN_HEADLESS_PERMISSION_REFERENCE` are required. Set them only after receiving documented LinkedIn crawling permission or an approved access path. The adapter does not use a LinkedIn account, cookies, proxies, fake identities, scrolling automation, or any CAPTCHA/login/2FA bypass. It publishes only posts whose URL carries a reliable publication date no more than ten days old. When direct reading is refused by a login wall even after the feed-update retry, the vacancy falls back to the real public search result — title, snippet, and activity-ID date — that discovered the link instead of being dropped; protection pages and off-domain redirects are never bypassed. On GitHub Actions, Chromium is installed only when the same permission gate is satisfied.
 
 ## Required Telegram Setup
@@ -350,6 +364,6 @@ Only the LinkedIn post adapters described above can register as automatic public
 
 ## LinkedIn Boundary
 
-This project permits three documented, opt-in LinkedIn paths: an optional keyed Google Search-backed public hiring-post search through SerpApi, free public search-result scraping, and headless parsing of publicly available post pages found through public search engines. These are the only automatic public-source adapters. The bot does not log in with a LinkedIn account, use proxies or anti-bot bypasses, invent vacancies, or publish fabricated records. Every published post is backed by a real public source — either the post page itself or the public search result (title, snippet, activity-ID date) that indexed it.
+This project permits four documented, opt-in LinkedIn paths: an optional keyed Google Search-backed public hiring-post search through SerpApi, free public search-result scraping, headless parsing of publicly available post pages found through public search engines, and reading LinkedIn's own public guest job listings. These are the only automatic public-source adapters. The bot does not log in with a LinkedIn account, use proxies or anti-bot bypasses, invent vacancies, or publish fabricated records. Every published item is backed by a real public source — either the post or job page itself, the public search result that indexed it, or LinkedIn's logged-out listing pages.
 
 LinkedIn links can also enter when an operator manually sends or forwards vacancy text containing a LinkedIn URL to the Telegram bot. In that case the normal forwarded-message parser can keep the URL and mark the vacancy source as `LinkedIn`.

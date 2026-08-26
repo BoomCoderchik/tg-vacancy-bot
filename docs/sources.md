@@ -30,6 +30,12 @@ Automatic polling is limited to LinkedIn hiring posts.
   - Reads the structured post body, direct LinkedIn post URL, author, and publication date.
   - Keeps only posts whose body contains both a hiring signal and a supported development role.
 
+- `LinkedInJobsGuestAdapter`
+  - Opt-in with `ENABLE_LINKEDIN_JOBS_GUEST=true`.
+  - Reads LinkedIn's own public, logged-out job listings through the guest search endpoint and public job pages; no account, key, or protection bypass is involved.
+  - Searches each configured keyword (`LINKEDIN_JOBS_GUEST_KEYWORDS`) within the freshness window, keeps only listings whose title carries junior-level and frontend/fullstack evidence, then reads the public job page for the real posting text.
+  - Works from any IP that can reach LinkedIn directly, including datacenter runners where search engines block scraping.
+
 ## Source Policy
 
 Every automatic source must produce real LinkedIn post URLs and real vacancy text. The bot does not log in to LinkedIn, store account cookies, create fake identities, perform CAPTCHA bypasses, publish placeholder vacancies, or invent fallback records. Every published headless vacancy is backed by a real public source: the post page itself or the public search result that indexed it. The Apify adapter is an explicitly enabled external hosted source; it sends only configured search input and reads the Actor's structured output. The selected Actor is independent from LinkedIn, so review its current terms, pricing, and behavior before enabling it.
