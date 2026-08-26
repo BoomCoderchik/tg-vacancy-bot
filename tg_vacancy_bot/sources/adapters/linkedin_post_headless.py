@@ -119,39 +119,58 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
             candidates = await self._discover_free_post_urls(limit)
 
         vacancies: list[Vacancy] = []
-        async with async_playwright() as playwright:
-            browser = await playwright.chromium.launch(
-                headless=True,
-                args=list(CHROMIUM_LAUNCH_ARGS),
-            )
-            context = await browser.new_context(
-                locale="en-US",
-                user_agent=HEADLESS_USER_AGENT,
-                viewport={"width": 1366, "height": 768},
-            )
-            try:
-                if not candidates:
-                    candidates = await self._discover_browser_post_urls(context, limit)
+        pending: list[LinkedInPostCandidate] = []
+        if candidates:
+            # Public guest pages are fully server-rendered for ordinary HTTP
+            # clients, so the lightweight read often succeeds where an
+            # automated browser gets authwalled. The browser remains the
+            # fallback path for everything this read cannot parse.
+            async with source_session(headers=BROWSER_HEADERS) as session:
                 for index, candidate in enumerate(candidates):
                     if index:
                         # Sequential guest reads without pauses are the main
                         # rate-limit trigger; jitter avoids a fixed rhythm.
                         await asyncio.sleep(_jittered_seconds(POST_READ_DELAY_SECONDS))
-                    vacancy = await self._read_public_post(context, candidate.url, timeout_ms)
+                    vacancy = await self._read_public_post_http(session, candidate.url)
                     if vacancy is None:
-                        # Direct guest reading can still be refused by a login
-                        # wall. The public search result that discovered the
-                        # link remains a real, dated source for the same post,
-                        # so it is used as the description instead of dropping
-                        # the vacancy.
-                        vacancy = _candidate_to_vacancy(candidate)
-                        if vacancy is not None:
-                            vacancy = replace(vacancy, source=self.name)
-                    if vacancy is not None:
+                        pending.append(candidate)
+                    else:
                         vacancies.append(vacancy)
-            finally:
-                await context.close()
-                await browser.close()
+
+        if not candidates or pending:
+            async with async_playwright() as playwright:
+                browser = await playwright.chromium.launch(
+                    headless=True,
+                    args=list(CHROMIUM_LAUNCH_ARGS),
+                )
+                context = await browser.new_context(
+                    locale="en-US",
+                    user_agent=HEADLESS_USER_AGENT,
+                    viewport={"width": 1366, "height": 768},
+                )
+                try:
+                    if not candidates:
+                        candidates = await self._discover_browser_post_urls(context, limit)
+                    for index, candidate in enumerate(pending or candidates):
+                        if index:
+                            # Sequential guest reads without pauses are the main
+                            # rate-limit trigger; jitter avoids a fixed rhythm.
+                            await asyncio.sleep(_jittered_seconds(POST_READ_DELAY_SECONDS))
+                        vacancy = await self._read_public_post(context, candidate.url, timeout_ms)
+                        if vacancy is None:
+                            # Direct guest reading can still be refused by a login
+                            # wall. The public search result that discovered the
+                            # link remains a real, dated source for the same post,
+                            # so it is used as the description instead of dropping
+                            # the vacancy.
+                            vacancy = _candidate_to_vacancy(candidate)
+                            if vacancy is not None:
+                                vacancy = replace(vacancy, source=self.name)
+                        if vacancy is not None:
+                            vacancies.append(vacancy)
+                finally:
+                    await context.close()
+                    await browser.close()
         return filter_fresh_vacancies(
             vacancies,
             max_age_hours=self.settings.linkedin_post_max_age_hours,
@@ -421,6 +440,46 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
             raw_text=f"{title} {description}",
         )
 
+    async def _read_public_post_http(self, session, url: str) -> Vacancy | None:
+        """Read one public guest post through plain HTTP without a browser.
+
+        LinkedIn serves fully rendered guest pages to ordinary HTTP clients,
+        so this read avoids the automated-browser authwall entirely. It stays
+        fail-closed: an HTTP error, an off-domain redirect, a login wall, or
+        missing post text yields no vacancy and leaves the candidate to the
+        browser fallback.
+        """
+
+        try:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                final_url = _canonicalize_linkedin_post_url(str(response.url))
+                if not final_url:
+                    return None
+                html = await response.text()
+        except Exception as exc:
+            logger.warning("LinkedIn guest HTTP read failed: %s", type(exc).__name__)
+            return None
+        if _requires_manual_access(html):
+            return None
+        description = _extract_post_text(html)
+        published_at = _published_at_from_activity_id(final_url)
+        if not description or published_at is None:
+            return None
+        title = _post_title(_html_page_title(html), description)
+        if not title:
+            return None
+        return Vacancy(
+            title=title,
+            description=description,
+            source=self.name,
+            url=final_url,
+            location=None,
+            stack=_stack_from_text(f"{title} {description}"),
+            published_at=published_at,
+            raw_text=f"{title} {description}",
+        )
+
 
 async def _fetch_provider_html(session, provider: str, query: str) -> str:
     """Fetch one search-result page; a protection screen yields no results."""
@@ -587,6 +646,12 @@ def _extract_post_text(html: str) -> str:
             if text:
                 return text[:4000]
     return ""
+
+
+def _html_page_title(html: str) -> str:
+    soup = BeautifulSoup(html or "", "html.parser")
+    tag = soup.find("title")
+    return html_to_text(str(tag)) if tag is not None else ""
 
 
 def _requires_manual_access(html: str) -> bool:
