@@ -4,6 +4,7 @@ from tg_vacancy_bot.config import Settings
 
 from .adapters.linkedin_post_headless import LinkedInPostHeadlessAdapter
 from .adapters.linkedin_post_apify import LinkedInPostApifyAdapter
+from .adapters.linkedin_jobs_guest import LinkedInJobsGuestAdapter
 from .adapters.linkedin_post_scraper import LinkedInPostScraperAdapter
 from .adapters.linkedin_post_search import LinkedInPostSearchAdapter
 from .base import SourceAdapter
@@ -25,6 +26,10 @@ def build_adapters(settings: Settings) -> list[SourceAdapter]:
         adapters.append(LinkedInPostApifyAdapter(settings))
     if headless_registered:
         adapters.append(LinkedInPostHeadlessAdapter(settings))
+    # Guest job listings read LinkedIn itself, so they are independent of the
+    # search-engine discovery paths above and register whenever enabled.
+    if settings.enable_linkedin_jobs_guest:
+        adapters.append(LinkedInJobsGuestAdapter(settings))
     return adapters
 
 
