@@ -21,6 +21,7 @@ jobs:
 
       - name: Probe public search endpoints
         run: |
+          pip install "aiohttp>=3.9,<4"
           python - <<'PY'
           import asyncio
           import aiohttp
