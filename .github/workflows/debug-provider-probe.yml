@@ -1,0 +1,79 @@
+name: Temporary search provider probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: probe-search-providers
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Probe public search endpoints
+        run: |
+          python - <<'PY'
+          import asyncio
+          import aiohttp
+
+          UA = {
+              "User-Agent": (
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                  "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+              ),
+              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+              "Accept-Language": "en-US,en;q=0.9",
+          }
+          QUERY = '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR hiring) ("junior frontend developer" OR "junior fullstack developer" OR frontend OR fullstack)'
+          MARKERS = ("captcha", "unusual traffic", "challenge-form", "anomaly", "automated queries")
+
+          async def report(session, name, url, params=None, data=None):
+              try:
+                  async with session.post(url, params=params, data=data, headers=UA) if data else session.get(url, params=params, headers=UA) as r:
+                      text = await r.text(errors="ignore")
+                      low = text.lower()
+                      flags = [m for m in MARKERS if m in low]
+                      print(f"{name}: HTTP {r.status} len={len(text)} markers={flags} "
+                            f"b_algo={low.count('b_algo')} rss_items={low.count('<item>')}")
+              except Exception as exc:
+                  print(f"{name}: ERROR {type(exc).__name__}")
+
+          async def main():
+              async with aiohttp.ClientSession() as s:
+                  await report(s, "bing_rss", "https://www.bing.com/search", {"q": QUERY, "format": "rss", "setlang": "en"})
+                  await asyncio.sleep(2)
+                  await report(s, "bing_html", "https://www.bing.com/search", {"q": QUERY, "setlang": "en"})
+                  await asyncio.sleep(2)
+                  await report(s, "ddg_html_get", "https://html.duckduckgo.com/html/", {"q": QUERY})
+                  await asyncio.sleep(2)
+                  await report(s, "ddg_html_post", "https://html.duckduckgo.com/html/", data={"q": QUERY})
+                  await asyncio.sleep(2)
+                  await report(s, "ddg_lite_post", "https://lite.duckduckgo.com/lite/", data={"q": QUERY})
+                  await asyncio.sleep(2)
+                  await report(s, "google_news_rss", "https://news.google.com/rss/search", {"q": "site:linkedin.com/posts hiring junior frontend", "hl": "en-US", "gl": "US", "ceid": "US:en"})
+                  await asyncio.sleep(2)
+                  try:
+                      async with s.get("https://www.mojeek.com/search", params={"q": QUERY}, headers=UA) as r:
+                          print(f"mojeek: HTTP {r.status}")
+                  except Exception as exc:
+                      print(f"mojeek: ERROR {type(exc).__name__}")
+                  await asyncio.sleep(2)
+                  try:
+                      url = "https://www.linkedin.com/feed/update/urn:li:activity:7498008999917948928/"
+                      async with s.get(url, headers=UA, allow_redirects=False) as r:
+                          body = await r.text(errors="ignore")
+                          print(f"linkedin_guest_aiohttp: HTTP {r.status} redirect={r.headers.get('location','')!r} len={len(body)}")
+                  except Exception as exc:
+                      print(f"linkedin_guest_aiohttp: ERROR {type(exc).__name__}")
+
+          asyncio.run(main())
+          PY
