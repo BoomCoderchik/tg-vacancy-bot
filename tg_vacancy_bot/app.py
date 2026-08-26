@@ -46,7 +46,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("check-sources", help="Check source adapter configuration without publishing.")
     diagnose_linkedin_parser = subparsers.add_parser(
         "diagnose-linkedin",
-        help="Run keyed LinkedIn URL discovery without browser access or publishing.",
+        help="Probe configured LinkedIn URL discovery (keyed or free) without browser access or publishing.",
     )
     diagnose_linkedin_parser.add_argument(
         "--limit",

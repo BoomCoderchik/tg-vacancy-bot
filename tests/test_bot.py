@@ -47,7 +47,6 @@ def test_build_status_text_reports_linkedin_post_search_missing_key() -> None:
         TARGET_CHAT_ID="@target",
         ENABLE_LINKEDIN_POST_SEARCH=True,
         SERPAPI_API_KEY="",
-        SERPER_API_KEY="",
         ENABLE_LINKEDIN_POST_HEADLESS=False,
     )
 
@@ -75,19 +74,19 @@ def test_build_status_text_reports_linkedin_search_suppressed_by_headless() -> N
     assert "serp-secret" not in text
 
 
-def test_build_status_text_reports_linkedin_post_search_on_with_serper_key() -> None:
+def test_build_status_text_reports_linkedin_post_search_on_with_serpapi_key() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="secret-token",
         TARGET_CHAT_ID="@target",
         ENABLE_LINKEDIN_POST_SEARCH=True,
-        SERPER_API_KEY="serper-secret",
+        SERPAPI_API_KEY="serp-secret",
         ENABLE_LINKEDIN_POST_HEADLESS=False,
     )
 
     text = build_status_text(settings)
 
     assert "LinkedInPosts=on" in text
-    assert "serper-secret" not in text
+    assert "serp-secret" not in text
 
 
 def test_build_status_text_reports_headless_permission_boundary() -> None:

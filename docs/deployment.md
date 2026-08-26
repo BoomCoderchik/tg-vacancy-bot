@@ -173,7 +173,7 @@ Required GitHub repository secrets:
 
 Set these only if the matching LinkedIn feature is enabled:
 
-- `SERPAPI_API_KEY` or `SERPER_API_KEY` when `ENABLE_LINKEDIN_POST_SEARCH=true`
+- `SERPAPI_API_KEY` when `ENABLE_LINKEDIN_POST_SEARCH=true`
 - `APIFY_API_TOKEN` when `ENABLE_LINKEDIN_POST_APIFY=true`
 - `LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=true` and `LINKEDIN_HEADLESS_PERMISSION_REFERENCE` only after documented LinkedIn crawling permission or an approved access path exists
 

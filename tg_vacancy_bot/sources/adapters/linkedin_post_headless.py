@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import logging
+import random
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode, urlsplit
@@ -15,10 +15,12 @@ from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy
 from tg_vacancy_bot.sources.base import SourceAdapter, html_to_text, source_session
 from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import (
+    ACTIVITY_ID_PATTERN,
     BING_SEARCH_URL,
     BROWSER_HEADERS,
     SearchHtmlResult,
     _clean_title,
+    _decode_bing_redirect_url,
     _fetch_bing_rss,
     _fetch_search_html,
     _looks_like_search_challenge,
@@ -30,7 +32,7 @@ from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import (
 from tg_vacancy_bot.sources.adapters.linkedin_post_search import (
     LinkedInPostCandidate,
     LinkedInPostSearchAdapter,
-    LinkedInPostSerperAdapter,
+    _candidate_to_vacancy,
     _canonicalize_linkedin_post_url,
     _post_title,
     _stack_from_text,
@@ -45,6 +47,22 @@ from tg_vacancy_bot.sources.linkedin_search_profile import (
 
 BING_PAGE_STEP = 10
 SEARCH_PAGE_DELAY_SECONDS = 1.5
+# Guest pages sometimes answer a canonical /posts/ URL with a login redirect
+# while the feed-update form of the same activity stays publicly readable.
+POST_READ_RETRY_DELAY_SECONDS = 2.0
+RATE_LIMIT_RETRY_DELAY_SECONDS = 5.0
+RETRYABLE_POST_STATUSES = frozenset({429, 999})
+HEADLESS_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+)
+# A real-Chrome UA combined with Playwright's default automation flag is an
+# inconsistent fingerprint that gets polite public reads classified as bot
+# traffic. Disabling the blink automation feature keeps the fingerprint
+# consistent with the claimed user agent. No login, cookies, or CAPTCHA
+# handling is involved.
+CHROMIUM_LAUNCH_ARGS = ("--disable-blink-features=AutomationControlled",)
+POST_READ_DELAY_SECONDS = 2.5
 logger = logging.getLogger(__name__)
 POST_TEXT_SELECTORS = (
     "article p.attributed-text-segment-list__content",
@@ -55,6 +73,7 @@ POST_TEXT_SELECTORS = (
     ".feed-shared-inline-show-more-text",
     "[data-test-id*='commentary']",
 )
+WAIT_CONTENT_SELECTOR = ", ".join(POST_TEXT_SELECTORS[:4])
 PROTECTION_MARKERS = (
     "captcha to continue",
     "complete the captcha",
@@ -68,6 +87,12 @@ PROTECTION_MARKERS = (
 
 def utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def _jittered_seconds(base: float) -> float:
+    """Return a politeness delay with up to 50% jitter to avoid fixed rhythms."""
+
+    return base + random.uniform(0, base * 0.5)
 
 
 class LinkedInPostHeadlessAdapter(SourceAdapter):
@@ -89,19 +114,39 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
             return []
 
         timeout_ms = self.settings.linkedin_post_headless_timeout_seconds * 1000
-        urls = await self._discover_keyed_post_urls(limit)
-        if not urls:
-            urls = await self._discover_free_post_urls(limit)
+        candidates = await self._discover_keyed_post_urls(limit)
+        if not candidates:
+            candidates = await self._discover_free_post_urls(limit)
 
         vacancies: list[Vacancy] = []
         async with async_playwright() as playwright:
-            browser = await playwright.chromium.launch(headless=True)
-            context = await browser.new_context(locale="en-US")
+            browser = await playwright.chromium.launch(
+                headless=True,
+                args=list(CHROMIUM_LAUNCH_ARGS),
+            )
+            context = await browser.new_context(
+                locale="en-US",
+                user_agent=HEADLESS_USER_AGENT,
+                viewport={"width": 1366, "height": 768},
+            )
             try:
-                if not urls:
-                    urls = await self._discover_browser_post_urls(context, limit)
-                for url in urls:
-                    vacancy = await self._read_public_post(context, url, timeout_ms)
+                if not candidates:
+                    candidates = await self._discover_browser_post_urls(context, limit)
+                for index, candidate in enumerate(candidates):
+                    if index:
+                        # Sequential guest reads without pauses are the main
+                        # rate-limit trigger; jitter avoids a fixed rhythm.
+                        await asyncio.sleep(_jittered_seconds(POST_READ_DELAY_SECONDS))
+                    vacancy = await self._read_public_post(context, candidate.url, timeout_ms)
+                    if vacancy is None:
+                        # Direct guest reading can still be refused by a login
+                        # wall. The public search result that discovered the
+                        # link remains a real, dated source for the same post,
+                        # so it is used as the description instead of dropping
+                        # the vacancy.
+                        vacancy = _candidate_to_vacancy(candidate)
+                        if vacancy is not None:
+                            vacancy = replace(vacancy, source=self.name)
                     if vacancy is not None:
                         vacancies.append(vacancy)
             finally:
@@ -114,12 +159,10 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
             require_published_at=True,
         )
 
-    async def _discover_keyed_post_urls(self, limit: int) -> tuple[str, ...]:
+    async def _discover_keyed_post_urls(self, limit: int) -> tuple[LinkedInPostCandidate, ...]:
         provider_types = []
         if self.settings.serpapi_api_key:
             provider_types.append(LinkedInPostSearchAdapter)
-        if self.settings.serper_api_key:
-            provider_types.append(LinkedInPostSerperAdapter)
 
         current_time = utcnow()
         all_intents = select_search_intents(self.settings.linkedin_post_headless_query)
@@ -173,17 +216,17 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
             ),
             reverse=True,
         )
-        return _post_urls_from_candidates(prioritized, limit)
+        return tuple(prioritized[:limit])
 
-    async def _discover_free_post_urls(self, limit: int) -> tuple[str, ...]:
+    async def _discover_free_post_urls(self, limit: int) -> tuple[LinkedInPostCandidate, ...]:
         """Discover public post URLs without a keyed search provider.
 
         Lightweight HTTP providers are used for discovery: Bing RSS, DuckDuckGo
-        HTML, then paginated Bing HTML. The browser is reserved for reading
-        LinkedIn post pages themselves. A protection screen ends that
-        provider's attempt instead of being bypassed. Undated results stay in
-        the queue: the reader later derives a reliable date from the activity
-        ID or rejects the candidate.
+        HTML, then paginated Bing HTML, DuckDuckGo Lite, and Mojeek. The
+        browser is reserved for reading LinkedIn post pages themselves. A
+        protection screen ends that provider's attempt instead of being
+        bypassed. Undated results stay in the queue: the reader later derives
+        a reliable date from the activity ID or rejects the candidate.
         """
 
         if limit <= 0:
@@ -194,8 +237,8 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
             cycle_index=_search_cycle_index(utcnow()),
         )
         seen_urls: set[str] = set()
-        dated_urls: list[tuple[datetime, str]] = []
-        undated_urls: list[str] = []
+        dated: list[tuple[datetime, LinkedInPostCandidate]] = []
+        undated: list[LinkedInPostCandidate] = []
 
         async with source_session(headers=BROWSER_HEADERS) as session:
             for intent in intents:
@@ -209,44 +252,67 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
                     rss_results = []
                 _collect_search_results(
                     rss_results,
+                    provider="bing_rss",
+                    query=intent,
                     seen_urls=seen_urls,
-                    dated_urls=dated_urls,
-                    undated_urls=undated_urls,
+                    dated=dated,
+                    undated=undated,
                     limit=limit,
                 )
 
-                await asyncio.sleep(SEARCH_PAGE_DELAY_SECONDS)
+                await asyncio.sleep(_jittered_seconds(SEARCH_PAGE_DELAY_SECONDS))
                 html = await _fetch_provider_html(session, "duckduckgo", intent.query)
                 if html:
                     _collect_search_results(
                         _search_html_results(BeautifulSoup(html, "html.parser")),
+                        provider="duckduckgo",
+                        query=intent,
                         seen_urls=seen_urls,
-                        dated_urls=dated_urls,
-                        undated_urls=undated_urls,
+                        dated=dated,
+                        undated=undated,
                         limit=limit,
                     )
 
                 for page_index in range(max(1, self.settings.linkedin_headless_discovery_pages)):
                     if len(seen_urls) >= limit:
                         break
-                    await asyncio.sleep(SEARCH_PAGE_DELAY_SECONDS)
+                    await asyncio.sleep(_jittered_seconds(SEARCH_PAGE_DELAY_SECONDS))
                     html = await _fetch_bing_html(session, intent.query, first=1 + page_index * BING_PAGE_STEP)
                     if not html or _looks_like_search_challenge(html):
                         break
                     before = len(seen_urls)
                     _collect_search_results(
                         _search_html_results(BeautifulSoup(html, "html.parser")),
+                        provider="bing",
+                        query=intent,
                         seen_urls=seen_urls,
-                        dated_urls=dated_urls,
-                        undated_urls=undated_urls,
+                        dated=dated,
+                        undated=undated,
                         limit=limit,
                     )
                     if len(seen_urls) == before:
                         break
 
-        return tuple(_ordered_discovered_urls(dated_urls, undated_urls)[:limit])
+                for provider in ("duckduckgo_lite", "mojeek"):
+                    if len(seen_urls) >= limit:
+                        break
+                    await asyncio.sleep(_jittered_seconds(SEARCH_PAGE_DELAY_SECONDS))
+                    html = await _fetch_provider_html(session, provider, intent.query)
+                    if not html:
+                        continue
+                    _collect_search_results(
+                        _search_html_results(BeautifulSoup(html, "html.parser")),
+                        provider=provider,
+                        query=intent,
+                        seen_urls=seen_urls,
+                        dated=dated,
+                        undated=undated,
+                        limit=limit,
+                    )
 
-    async def _discover_browser_post_urls(self, context, limit: int) -> tuple[str, ...]:
+        return tuple(_ordered_discovered_candidates(dated, undated)[:limit])
+
+    async def _discover_browser_post_urls(self, context, limit: int) -> tuple[LinkedInPostCandidate, ...]:
         """Discover public post URLs by reading Bing result pages in a browser.
 
         Used when keyed and lightweight HTTP discovery produced no candidates.
@@ -264,8 +330,8 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
         )
         timeout_ms = self.settings.linkedin_post_headless_timeout_seconds * 1000
         seen_urls: set[str] = set()
-        dated_urls: list[tuple[datetime, str]] = []
-        undated_urls: list[str] = []
+        dated: list[tuple[datetime, LinkedInPostCandidate]] = []
+        undated: list[LinkedInPostCandidate] = []
         page = await context.new_page()
         page.set_default_timeout(timeout_ms)
         try:
@@ -283,48 +349,77 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
                     before = len(seen_urls)
                     _collect_search_results(
                         _search_html_results(BeautifulSoup(html, "html.parser")),
+                        provider="bing_browser",
+                        query=intent,
                         seen_urls=seen_urls,
-                        dated_urls=dated_urls,
-                        undated_urls=undated_urls,
+                        dated=dated,
+                        undated=undated,
                         limit=limit,
                     )
                     if len(seen_urls) == before:
                         break
-                    await asyncio.sleep(SEARCH_PAGE_DELAY_SECONDS)
+                    await asyncio.sleep(_jittered_seconds(SEARCH_PAGE_DELAY_SECONDS))
         finally:
             await page.close()
-        return tuple(_ordered_discovered_urls(dated_urls, undated_urls)[:limit])
+        return tuple(_ordered_discovered_candidates(dated, undated)[:limit])
 
     async def _read_public_post(self, context, url: str, timeout_ms: int) -> Vacancy | None:
         page = await context.new_page()
         page.set_default_timeout(timeout_ms)
         try:
-            await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
-            final_url = _canonicalize_linkedin_post_url(page.url)
-            if not final_url:
-                return None
-            html = await page.content()
-            if _requires_manual_access(html):
-                return None
-            description = _extract_post_text(html)
-            published_at = _published_at_from_activity_id(final_url)
-            if not description or published_at is None:
-                return None
-            title = _post_title(await page.title(), description)
-            if not title:
-                return None
-            return Vacancy(
-                title=title,
-                description=description,
-                source=self.name,
-                url=final_url,
-                location=None,
-                stack=_stack_from_text(f"{title} {description}"),
-                published_at=published_at,
-                raw_text=f"{title} {description}",
-            )
+            vacancy = await self._read_once(page, url, timeout_ms)
+            if vacancy is None:
+                # A login/authwall redirect can serve one canonical URL form
+                # while the feed-update form of the same activity stays publicly
+                # readable. Retry once through that alternate form.
+                alternate = _alternate_post_url(url)
+                if alternate:
+                    await asyncio.sleep(POST_READ_RETRY_DELAY_SECONDS)
+                    vacancy = await self._read_once(page, alternate, timeout_ms)
+            return vacancy
         finally:
             await page.close()
+
+    async def _read_once(self, page, url: str, timeout_ms: int) -> Vacancy | None:
+        try:
+            response = await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+            status = getattr(response, "status", None)
+            if status in RETRYABLE_POST_STATUSES:
+                logger.warning(
+                    "LinkedIn post read got HTTP %s; retrying once after backoff", status
+                )
+                await asyncio.sleep(RATE_LIMIT_RETRY_DELAY_SECONDS)
+                response = await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+        except Exception as exc:
+            logger.warning("LinkedIn post read failed: %s", type(exc).__name__)
+            return None
+        final_url = _canonicalize_linkedin_post_url(page.url)
+        if not final_url:
+            return None
+        html = await page.content()
+        if _requires_manual_access(html):
+            return None
+        description = _extract_post_text(html)
+        if not description:
+            description = await _wait_for_post_text(page, timeout_ms)
+        if not description:
+            return None
+        published_at = _published_at_from_activity_id(final_url)
+        if published_at is None:
+            return None
+        title = _post_title(await page.title(), description)
+        if not title:
+            return None
+        return Vacancy(
+            title=title,
+            description=description,
+            source=self.name,
+            url=final_url,
+            location=None,
+            stack=_stack_from_text(f"{title} {description}"),
+            published_at=published_at,
+            raw_text=f"{title} {description}",
+        )
 
 
 async def _fetch_provider_html(session, provider: str, query: str) -> str:
@@ -364,9 +459,11 @@ async def _fetch_bing_result_html(page, query: str, *, first: int) -> str:
 def _collect_search_results(
     results: list[SearchHtmlResult],
     *,
+    provider: str,
+    query,
     seen_urls: set[str],
-    dated_urls: list[tuple[datetime, str]],
-    undated_urls: list[str],
+    dated: list[tuple[datetime, LinkedInPostCandidate]],
+    undated: list[LinkedInPostCandidate],
     limit: int,
 ) -> None:
     for result in results:
@@ -376,20 +473,30 @@ def _collect_search_results(
         if not url or url in seen_urls:
             continue
         seen_urls.add(url)
+        candidate = LinkedInPostCandidate(
+            url=url,
+            search_title=result.title,
+            snippet=result.snippet,
+            date_text=result.date_text,
+            provider=provider,
+            query=query.query,
+            family=query.family,
+            language=query.language,
+        )
         published_at = _published_at_for_result(result.date_text, url)
         if published_at is None:
-            undated_urls.append(url)
+            undated.append(candidate)
         else:
-            dated_urls.append((published_at, url))
+            dated.append((published_at, candidate))
 
 
-def _ordered_discovered_urls(
-    dated_urls: list[tuple[datetime, str]],
-    undated_urls: list[str],
-) -> list[str]:
-    ordered = [url for _, url in sorted(dated_urls, reverse=True)]
-    ordered_set = set(ordered)
-    ordered.extend(url for url in undated_urls if url not in ordered_set)
+def _ordered_discovered_candidates(
+    dated: list[tuple[datetime, LinkedInPostCandidate]],
+    undated: list[LinkedInPostCandidate],
+) -> list[LinkedInPostCandidate]:
+    ordered = [candidate for _, candidate in sorted(dated, key=lambda item: (item[0], item[1].url), reverse=True)]
+    ordered_set = {candidate.url for candidate in ordered}
+    ordered.extend(candidate for candidate in undated if candidate.url not in ordered_set)
     return ordered
 
 
@@ -428,34 +535,31 @@ def _rss_post_results(rss: str) -> list[SearchHtmlResult]:
     return results
 
 
-def _decode_bing_redirect_url(href: str) -> str:
-    """Decode Bing ``/ck/a`` redirect wrappers into the real target URL."""
+def _alternate_post_url(url: str) -> str:
+    """Return the guest-accessible feed-update form of a LinkedIn post URL.
 
-    if "/ck/a" not in href:
-        return href
-    marker = "u=a1"
-    index = href.find(marker)
-    if index == -1:
+    Only the ``/posts/`` form can be converted: the reverse mapping would need
+    the post slug that only search results provide. Returns an empty string
+    when the URL carries no activity ID.
+    """
+
+    if "/posts/" not in url:
         return ""
-    payload = href[index + len(marker):].split("&", 1)[0]
-    padding = "=" * (-len(payload) % 4)
+    match = ACTIVITY_ID_PATTERN.search(url)
+    if not match:
+        return ""
+    return f"https://www.linkedin.com/feed/update/urn:li:activity:{match.group(1)}/"
+
+
+async def _wait_for_post_text(page, timeout_ms: int) -> str:
+    """Wait briefly for late-hydrating guest post text; empty on timeout."""
+
     try:
-        return base64.urlsafe_b64decode(payload + padding).decode("utf-8", "ignore")
-    except (ValueError, UnicodeDecodeError):
+        await page.wait_for_selector(WAIT_CONTENT_SELECTOR, state="attached", timeout=timeout_ms)
+    except Exception as exc:
+        logger.warning("LinkedIn post text did not render in time: %s", type(exc).__name__)
         return ""
-
-
-def _post_urls_from_candidates(
-    candidates: list[LinkedInPostCandidate],
-    limit: int,
-) -> tuple[str, ...]:
-    urls: list[str] = []
-    for candidate in candidates:
-        if candidate.url and candidate.url not in urls:
-            urls.append(candidate.url)
-        if len(urls) >= limit:
-            break
-    return tuple(urls)
+    return _extract_post_text(await page.content())
 
 
 def _candidate_priority_key(

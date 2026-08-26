@@ -13,7 +13,7 @@ The profile and queued-application foundations are documented in [`docs/applicat
   - `copy`: copy the original message to the target channel after the same allowed-vacancy intake check.
 - Publishes only posts that really seek Junior Frontend or Fullstack developers: each post needs a hiring signal, explicit frontend/fullstack role evidence, and a junior or entry-level marker.
 - Stores message fingerprints in SQLite to avoid duplicates.
-- Includes opt-in LinkedIn hiring-post discovery through keyed search, free search-result scraping, Apify post-body search, and permission-gated headless public-post parsing.
+- Includes opt-in LinkedIn hiring-post discovery through keyless public search-result scraping and permission-gated headless public-post parsing. A keyed SerpApi search remains available but is never required.
 - Polls configured public sources in the background while the bot is running.
 
 ## Profile storage foundation
@@ -59,18 +59,16 @@ Sixty-second polling is near-real-time for the configured LinkedIn discovery pro
 
 ## LinkedIn Hiring Post Discovery
 
-To find ordinary LinkedIn posts like "Ищем Junior Front-End Developer..." rather than LinkedIn Jobs cards, enable the Google Search-backed post search source through [SerpApi](https://serpapi.com/search-api) or [Serper](https://serper.dev/):
+To find ordinary LinkedIn posts like "Ищем Junior Front-End Developer..." rather than LinkedIn Jobs cards, an optional Google Search-backed post search source is available through [SerpApi](https://serpapi.com/search-api):
 
 ```dotenv
 ENABLE_LINKEDIN_POST_SEARCH=true
 SERPAPI_API_KEY=
-# Or use Serper instead of SerpApi:
-SERPER_API_KEY=
 LINKEDIN_POST_SEARCH_QUERY=(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR "we're hiring" OR hiring OR "looking for" OR "join our team" OR "open role" OR "ищем" OR "ищет" OR "нанимаем" OR "в команду") ("junior frontend developer" OR "junior front-end developer" OR "junior frontend engineer" OR "junior fullstack developer" OR "junior full-stack developer" OR "junior full stack engineer" OR "intern frontend developer" OR "trainee fullstack developer" OR frontend OR fullstack)
 LINKEDIN_POST_SEARCH_RESULTS_WANTED=10
 ```
 
-This source uses SerpApi or Serper Google Search results for publicly indexed LinkedIn post URLs worldwide. It publishes only real search results with a short snippet-based summary and the LinkedIn post link. Every LinkedIn result needs a reliable publication date and is rejected once it is older than `LINKEDIN_POST_MAX_AGE_HOURS` (maximum 240 hours / 10 days). Use `||` to separate fallback search queries when you want the keyed provider to try several hiring-post searches. If neither `SERPAPI_API_KEY` nor `SERPER_API_KEY` is set, the source is not registered.
+This source uses SerpApi Google Search results for publicly indexed LinkedIn post URLs worldwide. It publishes only real search results with a short snippet-based summary and the LinkedIn post link. Every LinkedIn result needs a reliable publication date and is rejected once it is older than `LINKEDIN_POST_MAX_AGE_HOURS` (maximum 240 hours / 10 days). Use `||` to separate fallback search queries when you want the keyed provider to try several hiring-post searches. Without `SERPAPI_API_KEY`, the keyed source is not registered and the free sources below cover discovery instead. Serper support was removed: the free pipeline needs no paid key.
 
 ## Free LinkedIn Hiring Post Scraper
 
@@ -79,11 +77,11 @@ To avoid paid search APIs, enable the free scraper source:
 ```dotenv
 ENABLE_LINKEDIN_POST_SCRAPER=true
 LINKEDIN_POST_SCRAPER_QUERY=(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR "we're hiring" OR hiring) ("junior frontend developer" OR "junior front-end developer" OR "junior fullstack developer" OR "junior full-stack developer" OR "intern frontend developer" OR "trainee frontend developer") || (site:linkedin.com/posts OR site:linkedin.com/feed/update) ("looking for" OR "join our team" OR "open role") (frontend OR "front-end" OR fullstack OR "full-stack") ("junior" OR intern OR trainee OR "entry level") || (site:linkedin.com/posts OR site:linkedin.com/feed/update) ("ищем" OR "ищет" OR "нанимаем" OR "в команду") (фронтенд OR фронтенд-разработчик OR фулстек OR фулстек-разработчик) (джуниор OR стажер OR "без опыта")
-LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS=bing_rss,duckduckgo,bing
+LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS=bing_rss,duckduckgo,bing,duckduckgo_lite,mojeek
 LINKEDIN_POST_SCRAPER_RESULTS_WANTED=100
 ```
 
-This source reads public search results and keeps only real `linkedin.com/posts/...` and `linkedin.com/feed/update/...` links. It tries Bing RSS first, then public search-result HTML providers. It does not require an API key and does not create placeholder vacancies. Use `||` to separate fallback search queries. Because the HTML fallback depends on public search-result markup, it can be less stable than SerpApi and may return no rows when the search engine changes HTML or rate-limits requests. If an HTML provider returns a CAPTCHA or anti-bot page, the scraper skips that provider rather than bypassing the protection.
+This source reads public search results and keeps only real `linkedin.com/posts/...` and `linkedin.com/feed/update/...` links. It tries Bing RSS first, then public search-result HTML providers (DuckDuckGo HTML, Bing HTML, DuckDuckGo Lite, and the independent Mojeek index). It does not require an API key and does not create placeholder vacancies. Use `||` to separate fallback search queries. Because HTML providers depend on public search-result markup, they can be less stable than a keyed provider and may return no rows when a search engine changes HTML or rate-limits requests. A provider that returns a CAPTCHA or anti-bot page is skipped rather than bypassed, one failing provider never blocks the remaining providers, and every vacancy still needs a reliable publication date before publication.
 
 The scraper searches public, globally indexed results. It keeps only results with a reliable publication date (from the search result or the LinkedIn activity ID) and rejects posts older than `LINKEDIN_POST_MAX_AGE_HOURS` (maximum 240 hours / 10 days) before they reach the common polling layer.
 The search depth is intentionally larger than the per-cycle publication budget: SQLite deduplication lets later polls publish the remaining fresh posts. Every source vacancy is localized to Russian before publication.
@@ -113,13 +111,13 @@ localization, publication-limit, and SQLite deduplication stages.
 
 ## Headless LinkedIn Hiring Post Parser
 
-The optional `LinkedInPostHeadlessAdapter` uses the project’s existing open-source [Playwright](https://github.com/microsoft/playwright-python) runtime to parse publicly indexed LinkedIn post pages in a clean headless browser context. For reliable link discovery, configure an existing SerpApi or Serper key; without one it falls back to Bing, which is best effort and can return no rows when blocked:
+The optional `LinkedInPostHeadlessAdapter` uses the project’s existing open-source [Playwright](https://github.com/microsoft/playwright-python) runtime to parse publicly indexed LinkedIn post pages in a clean headless browser context. For reliable link discovery, an existing SerpApi key can be configured; without one the adapter discovers links through its own free public search pipeline, which needs no key at all:
 
 ```dotenv
 ENABLE_LINKEDIN_POST_HEADLESS=true
 LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=true
 LINKEDIN_HEADLESS_PERMISSION_REFERENCE=linkedin-crawling-approval-id-or-url
-SERPAPI_API_KEY=your_key # or SERPER_API_KEY=your_key
+SERPAPI_API_KEY=your_key # optional; free discovery works without it
 LINKEDIN_POST_HEADLESS_QUERY=
 LINKEDIN_POST_HEADLESS_RESULTS_WANTED=10
 LINKEDIN_POST_SEARCH_INTENTS_PER_CYCLE=6
@@ -129,19 +127,21 @@ LINKEDIN_HEADLESS_DISCOVERY_PAGES=3
 
 When `LINKEDIN_POST_HEADLESS_QUERY` is blank, the autonomous profile uses eight explicit searches: frontend and fullstack, each in junior/entry-level and internship/trainee variants, in Russian and English — all worldwide. The whole profile is covered within a couple of polling cycles. Set a custom `||`-separated query list only when overriding that built-in profile intentionally.
 
-Without a keyed provider the adapter performs its own free discovery through lightweight public search requests: Bing RSS first, then the DuckDuckGo HTML endpoint, then up to `LINKEDIN_HEADLESS_DISCOVERY_PAGES` (default 3) paginated Bing HTML result pages per selected intent. When all HTTP discovery providers return no candidate URLs, the adapter reads Bing result pages inside the same clean headless browser context that later reads the post pages, using the same pagination limit; a challenge page or an unexpected redirect domain skips that attempt instead of being bypassed.
+Without a keyed provider the adapter performs its own free discovery through lightweight public search requests: Bing RSS first, then DuckDuckGo HTML, Bing HTML, DuckDuckGo Lite, and Mojeek, then up to `LINKEDIN_HEADLESS_DISCOVERY_PAGES` (default 3) paginated Bing HTML result pages per selected intent. When all HTTP discovery providers return no candidate URLs, the adapter reads Bing result pages inside the same clean headless browser context that later reads the post pages, using the same pagination limit; a challenge page or an unexpected redirect domain skips that attempt instead of being bypassed.
 
-It discovers globally indexed public posts without a country restriction. Each selected intent receives a balanced result quota; candidates from all selected families are then ordered by their verifiable publication-date hint before the browser-read limit is applied. SerpApi and Serper requests also use Google’s nearest supported recent-results window (`tbs=qdr:*`); the bot still verifies every date against the exact configured age limit. Search results are retained as raw URL candidates, so a missing search snippet or date no longer removes a link before the browser can inspect it. When the authorized headless pipeline is active, the standalone LinkedIn search and scraper adapters are not registered as parallel publishers.
+It discovers globally indexed public posts without a country restriction. Each selected intent receives a balanced result quota; candidates from all selected families are then ordered by their verifiable publication-date hint before the browser-read limit is applied. SerpApi requests also use Google’s nearest supported recent-results window (`tbs=qdr:*`); the bot still verifies every date against the exact configured age limit. Search results are retained as raw URL candidates, so a missing search snippet or date no longer removes a link before the browser can inspect it. When the authorized headless pipeline is active, the standalone LinkedIn search and scraper adapters are not registered as parallel publishers.
 
-Before enabling browser access, verify real keyed discovery without Telegram publication:
+Guest-page reading is paced and hardened for reliability without any protection bypass: sequential post reads are separated by jittered delays, the browser presents a consistent real-Chrome user agent with the automation flag disabled, slow guest pages get a short wait for late-rendering text, an HTTP 429/999 answer is retried once after a backoff, and a canonical `/posts/...` login redirect is retried once through the publicly readable `/feed/update/urn:li:activity:...` form of the same activity before the candidate is skipped.
+
+Before enabling browser access, verify discovery without Telegram publication:
 
 ```bash
 tg-vacancy-bot diagnose-linkedin --use-default-profile --limit 10 --show-limit 5
 ```
 
-The report shows configured-provider status, candidate and unique URL counts, and the permission-gate state. When a provider rejects every request, it reports only a safe HTTP status class (for example, `Http429`) rather than a secret-bearing request URL or response body. It never launches Playwright, creates a Telegram publisher, writes publication state, prints search snippets, or exposes API keys.
+Without `SERPAPI_API_KEY`, the report probes every configured free public search provider per selected intent and shows which engines answer, return empty results, or fail with a safe error class (for example, `Http429` or `TimeoutError`), so search-engine blockages are visible without any API key. It never launches Playwright, creates a Telegram publisher, writes publication state, prints search snippets, or exposes API keys. To verify the full free pipeline end to end without publishing, run `tg-vacancy-bot preview-sources --source "LinkedIn Hiring Posts (Headless)"`.
 
-Direct page reading is fail-closed: both `LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=true` and a non-empty `LINKEDIN_HEADLESS_PERMISSION_REFERENCE` are required. Set them only after receiving documented LinkedIn crawling permission or an approved access path. The adapter does not use a LinkedIn account, cookies, proxies, fake identities, scrolling automation, or any CAPTCHA/login/2FA bypass. It publishes only posts whose public page contains extractable text, whose activity URL has a reliable publication date, and whose date is no more than ten days old. A login, protection page, or off-domain redirect is skipped without a snippet fallback. On GitHub Actions, Chromium is installed only when the same permission gate is satisfied.
+Direct page reading is fail-closed: both `LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=true` and a non-empty `LINKEDIN_HEADLESS_PERMISSION_REFERENCE` are required. Set them only after receiving documented LinkedIn crawling permission or an approved access path. The adapter does not use a LinkedIn account, cookies, proxies, fake identities, scrolling automation, or any CAPTCHA/login/2FA bypass. It publishes only posts whose URL carries a reliable publication date no more than ten days old. When direct reading is refused by a login wall even after the feed-update retry, the vacancy falls back to the real public search result — title, snippet, and activity-ID date — that discovered the link instead of being dropped; protection pages and off-domain redirects are never bypassed. On GitHub Actions, Chromium is installed only when the same permission gate is satisfied.
 
 ## Required Telegram Setup
 
@@ -199,7 +199,7 @@ use:
 - `TARGET_CHAT_ID`
 - One localization key when `LOCALIZE_DESCRIPTIONS=true`: `OPENAI_API_KEY` for the default mode, or `GROQ_API_KEY` when `LOCALIZATION_PROVIDER=groq`.
 
-Optional LinkedIn source keys and toggles such as `SERPAPI_API_KEY`, `SERPER_API_KEY`,
+Optional LinkedIn source keys and toggles such as `SERPAPI_API_KEY`,
 and `ENABLE_LINKEDIN_POST_*` can also be configured as GitHub secrets. The workflow keeps `DATABASE_PATH` under
 `data/` and restores it with the GitHub Actions cache so source deduplication is
 preserved between scheduled runs.
@@ -350,6 +350,6 @@ Only the LinkedIn post adapters described above can register as automatic public
 
 ## LinkedIn Boundary
 
-This project permits three documented, opt-in LinkedIn paths: keyed Google Search-backed public hiring-post search through SerpApi or Serper, free public search-result scraping, and headless parsing of publicly available post pages found through Bing. These are the only automatic public-source adapters. The bot does not log in with a LinkedIn account, use proxies or anti-bot bypasses, invent vacancies, or publish fake fallback records when LinkedIn or a search provider blocks or returns no results.
+This project permits three documented, opt-in LinkedIn paths: an optional keyed Google Search-backed public hiring-post search through SerpApi, free public search-result scraping, and headless parsing of publicly available post pages found through public search engines. These are the only automatic public-source adapters. The bot does not log in with a LinkedIn account, use proxies or anti-bot bypasses, invent vacancies, or publish fabricated records. Every published post is backed by a real public source — either the post page itself or the public search result (title, snippet, activity-ID date) that indexed it.
 
 LinkedIn links can also enter when an operator manually sends or forwards vacancy text containing a LinkedIn URL to the Telegram bot. In that case the normal forwarded-message parser can keep the URL and mark the vacancy source as `LinkedIn`.

@@ -31,12 +31,11 @@ jobs:
       SOURCE_MAX_AGE_HOURS: ${{ secrets.SOURCE_MAX_AGE_HOURS || '48' }}
       ENABLE_LINKEDIN_POST_SEARCH: ${{ secrets.ENABLE_LINKEDIN_POST_SEARCH || 'false' }}
       SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
-      SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
       LINKEDIN_POST_SEARCH_QUERY: ${{ secrets.LINKEDIN_POST_SEARCH_QUERY || '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR hiring OR "ищем" OR "ищет") ("junior frontend developer" OR "junior fullstack developer" OR frontend OR fullstack)' }}
       LINKEDIN_POST_SEARCH_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SEARCH_RESULTS_WANTED || '10' }}
       ENABLE_LINKEDIN_POST_SCRAPER: ${{ secrets.ENABLE_LINKEDIN_POST_SCRAPER || 'false' }}
       LINKEDIN_POST_SCRAPER_QUERY: ${{ secrets.LINKEDIN_POST_SCRAPER_QUERY || '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR hiring OR "ищем" OR "ищет") ("junior frontend developer" OR "junior fullstack developer" OR frontend OR fullstack)' }}
-      LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS: ${{ secrets.LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS || 'bing_rss,duckduckgo,bing' }}
+      LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS: ${{ secrets.LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS || 'bing_rss,duckduckgo,bing,duckduckgo_lite,mojeek' }}
       LINKEDIN_POST_SCRAPER_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SCRAPER_RESULTS_WANTED || '100' }}
       ENABLE_LINKEDIN_POST_APIFY: ${{ secrets.ENABLE_LINKEDIN_POST_APIFY || 'false' }}
       APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
