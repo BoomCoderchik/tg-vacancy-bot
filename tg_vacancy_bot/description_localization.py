@@ -13,7 +13,15 @@ MAX_LOCALIZED_DESCRIPTION_CHARS = 700
 MAX_OUTPUT_TOKENS = 260
 MODEL_OUTPUT_TOKEN_LIMITS = {
     "nvidia/nemotron-3-super-120b-a12b:free": 420,
+    # Groq's GPT-OSS models spend completion tokens on hidden reasoning before
+    # the answer, so the two-sentence output needs a larger budget.
+    "openai/gpt-oss-120b": 900,
+    "openai/gpt-oss-20b": 900,
 }
+# Reasoning models accept an effort knob; "low" keeps latency and token use
+# small for a short translation task while still allowing brief thinking.
+REASONING_MODEL_PREFIXES = ("openai/gpt-oss",)
+REASONING_EFFORT = "low"
 CYRILLIC_RE = re.compile(r"[\u0400-\u04FF]")
 LETTER_RE = re.compile(r"[A-Za-z\u0400-\u04FF]")
 MIN_RUSSIAN_CYRILLIC_RATIO = 0.35
@@ -59,16 +67,19 @@ class OpenAIDescriptionLocalizer:
     async def localize(self, description: str) -> str:
         errors: list[str] = []
         for model in unique_models((self.model, *self.fallback_models)):
+            request_kwargs: dict[str, object] = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": LOCALIZATION_INSTRUCTIONS},
+                    {"role": "user", "content": description},
+                ],
+                "max_tokens": MODEL_OUTPUT_TOKEN_LIMITS.get(model, MAX_OUTPUT_TOKENS),
+                "temperature": 0.2,
+            }
+            if model.startswith(REASONING_MODEL_PREFIXES):
+                request_kwargs["reasoning_effort"] = REASONING_EFFORT
             try:
-                response = await self.client.chat.completions.create(
-                    model=model,
-                    messages=[
-                        {"role": "system", "content": LOCALIZATION_INSTRUCTIONS},
-                        {"role": "user", "content": description},
-                    ],
-                    max_tokens=MODEL_OUTPUT_TOKEN_LIMITS.get(model, MAX_OUTPUT_TOKENS),
-                    temperature=0.2,
-                )
+                response = await self.client.chat.completions.create(**request_kwargs)
             except Exception as exc:
                 errors.append(format_openai_error(exc))
                 continue

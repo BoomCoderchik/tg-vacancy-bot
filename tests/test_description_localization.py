@@ -136,6 +136,31 @@ def test_openai_localizer_gives_nemotron_super_more_room_for_reasoning() -> None
     assert client.chat.completions.request["max_tokens"] == 420
 
 
+def test_openai_localizer_gives_groq_gpt_oss_reasoning_models_room_and_low_effort() -> None:
+    client = FakeOpenAIClient()
+    localizer = OpenAIDescriptionLocalizer(
+        api_key="test-key",
+        model="openai/gpt-oss-120b",
+        fallback_models=("openai/gpt-oss-20b",),
+        client=client,
+    )
+
+    asyncio.run(localizer.localize("Wir suchen einen Python Entwickler fuer Remote Backend Arbeit."))
+
+    request = client.chat.completions.request
+    assert request["max_tokens"] == 900
+    assert request["reasoning_effort"] == "low"
+
+
+def test_openai_localizer_omits_reasoning_effort_for_plain_models() -> None:
+    client = FakeOpenAIClient()
+    localizer = OpenAIDescriptionLocalizer(api_key="test-key", model="test-model", client=client)
+
+    asyncio.run(localizer.localize("Wir suchen einen Python Entwickler fuer Remote Backend Arbeit."))
+
+    assert "reasoning_effort" not in client.chat.completions.request
+
+
 def test_openai_localizer_uses_fallback_model_when_primary_returns_empty_text() -> None:
     client = EmptyThenGoodOpenAIClient()
     localizer = OpenAIDescriptionLocalizer(

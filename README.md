@@ -283,20 +283,20 @@ OPENAI_FALLBACK_MODELS=openai/gpt-oss-20b:free,openrouter/free
 
 This model chain was smoke-tested for Russian translation and two-sentence vacancy compression on 2026-08-10. The selected Super model receives a 420-token completion budget because its reasoning output shares the completion limit; other fallback models keep the standard 260-token budget. OpenRouter free-model availability and rate limits change; the paid `openai/gpt-4.1-mini` fallback is appended automatically after the configured free models and requires OpenRouter credits. If all localization attempts fail, source vacancies are still published with their original description and link.
 
-### Free Groq localization mode
+### Groq localization mode
 
-For the scheduled parser's current load profile, Groq is the supported free option:
+For the scheduled parser's current load profile, Groq is the supported default provider:
 
 ```dotenv
 LOCALIZE_DESCRIPTIONS=true
 LOCALIZATION_PROVIDER=groq
 GROQ_API_KEY=gsk_...
 # Defaults shown explicitly; change these only after testing a replacement model.
-GROQ_MODEL=llama-3.1-8b-instant
+GROQ_MODEL=openai/gpt-oss-120b
 GROQ_FALLBACK_MODELS=openai/gpt-oss-20b
 ```
 
-Groq is OpenAI-client-compatible, so the bot uses its API directly rather than the unstable OpenRouter free-model pool. At the time this was documented, the free limit for `llama-3.1-8b-instant` is 30 requests/minute and 14,400 requests/day: above the bot's 20-vacancy, 15-minute poll ceiling. Groq has announced that this particular model will be removed on 2026-08-16; the configured `openai/gpt-oss-20b` fallback keeps the bot running, but has a lower free quota. Before that date, test and set a replacement through `GROQ_MODEL` and `GROQ_FALLBACK_MODELS` without changing code. Add `LOCALIZATION_PROVIDER=groq`, `GROQ_API_KEY`, and optionally the two model variables as GitHub Actions secrets; do not store the key in the repository.
+The primary model is `openai/gpt-oss-120b` — Groq's strongest production model and its own recommended replacement for the retired Llama 3.1 8B / 3.3 70B models (both shut down on 2026-08-16), with `openai/gpt-oss-20b` as the faster fallback. GPT-OSS models reason before answering, so the localization client gives them an enlarged completion budget (900 tokens) and sends `reasoning_effort=low` to keep latency small for this short translation task. Groq is OpenAI-client-compatible, so the bot uses its API directly. The free tier covers the bot's 20-vacancy, 15-minute poll ceiling; add `LOCALIZATION_PROVIDER=groq`, `GROQ_API_KEY`, and optionally the two model variables as GitHub Actions secrets — do not store the key in the repository.
 
 ## Preview And Manual Publish
 
