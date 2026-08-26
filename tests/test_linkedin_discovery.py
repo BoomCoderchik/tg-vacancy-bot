@@ -987,6 +987,13 @@ def test_fetch_paces_sequential_post_reads(monkeypatch) -> None:
     async def empty(limit: int):
         return ()
 
+    # The HTTP-first pass must never touch the network in tests: every guest
+    # page request fails closed and falls through to the browser pass.
+    monkeypatch.setattr(
+        adapter,
+        "_read_public_post_http",
+        _failing_http_read,
+    )
     monkeypatch.setattr(adapter, "_discover_keyed_post_urls", empty)
     monkeypatch.setattr(adapter, "_discover_free_post_urls", two_urls)
     monkeypatch.setattr(adapter, "_read_public_post", fake_read)
@@ -1029,6 +1036,9 @@ def test_fetch_publishes_search_snippet_when_guest_read_is_blocked(monkeypatch) 
     async def blocked_read(context, url: str, timeout_ms: int):
         return None
 
+    async def failing_http_read(session, url: str):
+        return None
+
     read_urls: list[str] = []
     original_read = blocked_read
 
@@ -1038,6 +1048,7 @@ def test_fetch_publishes_search_snippet_when_guest_read_is_blocked(monkeypatch) 
 
     monkeypatch.setattr(adapter, "_discover_keyed_post_urls", empty)
     monkeypatch.setattr(adapter, "_discover_free_post_urls", free_discovery)
+    monkeypatch.setattr(adapter, "_read_public_post_http", failing_http_read)
     monkeypatch.setattr(adapter, "_read_public_post", recording_read)
     monkeypatch.setattr(linkedin_post_headless, "async_playwright", _fake_playwright_factory)
 
@@ -1048,6 +1059,113 @@ def test_fetch_publishes_search_snippet_when_guest_read_is_blocked(monkeypatch) 
     assert vacancies[0].source == adapter.name
     assert "junior frontend developer" in vacancies[0].description.lower()
     assert read_urls == [POST_URL]
+
+
+async def _failing_http_read(session, url: str):
+    return None
+
+
+def _fresh_post_url(slug: str) -> str:
+    activity_id = int(datetime.now(UTC).timestamp() * 1000) << 22
+    return f"https://www.linkedin.com/posts/{slug}_hiring-junior-frontend-activity-{activity_id}-abcd"
+
+
+def _guest_post_html(title_text: str, body_text: str) -> str:
+    return (
+        "<html><head><title>"
+        f"{title_text} | LinkedIn"
+        "</title></head><body><article>"
+        "<p class=\"attributed-text-segment-list__content\">"
+        f"{body_text}"
+        "</p></article></body></html>"
+    )
+
+
+class FakeHttpResponse:
+    def __init__(self, url: str, html: str = "", status: int = 200) -> None:
+        self._url = url
+        self._html = html
+        self.status = status
+
+    @property
+    def url(self) -> str:
+        return self._url
+
+    def raise_for_status(self) -> None:
+        if self.status >= 400:
+            raise aiohttp.ClientResponseError(
+                request_info=SimpleNamespace(real_url=self._url),
+                history=(),
+                status=self.status,
+                message="guest page request rejected",
+            )
+
+    async def text(self) -> str:
+        return self._html
+
+
+class _FakeHttpContext:
+    def __init__(self, response: FakeHttpResponse) -> None:
+        self._response = response
+
+    async def __aenter__(self) -> FakeHttpResponse:
+        return self._response
+
+    async def __aexit__(self, *args: object) -> None:
+        return None
+
+
+class FakeHttpSession:
+    """Serves canned guest-page responses by exact URL, like aiohttp."""
+
+    def __init__(self, routes: dict[str, FakeHttpResponse] | None = None) -> None:
+        self.routes = routes or {}
+        self.requested: list[str] = []
+
+    def get(self, url: str):
+        self.requested.append(url)
+        return _FakeHttpContext(self.routes.get(url, FakeHttpResponse(url, status=503)))
+
+
+def test_read_public_post_http_builds_vacancy_from_static_guest_page() -> None:
+    url = _fresh_post_url("static")
+    session = FakeHttpSession(
+        {
+            url: FakeHttpResponse(
+                url,
+                _guest_post_html(
+                    "Hiring Junior Frontend Developer",
+                    "We are hiring a junior frontend developer to build React UI.",
+                ),
+            )
+        }
+    )
+    adapter = LinkedInPostHeadlessAdapter(Settings())
+
+    vacancy = asyncio.run(adapter._read_public_post_http(session, url))
+
+    assert vacancy is not None
+    assert vacancy.url == url
+    assert "junior frontend" in vacancy.title.lower()
+    assert "react" in vacancy.description.lower()
+    assert vacancy.published_at is not None
+
+
+def test_read_public_post_http_fails_closed_on_authwall_page() -> None:
+    url = _fresh_post_url("authwall")
+    authwall = "<html><body><form><input type='password'></form></body></html>"
+    session = FakeHttpSession({url: FakeHttpResponse(url, authwall)})
+    adapter = LinkedInPostHeadlessAdapter(Settings())
+
+    assert asyncio.run(adapter._read_public_post_http(session, url)) is None
+
+
+def test_read_public_post_http_fails_closed_on_off_domain_redirect() -> None:
+    url = _fresh_post_url("redirected")
+    session = FakeHttpSession({url: FakeHttpResponse("https://authwall.example.com/login", "<html>sign in</html>")})
+    adapter = LinkedInPostHeadlessAdapter(Settings())
+
+    assert asyncio.run(adapter._read_public_post_http(session, url)) is None
 
 
 async def _fake_noop() -> None:
