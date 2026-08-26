@@ -5,7 +5,7 @@ from tg_vacancy_bot.config import Settings
 from .adapters.linkedin_post_headless import LinkedInPostHeadlessAdapter
 from .adapters.linkedin_post_apify import LinkedInPostApifyAdapter
 from .adapters.linkedin_post_scraper import LinkedInPostScraperAdapter
-from .adapters.linkedin_post_search import LinkedInPostSearchAdapter, LinkedInPostSerperAdapter
+from .adapters.linkedin_post_search import LinkedInPostSearchAdapter
 from .base import SourceAdapter
 
 
@@ -19,8 +19,6 @@ def build_adapters(settings: Settings) -> list[SourceAdapter]:
     )
     if not headless_requested and settings.enable_linkedin_post_search and settings.serpapi_api_key:
         adapters.append(LinkedInPostSearchAdapter(settings))
-    if not headless_requested and settings.enable_linkedin_post_search and settings.serper_api_key:
-        adapters.append(LinkedInPostSerperAdapter(settings))
     if not headless_requested and settings.enable_linkedin_post_scraper:
         adapters.append(LinkedInPostScraperAdapter(settings))
     if not headless_requested and settings.enable_linkedin_post_apify and settings.apify_api_token:
@@ -41,18 +39,18 @@ def source_configuration_warnings(settings: Settings) -> list[str]:
     if (
         not headless_requested
         and settings.enable_linkedin_post_search
-        and not (settings.serpapi_api_key or settings.serper_api_key)
+        and not settings.serpapi_api_key
     ):
         warnings.append(
-            "LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY or SERPER_API_KEY is missing."
+            "LinkedIn Hiring Posts source is enabled but SERPAPI_API_KEY is missing."
         )
     if settings.enable_linkedin_post_apify and not settings.apify_api_token:
         warnings.append(
             "LinkedIn Apify source is enabled but APIFY_API_TOKEN is missing."
         )
-    if headless_registered and not (settings.serpapi_api_key or settings.serper_api_key):
+    if headless_registered and not settings.serpapi_api_key:
         warnings.append(
-            "LinkedIn Headless source has no SERPAPI_API_KEY or SERPER_API_KEY; Bing discovery is best effort."
+            "LinkedIn Headless source has no SERPAPI_API_KEY; free Bing/DuckDuckGo discovery is used."
         )
     if settings.enable_linkedin_post_headless and not settings.linkedin_headless_access_authorized:
         warnings.append(

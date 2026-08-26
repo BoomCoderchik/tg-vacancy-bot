@@ -80,7 +80,7 @@ def _linkedin_post_search_state(settings: Settings) -> str:
         return "off"
     if settings.enable_linkedin_post_headless:
         return "suppressed-by-headless"
-    if not (settings.serpapi_api_key or settings.serper_api_key):
+    if not settings.serpapi_api_key:
         return "missing-key"
     return "on"
 

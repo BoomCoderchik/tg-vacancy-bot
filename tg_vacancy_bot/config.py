@@ -30,6 +30,12 @@ DEFAULT_LINKEDIN_POST_SCRAPER_QUERY = (
     '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("ищем" OR "ищет" OR "нанимаем" OR "в команду") '
     '(фронтенд OR фронтенд-разработчик OR фулстек OR фулстек-разработчик) (джуниор OR стажер OR "без опыта")'
 )
+# Free public search-result providers used by our own scraper pipeline, in
+# reliability order: Bing RSS output first, then DuckDuckGo HTML, Bing HTML,
+# the lightweight DuckDuckGo Lite endpoint, and the independent Mojeek index.
+DEFAULT_LINKEDIN_POST_SCRAPER_PROVIDERS = (
+    "bing_rss,duckduckgo,bing,duckduckgo_lite,mojeek"
+)
 DEFAULT_LINKEDIN_POST_APIFY_SEARCH_QUERIES = (
     "Hiring junior frontend developer",
     "Hiring junior full stack developer",
@@ -107,7 +113,6 @@ class Settings(BaseSettings):
     # than ten days old. A lower value is allowed, but never a longer window.
     linkedin_post_max_age_hours: int = Field(default=240, alias="LINKEDIN_POST_MAX_AGE_HOURS", gt=0, le=240)
     serpapi_api_key: str = Field(default="", alias="SERPAPI_API_KEY")
-    serper_api_key: str = Field(default="", alias="SERPER_API_KEY")
     linkedin_post_search_query: str = Field(
         default=(
             '(site:linkedin.com/posts OR site:linkedin.com/feed/update) '
@@ -125,7 +130,7 @@ class Settings(BaseSettings):
         alias="LINKEDIN_POST_SCRAPER_QUERY",
     )
     linkedin_post_scraper_search_providers_raw: str = Field(
-        default="bing_rss,duckduckgo,bing",
+        default=DEFAULT_LINKEDIN_POST_SCRAPER_PROVIDERS,
         alias="LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS",
     )
     # Search depth is intentionally larger than the per-cycle publication
@@ -230,13 +235,18 @@ class Settings(BaseSettings):
             "duck": "duckduckgo",
             "duckduckgo": "duckduckgo",
             "bing": "bing",
+            "ddg-lite": "duckduckgo_lite",
+            "ddg_lite": "duckduckgo_lite",
+            "duckduckgo-lite": "duckduckgo_lite",
+            "duckduckgo_lite": "duckduckgo_lite",
+            "mojeek": "mojeek",
         }
         providers = []
         for raw_provider in self.linkedin_post_scraper_search_providers_raw.split(","):
             provider = aliases.get(raw_provider.strip().lower())
             if provider and provider not in providers:
                 providers.append(provider)
-        return tuple(providers or ("bing_rss", "duckduckgo", "bing"))
+        return tuple(providers or tuple(DEFAULT_LINKEDIN_POST_SCRAPER_PROVIDERS.split(",")))
 
     @property
     def linkedin_post_apify_search_queries(self) -> tuple[str, ...]:

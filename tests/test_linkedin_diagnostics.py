@@ -10,6 +10,7 @@ from tg_vacancy_bot.linkedin_diagnostics import (
     collect_linkedin_diagnostics,
     format_linkedin_diagnostics,
 )
+from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import SearchHtmlResult
 from tg_vacancy_bot.sources.adapters.linkedin_post_search import LinkedInPostCandidate
 from tg_vacancy_bot.sources.adapters.linkedin_post_search import LinkedInSearchProviderError
 
@@ -28,39 +29,77 @@ def _candidate(url: str = POST_URL) -> LinkedInPostCandidate:
     )
 
 
-def test_diagnostics_reports_missing_key_without_browser_or_publishing() -> None:
+def test_diagnostics_probes_free_providers_without_any_key(monkeypatch) -> None:
     settings = Settings(
         SERPAPI_API_KEY="",
-        SERPER_API_KEY="",
         LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=False,
         LINKEDIN_HEADLESS_PERMISSION_REFERENCE="",
     )
 
+    async def fake_free_results(session, provider: str, query: str):
+        if provider == "duckduckgo":
+            return [
+                SearchHtmlResult(
+                    title="Hiring Junior Frontend Developer",
+                    link=POST_URL,
+                    snippet="We are hiring.",
+                    date_text="",
+                )
+            ]
+        return []
+
+    monkeypatch.setattr(linkedin_diagnostics, "_fetch_free_search_results", fake_free_results)
+
     report = asyncio.run(collect_linkedin_diagnostics(settings, limit=10))
+    output = format_linkedin_diagnostics(report)
 
-    assert report.status == "misconfigured"
+    assert report.status == "ok"
     assert report.permission_gate == "not_authorized"
-    assert report.providers == ()
-    assert report.urls == ()
+    assert report.provider_count == len(settings.linkedin_post_scraper_search_providers)
+    assert report.urls == (POST_URL,)
+    assert "provider=duckduckgo" in output
+    assert "provider=bing_rss" in output
 
 
-def test_diagnostics_continues_after_provider_error_and_deduplicates(monkeypatch) -> None:
-    class FailingProvider:
+def test_diagnostics_free_path_reports_provider_errors_safely(monkeypatch) -> None:
+    settings = Settings(
+        SERPAPI_API_KEY="",
+        LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=True,
+        LINKEDIN_HEADLESS_PERMISSION_REFERENCE="approval-reference",
+    )
+
+    async def failing_free_results(session, provider: str, query: str):
+        if provider == "duckduckgo":
+            raise TimeoutError("sensitive endpoint details")
+        return []
+
+    monkeypatch.setattr(linkedin_diagnostics, "_fetch_free_search_results", failing_free_results)
+
+    report = asyncio.run(collect_linkedin_diagnostics(settings, limit=10))
+    output = format_linkedin_diagnostics(report)
+
+    duckduckgo = next(provider for provider in report.providers if provider.provider == "duckduckgo")
+    assert duckduckgo.status == "error"
+    assert duckduckgo.error_type == "TimeoutError"
+    assert report.status == "degraded"
+    assert report.permission_gate == "authorized"
+    assert "sensitive endpoint details" not in output
+
+
+def test_diagnostics_continues_after_query_error_and_deduplicates(monkeypatch) -> None:
+    calls = {"count": 0}
+
+    class MixedProvider:
         def __init__(self, settings: Settings) -> None:
             self.settings = settings
 
         async def discover(self, *, limit: int):
-            raise RuntimeError("message contains super-secret-key")
-
-    class WorkingProvider:
-        def __init__(self, settings: Settings) -> None:
-            self.settings = settings
-
-        async def discover(self, *, limit: int):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                raise RuntimeError("message contains super-secret-key")
             return [_candidate(), _candidate()]
 
-    monkeypatch.setattr(linkedin_diagnostics, "LinkedInPostSearchAdapter", FailingProvider)
-    monkeypatch.setattr(linkedin_diagnostics, "LinkedInPostSerperAdapter", WorkingProvider)
+    monkeypatch.setattr(linkedin_diagnostics, "LinkedInPostSearchAdapter", MixedProvider)
     monkeypatch.setattr(
         linkedin_diagnostics,
         "utcnow",
@@ -68,7 +107,6 @@ def test_diagnostics_continues_after_provider_error_and_deduplicates(monkeypatch
     )
     settings = Settings(
         SERPAPI_API_KEY="super-secret-key",
-        SERPER_API_KEY="second-secret-key",
         LINKEDIN_POST_HEADLESS_QUERY="first query || second query",
         LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=True,
         LINKEDIN_HEADLESS_PERMISSION_REFERENCE="approval-reference",
@@ -85,12 +123,10 @@ def test_diagnostics_continues_after_provider_error_and_deduplicates(monkeypatch
     assert report.fresh_date_hints == 1
     assert report.stale_date_hints == 0
     assert report.undated == 0
-    assert "provider=serpapi status=error queries=2 query_errors=2 candidates=0 error_type=RuntimeError" in output
-    assert "provider=serper status=ok queries=2 query_errors=0 candidates=1" in output
+    assert "provider=serpapi status=degraded queries=2 query_errors=1 candidates=1" in output
     assert "profile_intents=2/2" in output
     assert "date_hints=fresh:1,stale:0,undated:0" in output
     assert "super-secret-key" not in output
-    assert "second-secret-key" not in output
     assert "Sensitive snippet" not in output
 
 
@@ -99,7 +135,7 @@ def test_diagnostics_formats_bounded_public_urls() -> None:
     report = LinkedInDiagnosticReport(
         status="ok",
         permission_gate="incomplete",
-        providers=(LinkedInProviderDiagnosticResult(provider="serper", urls=urls),),
+        providers=(LinkedInProviderDiagnosticResult(provider="serpapi", urls=urls),),
         urls=urls,
     )
 
@@ -129,7 +165,6 @@ def test_diagnostics_distinguishes_empty_and_all_provider_errors(monkeypatch) ->
 
     settings = Settings(
         SERPAPI_API_KEY="secret",
-        SERPER_API_KEY="",
         LINKEDIN_POST_HEADLESS_QUERY="custom query",
     )
     monkeypatch.setattr(linkedin_diagnostics, "LinkedInPostSearchAdapter", EmptyProvider)
@@ -196,7 +231,6 @@ def test_diagnostics_counts_fresh_stale_and_undated_candidates(monkeypatch) -> N
     )
     settings = Settings(
         SERPAPI_API_KEY="secret",
-        SERPER_API_KEY="",
         LINKEDIN_POST_HEADLESS_QUERY="custom query",
         LINKEDIN_POST_MAX_AGE_HOURS=240,
     )

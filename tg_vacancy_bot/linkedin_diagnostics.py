@@ -5,14 +5,27 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Literal, Protocol
 
+from bs4 import BeautifulSoup
+
 from tg_vacancy_bot.config import Settings
+from tg_vacancy_bot.sources.adapters.linkedin_post_headless import (
+    _fetch_bing_rss,
+    _fetch_provider_html,
+    _rss_post_results,
+    _search_html_results,
+)
+from tg_vacancy_bot.sources.adapters.linkedin_post_scraper import (
+    BROWSER_HEADERS,
+    _normalize_result_url,
+)
 from tg_vacancy_bot.sources.adapters.linkedin_post_search import (
     LinkedInPostCandidate,
     LinkedInPostSearchAdapter,
-    LinkedInPostSerperAdapter,
     LinkedInSearchProviderError,
+    _canonicalize_linkedin_post_url,
     _published_at_for_result,
 )
+from tg_vacancy_bot.sources.base import source_session
 from tg_vacancy_bot.sources.linkedin_search_profile import (
     fair_query_limits,
     select_cycle_intents,
@@ -21,7 +34,6 @@ from tg_vacancy_bot.sources.linkedin_search_profile import (
 
 
 DiagnosticStatus = Literal[
-    "misconfigured",
     "no_results",
     "ok",
     "degraded",
@@ -93,15 +105,18 @@ async def collect_linkedin_diagnostics(
     settings: Settings,
     limit: int,
 ) -> LinkedInDiagnosticReport:
-    """Run configured keyed discovery providers without browser or publishing side effects."""
+    """Run configured discovery providers without browser or publishing side effects.
+
+    With a SerpApi key the keyed provider is exercised; otherwise the same
+    free public search providers that power production discovery are probed
+    per intent so blockages are visible without any API key.
+    """
 
     current_time = utcnow()
     wanted = min(max(limit, 0), MAX_DIAGNOSTIC_RESULTS_PER_PROVIDER)
-    provider_types: list[tuple[str, type[_DiscoveryProvider]]] = []
+    keyed_providers: list[tuple[str, type[_DiscoveryProvider]]] = []
     if settings.serpapi_api_key.strip():
-        provider_types.append(("serpapi", LinkedInPostSearchAdapter))
-    if settings.serper_api_key.strip():
-        provider_types.append(("serper", LinkedInPostSerperAdapter))
+        keyed_providers.append(("serpapi", LinkedInPostSearchAdapter))
 
     all_intents = select_search_intents(settings.linkedin_post_headless_query)
     selected = select_cycle_intents(
@@ -113,22 +128,13 @@ async def collect_linkedin_diagnostics(
     intent_labels = tuple(f"{intent.family}:{intent.language}" for intent in selected)
 
     permission_gate = _permission_gate(settings)
-    if not provider_types:
-        return LinkedInDiagnosticReport(
-            status="misconfigured",
-            permission_gate=permission_gate,
-            providers=(),
-            urls=(),
-            selected_intents=intent_labels,
-            total_profile_intents=len(all_intents),
-        )
 
     provider_results: list[LinkedInProviderDiagnosticResult] = []
     unique_urls: list[str] = []
     seen_urls: set[str] = set()
     published_at_hints: dict[str, datetime | None] = {}
 
-    for provider_name, provider_type in provider_types:
+    for provider_name, provider_type in keyed_providers:
         provider_urls: list[str] = []
         provider_seen_urls: set[str] = set()
         family_counts: dict[str, int] = {}
@@ -149,19 +155,16 @@ async def collect_linkedin_diagnostics(
                 error_type = error_type or _sanitized_error_type(exc)
                 continue
             for candidate in candidates:
-                url = str(candidate.url).strip()
-                if not url or url in provider_seen_urls:
-                    continue
-                provider_seen_urls.add(url)
-                provider_urls.append(url)
-                family_counts[intent.family] = family_counts.get(intent.family, 0) + 1
-                published_at = _published_at_for_result(candidate.date_text, url)
-                if url not in seen_urls:
-                    seen_urls.add(url)
-                    unique_urls.append(url)
-                    published_at_hints[url] = published_at
-                elif published_at_hints[url] is None and published_at is not None:
-                    published_at_hints[url] = published_at
+                _collect_candidate(
+                    candidate,
+                    intent_family=intent.family,
+                    provider_seen_urls=provider_seen_urls,
+                    provider_urls=provider_urls,
+                    family_counts=family_counts,
+                    seen_urls=seen_urls,
+                    unique_urls=unique_urls,
+                    published_at_hints=published_at_hints,
+                )
 
         provider_results.append(
             LinkedInProviderDiagnosticResult(
@@ -171,6 +174,18 @@ async def collect_linkedin_diagnostics(
                 queries_attempted=len(selected),
                 query_errors=query_errors,
                 family_counts=tuple(family_counts.items()),
+            )
+        )
+
+    if not keyed_providers and selected:
+        provider_results.extend(
+            await _free_provider_diagnostics(
+                settings,
+                selected,
+                wanted,
+                seen_urls=seen_urls,
+                unique_urls=unique_urls,
+                published_at_hints=published_at_hints,
             )
         )
 
@@ -237,6 +252,111 @@ def _permission_gate(settings: Settings) -> PermissionGateState:
     if authorized or has_reference:
         return "incomplete"
     return "not_authorized"
+
+
+def _collect_candidate(
+    candidate: LinkedInPostCandidate,
+    *,
+    intent_family: str,
+    provider_seen_urls: set[str],
+    provider_urls: list[str],
+    family_counts: dict[str, int],
+    seen_urls: set[str],
+    unique_urls: list[str],
+    published_at_hints: dict[str, datetime | None],
+) -> None:
+    url = str(candidate.url).strip()
+    if not url or url in provider_seen_urls:
+        return
+    provider_seen_urls.add(url)
+    provider_urls.append(url)
+    family_counts[intent_family] = family_counts.get(intent_family, 0) + 1
+    published_at = _published_at_for_result(candidate.date_text, url)
+    if url not in seen_urls:
+        seen_urls.add(url)
+        unique_urls.append(url)
+        published_at_hints[url] = published_at
+    elif published_at_hints[url] is None and published_at is not None:
+        published_at_hints[url] = published_at
+
+
+async def _free_provider_diagnostics(
+    settings: Settings,
+    selected,
+    wanted: int,
+    *,
+    seen_urls: set[str],
+    unique_urls: list[str],
+    published_at_hints: dict[str, datetime | None],
+) -> tuple[LinkedInProviderDiagnosticResult, ...]:
+    """Probe each free public search provider per intent without a browser.
+
+    Uses the same HTTP discovery helpers as production so the report reflects
+    real blockages (anti-bot challenges surface as empty results for that
+    engine instead of being bypassed).
+    """
+
+    results: list[LinkedInProviderDiagnosticResult] = []
+
+    async with source_session(headers=BROWSER_HEADERS) as session:
+        for provider_name in settings.linkedin_post_scraper_search_providers:
+            provider_seen_urls: set[str] = set()
+            provider_urls: list[str] = []
+            family_counts: dict[str, int] = {}
+            query_errors = 0
+            error_type: str | None = None
+            for intent in selected:
+                try:
+                    search_results = await _fetch_free_search_results(session, provider_name, intent.query)
+                except Exception as exc:
+                    query_errors += 1
+                    error_type = error_type or _sanitized_error_type(exc)
+                    continue
+                for result in search_results:
+                    if len(provider_seen_urls) >= wanted:
+                        break
+                    url = _canonicalize_linkedin_post_url(_normalize_result_url(result.link))
+                    if not url:
+                        continue
+                    _collect_candidate(
+                        LinkedInPostCandidate(
+                            url=url,
+                            search_title=result.title,
+                            snippet=result.snippet,
+                            date_text=result.date_text,
+                            provider=provider_name,
+                            query=intent.query,
+                            family=intent.family,
+                            language=intent.language,
+                        ),
+                        intent_family=intent.family,
+                        provider_seen_urls=provider_seen_urls,
+                        provider_urls=provider_urls,
+                        family_counts=family_counts,
+                        seen_urls=seen_urls,
+                        unique_urls=unique_urls,
+                        published_at_hints=published_at_hints,
+                    )
+            results.append(
+                LinkedInProviderDiagnosticResult(
+                    provider=provider_name,
+                    urls=tuple(provider_urls),
+                    error_type=error_type,
+                    queries_attempted=len(selected),
+                    query_errors=query_errors,
+                    family_counts=tuple(family_counts.items()),
+                )
+            )
+    return tuple(results)
+
+
+async def _fetch_free_search_results(session, provider: str, query: str):
+    if provider == "bing_rss":
+        return _rss_post_results(await _fetch_bing_rss(session, query))
+    html = await _fetch_provider_html(session, provider, query)
+    if not html:
+        return []
+    return _search_html_results(BeautifulSoup(html, "html.parser"))
 
 
 def _diagnostic_status(
