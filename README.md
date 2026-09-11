@@ -326,7 +326,7 @@ Messages that do not look like allowed development/design/AI vacancies are skipp
 
 ## Bot Commands
 
-- `/start`: for an incomplete operator profile, prompts to fill in fields and upload a resume; otherwise shows forwarding instructions.
+- `/start`: сразу показывает кнопки выбора специальности и грейда для фильтра парсинга.
 - `/help`: shows forwarding instructions.
 - `/whoami`: returns your Telegram user ID for `OPERATOR_USER_IDS`.
 - `/status`: shows the active forwarding mode, target chat, polling interval, current vacancy filter, and enabled sources without exposing secrets.

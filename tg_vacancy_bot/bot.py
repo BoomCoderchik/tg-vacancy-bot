@@ -658,15 +658,21 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
         await callback.answer(message, show_alert=True)
 
     @dp.message(Command("start"))
-    async def start(message: Message) -> None:
-        operator_user_id = profile_operator_from_message(message)
-        profile = store.get_operator_profile(operator_user_id) if operator_user_id is not None else None
-        if operator_user_id is not None and needs_profile_onboarding(profile):
-            await message.answer(profile_onboarding_text(profile), reply_markup=profile_menu())
+    async def start(message: Message, state: FSMContext) -> None:
+        if not _message_is_authorized(message, settings):
+            await message.answer(
+                "Пришли или перешли мне вакансию. Я опубликую ее в целевой канал "
+                "как карточку или скопирую оригинал, в зависимости от FORWARDED_MODE."
+            )
             return
+        await state.clear()
+        await state.set_state(FilterForm.specialty)
+        current = store.get_vacancy_filter()
         await message.answer(
-            "Пришли или перешли мне вакансию. Я опубликую ее в целевой канал "
-            "как карточку или скопирую оригинал, в зависимости от FORWARDED_MODE."
+            "Выбери, какие вакансии парсить.\n\n"
+            f"Текущий фильтр: {format_filter_text(current)}.\n\n"
+            "Шаг 1/2 — специальность:",
+            reply_markup=specialty_keyboard(),
         )
 
     @dp.message(Command("help"))
