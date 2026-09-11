@@ -3,13 +3,19 @@
 ## Выбор специальности и грейда (обновлено 2026-09-11)
 
 Фильтр больше не захардкожен на Junior Frontend/Fullstack. Активный фильтр —
-глобальный (один `TARGET_CHAT_ID`): специальность + грейд, хранится в SQLite
-(`vacancy_filters`, одна строка `id=1`), дефолт — `frontend_fullstack`/`junior`.
+глобальный (один `TARGET_CHAT_ID`): несколько специальностей + несколько
+грейдов, хранится в SQLite (`vacancy_filters`, одна строка `id=1`,
+списки в `specialties_json`/`grades_json`, миграция v5), дефолт —
+`frontend_fullstack`/`junior`.
 
-- Команда `/filters` (только `OPERATOR_USER_IDS`): шаг 1 — специальность
+- Команда `/filters` (только `OPERATOR_USER_IDS`): шаг 1 — специальности
   (`frontend`, `backend`, `fullstack`, `frontend_fullstack`, `mobile`, `qa`,
-  `devops`, `data`, `design`), шаг 2 — грейд (`intern`, `junior`, `middle`,
-  `senior`, `lead`), затем подтверждение «Применить».
+  `devops`, `data`, `design`), шаг 2 — грейды (`intern`, `junior`, `middle`,
+  `senior`, `lead`). Кнопки-тогглы: выбранные помечены ✅, выбор можно
+  менять до нажатия «Далее»; дальше — подтверждение «Применить».
+- Пост проходит, если совпала хотя бы одна выбранная специальность и хотя бы
+  один выбранный грейд без конфликтующего сениорити у роли.
+- `/start` у оператора сразу открывает панель выбора специальностей.
 - `/status` показывает активный фильтр (`Vacancy filter: Backend • Middle`).
 - Реализация: `evaluate_vacancy_policy(text, specialty, grade)` и
   `filter_it_vacancies(vacancies, specialty, grade)` в

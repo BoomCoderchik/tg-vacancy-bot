@@ -12,7 +12,6 @@ from .description_localization import localize_vacancy_description
 from .formatting import format_vacancy_card
 from .models import VacancyFilter
 from .sources import build_adapters, filter_it_vacancies, source_configuration_warnings
-from .sources.filters import DEFAULT_GRADE, DEFAULT_SPECIALTY
 from .sources.freshness import filter_fresh_vacancies
 from .storage import VacancyStore
 
@@ -31,7 +30,7 @@ def resolve_active_filter(store: VacancyStore) -> VacancyFilter:
             return getter()
         except Exception:
             logger.warning("Could not read stored vacancy filter; using defaults.", exc_info=True)
-    return VacancyFilter(specialty=DEFAULT_SPECIALTY, grade=DEFAULT_GRADE)
+    return VacancyFilter()
 
 
 async def poll_sources_once(bot: Bot, settings: Settings, store: VacancyStore) -> int:
@@ -50,7 +49,7 @@ async def poll_sources_once(bot: Bot, settings: Settings, store: VacancyStore) -
 
         active_filter = resolve_active_filter(store)
         publishable_vacancies = filter_fresh_vacancies(
-            filter_it_vacancies(vacancies, active_filter.specialty, active_filter.grade),
+            filter_it_vacancies(vacancies, active_filter.specialties, active_filter.grades),
             max_age_hours=settings.source_max_age_hours,
             current_time=utcnow(),
         )

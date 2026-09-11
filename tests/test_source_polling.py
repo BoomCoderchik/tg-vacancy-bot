@@ -27,7 +27,7 @@ class FakeStore:
         return True
 
     def get_vacancy_filter(self) -> VacancyFilter:
-        return VacancyFilter(specialty="frontend_fullstack", grade="junior")
+        return VacancyFilter(specialties=("frontend_fullstack",), grades=("junior",))
 
 
 class FakeAdapter:

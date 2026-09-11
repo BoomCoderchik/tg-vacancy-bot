@@ -330,7 +330,7 @@ Messages that do not look like allowed development/design/AI vacancies are skipp
 - `/help`: shows forwarding instructions.
 - `/whoami`: returns your Telegram user ID for `OPERATOR_USER_IDS`.
 - `/status`: shows the active forwarding mode, target chat, polling interval, current vacancy filter, and enabled sources without exposing secrets.
-- `/filters`: operators-only vacancy filter setup. Step 1 — pick a specialty (Frontend, Backend, Fullstack, Mobile, QA, DevOps, Data, Design), step 2 — pick a grade (Стажёр, Junior, Middle, Senior, Lead), then confirm. Only matching vacancies are parsed from now on; check the active filter with `/status`.
+- `/filters`: operators-only vacancy filter setup. Step 1 — toggle specialties (Frontend, Backend, Fullstack, Mobile, QA, DevOps, Data, Design — several allowed, chosen ones show ✅), step 2 — toggle grades (Стажёр, Junior, Middle, Senior, Lead — several allowed), then confirm. Only matching vacancies are parsed from now on; check the active filter with `/status`.
 - `/profile`: private operator profile: view/edit job preferences, upload or replace a resume, or delete the profile.
 - `/queue_resume`: attach this caption to a PDF/DOCX sent privately while queue mode is active; the next GitHub Actions run registers or replaces the queue resume.
 - `/queue_resume_id`: legacy private operator-only command that shows the saved Telegram `file_id`; it is no longer needed for normal queue setup.
