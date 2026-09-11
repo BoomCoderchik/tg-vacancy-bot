@@ -66,6 +66,19 @@ Backend-only, mobile, QA, DevOps, data-, design- и менеджерские р�
 - Посты «Senior/Middle + джунам тут не место», а также смешанные объявления
   «Junior & Middle» отклоняются консервативно: точность важнее полноты.
 
+## Автогенерация discovery-запросов из фильтра
+
+Discovery-запросы LinkedIn-источников строятся из активного `VacancyFilter`
+(`tg_vacancy_bot/sources/filter_queries.py`): один интент на
+(specialty × язык en/ru), site-scope и hiring-intent переиспользуются из
+`linkedin_search_profile.py`, Apify-запросы — plain-text строго ≤85 символов,
+guest-ключи — plain-lowercase. `frontend_fullstack` раскрывается в
+`frontend`+`fullstack`. Хуки в `source_polling.poll_sources_once`,
+`app.poll_once`, `app.preview_sources` и `diagnose-linkedin` применяют
+`apply_filter_queries()` до `build_adapters`. Ручные `LINKEDIN_*`-запросы в
+`.env` имеют приоритет: поле со значением ≠ дефолта `Settings` не
+перетирается (headless — только если raw пуст).
+
 ## Поисковые профили источников
 
 Дефолтные запросы всех LinkedIn-источников сужены до junior-формулировок:

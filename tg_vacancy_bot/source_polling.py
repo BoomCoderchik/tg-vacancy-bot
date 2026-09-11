@@ -12,6 +12,7 @@ from .description_localization import localize_vacancy_description
 from .formatting import format_vacancy_card
 from .models import VacancyFilter
 from .sources import build_adapters, filter_it_vacancies, source_configuration_warnings
+from .sources.filter_queries import apply_filter_queries
 from .sources.freshness import filter_fresh_vacancies
 from .storage import VacancyStore
 
@@ -34,6 +35,8 @@ def resolve_active_filter(store: VacancyStore) -> VacancyFilter:
 
 
 async def poll_sources_once(bot: Bot, settings: Settings, store: VacancyStore) -> int:
+    active_filter = resolve_active_filter(store)
+    settings = apply_filter_queries(settings, active_filter.specialties, active_filter.grades)
     published = 0
     max_publish = settings.source_max_publish_per_poll
     localization_settings = settings.model_copy(update={"localize_descriptions": True})
@@ -47,7 +50,6 @@ async def poll_sources_once(bot: Bot, settings: Settings, store: VacancyStore) -
             logger.exception("%s: source fetch failed", adapter.name)
             continue
 
-        active_filter = resolve_active_filter(store)
         publishable_vacancies = filter_fresh_vacancies(
             filter_it_vacancies(vacancies, active_filter.specialties, active_filter.grades),
             max_age_hours=settings.source_max_age_hours,
