@@ -702,7 +702,7 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
     async def start(message: Message, state: FSMContext) -> None:
         if not _message_is_authorized(message, settings):
             await message.answer(
-                "Пришли или перешли мне вакансию. Я опубликую ее в целевой канал "
+                "Пришли или перешли мне вакансию. Я опубликую ее тебе в личку "
                 "как карточку или скопирую оригинал, в зависимости от FORWARDED_MODE."
             )
             return
@@ -723,7 +723,7 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
     @dp.message(Command("help"))
     async def help_command(message: Message) -> None:
         await message.answer(
-            "Пришли или перешли мне вакансию. Я опубликую ее в целевой канал "
+            "Пришли или перешли мне вакансию. Я опубликую ее тебе в личку "
             "как карточку или скопирую оригинал, в зависимости от FORWARDED_MODE."
         )
 
@@ -913,7 +913,7 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
                 from_chat_id=message.chat.id,
                 message_id=message.message_id,
             )
-            await message.reply("Скопировал сообщение в канал.")
+            await message.reply("Скопировал сообщение тебе в личку.")
             return
 
         vacancy = parse_publishable_message(text, active_filter.specialties, active_filter.grades)
@@ -940,7 +940,7 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             disable_web_page_preview=True,
         )
         store.mark_published(vacancy)
-        await message.reply("Опубликовал вакансию в канал.")
+        await message.reply("Опубликовал вакансию тебе в личку.")
 
     return dp
 
