@@ -62,10 +62,10 @@ class Vacancy:
 
 @dataclass(frozen=True)
 class VacancyFilter:
-    """Global user-selected vacancy filter (specialty + grade)."""
+    """Global user-selected vacancy filter (specialties + grades)."""
 
-    specialty: str = "frontend_fullstack"
-    grade: str = "junior"
+    specialties: tuple[str, ...] = ("frontend_fullstack",)
+    grades: tuple[str, ...] = ("junior",)
 
 
 @dataclass(frozen=True)

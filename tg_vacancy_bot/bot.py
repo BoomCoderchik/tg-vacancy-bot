@@ -31,8 +31,6 @@ from .sources.filters import (
     SPECIALTY_LABELS_RU,
     VALID_GRADES,
     VALID_SPECIALTIES,
-    normalize_grade,
-    normalize_specialty,
 )
 from .profile_flow import (
     CANCEL_TEXT,
@@ -74,28 +72,71 @@ class FilterForm(StatesGroup):
 
 
 def format_filter_text(vacancy_filter: VacancyFilter | None = None) -> str:
-    specialty = normalize_specialty(vacancy_filter.specialty if vacancy_filter else DEFAULT_SPECIALTY)
-    grade = normalize_grade(vacancy_filter.grade if vacancy_filter else DEFAULT_GRADE)
-    specialty_label = SPECIALTY_LABELS_RU.get(specialty, specialty)
-    grade_label = GRADE_LABELS_RU.get(grade, grade)
-    return f"{specialty_label} • {grade_label}"
+    if vacancy_filter and vacancy_filter.specialties:
+        specialties = [item for item in vacancy_filter.specialties if item in SPECIALTY_LABELS_RU]
+    else:
+        specialties = [DEFAULT_SPECIALTY]
+    if vacancy_filter and vacancy_filter.grades:
+        grades = [item for item in vacancy_filter.grades if item in GRADE_LABELS_RU]
+    else:
+        grades = [DEFAULT_GRADE]
+    specialty_labels = ", ".join(SPECIALTY_LABELS_RU[item] for item in specialties)
+    grade_labels = ", ".join(GRADE_LABELS_RU[item] for item in grades)
+    return f"{specialty_labels} • {grade_labels}"
 
 
-def specialty_keyboard() -> InlineKeyboardMarkup:
+def format_selection_labels(selected: list[str], labels: dict[str, str]) -> str:
+    if not selected:
+        return "ничего не выбрано"
+    return ", ".join(labels.get(item, item) for item in selected)
+
+
+def specialty_panel_text(selected: list[str]) -> str:
+    return (
+        "Шаг 1/2 — специальности (можно выбрать несколько).\n"
+        f"Выбрано: {format_selection_labels(selected, SPECIALTY_LABELS_RU)}.\n\n"
+        "Нажимайте кнопки, чтобы отметить или снять выбор, затем — «Далее»."
+    )
+
+
+def grade_panel_text(selected: list[str]) -> str:
+    return (
+        "Шаг 2/2 — грейды (можно выбрать несколько).\n"
+        f"Выбрано: {format_selection_labels(selected, GRADE_LABELS_RU)}.\n\n"
+        "Нажимайте кнопки, чтобы отметить или снять выбор, затем — «Далее»."
+    )
+
+
+def specialty_keyboard(selected: list[str] | tuple[str, ...]) -> InlineKeyboardMarkup:
+    chosen = set(selected)
     buttons = [
-        InlineKeyboardButton(text=SPECIALTY_LABELS_RU[specialty], callback_data=f"filter:{specialty}")
+        InlineKeyboardButton(
+            text=f"{'✅ ' if specialty in chosen else ''}{SPECIALTY_LABELS_RU[specialty]}",
+            callback_data=f"fspec:{specialty}",
+        )
         for specialty in VALID_SPECIALTIES
     ]
     rows = [buttons[index : index + 2] for index in range(0, len(buttons), 2)]
+    rows.append([InlineKeyboardButton(text="➡️ Далее: грейды", callback_data="filter:next")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def grade_keyboard() -> InlineKeyboardMarkup:
+def grade_keyboard(selected: list[str] | tuple[str, ...]) -> InlineKeyboardMarkup:
+    chosen = set(selected)
     buttons = [
-        InlineKeyboardButton(text=GRADE_LABELS_RU[grade], callback_data=f"grade:{grade}")
+        InlineKeyboardButton(
+            text=f"{'✅ ' if grade in chosen else ''}{GRADE_LABELS_RU[grade]}",
+            callback_data=f"fgrade:{grade}",
+        )
         for grade in VALID_GRADES
     ]
     rows = [buttons[index : index + 2] for index in range(0, len(buttons), 2)]
+    rows.append(
+        [
+            InlineKeyboardButton(text="↩️ Назад", callback_data="filter:back"),
+            InlineKeyboardButton(text="➡️ Далее", callback_data="filter:next"),
+        ]
+    )
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -666,13 +707,17 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             )
             return
         await state.clear()
-        await state.set_state(FilterForm.specialty)
         current = store.get_vacancy_filter()
+        await state.update_data(
+            specialties=list(current.specialties),
+            grades=list(current.grades),
+        )
+        await state.set_state(FilterForm.specialty)
         await message.answer(
             "Выбери, какие вакансии парсить.\n\n"
             f"Текущий фильтр: {format_filter_text(current)}.\n\n"
-            "Шаг 1/2 — специальность:",
-            reply_markup=specialty_keyboard(),
+            f"{specialty_panel_text(list(current.specialties))}",
+            reply_markup=specialty_keyboard(list(current.specialties)),
         )
 
     @dp.message(Command("help"))
@@ -695,46 +740,114 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             await message.reply("Not authorized.")
             return
         await state.clear()
-        await state.set_state(FilterForm.specialty)
         current = store.get_vacancy_filter()
+        await state.update_data(
+            specialties=list(current.specialties),
+            grades=list(current.grades),
+        )
+        await state.set_state(FilterForm.specialty)
         await message.answer(
             f"Текущий фильтр: {format_filter_text(current)}.\n\n"
-            "Шаг 1/2 — выберите специальность, вакансии которой нужно парсить:",
-            reply_markup=specialty_keyboard(),
+            f"{specialty_panel_text(list(current.specialties))}",
+            reply_markup=specialty_keyboard(list(current.specialties)),
         )
 
-    @dp.callback_query(FilterForm.specialty, F.data.startswith("filter:"))
-    async def filter_specialty_chosen(callback: CallbackQuery, state: FSMContext) -> None:
+    @dp.callback_query(FilterForm.specialty, F.data.startswith("fspec:"))
+    async def filter_specialty_toggled(callback: CallbackQuery, state: FSMContext) -> None:
         if not _callback_is_authorized(callback, settings):
             await callback.answer("Not authorized.", show_alert=True)
             return
-        specialty = normalize_specialty((callback.data or "").removeprefix("filter:"))
-        await state.update_data(specialty=specialty)
+        specialty = (callback.data or "").removeprefix("fspec:").strip().lower()
+        if specialty not in VALID_SPECIALTIES:
+            await callback.answer("Неизвестная специальность.", show_alert=True)
+            return
+        data = await state.get_data()
+        selected = [item for item in data.get("specialties", []) if item in VALID_SPECIALTIES]
+        if specialty in selected:
+            selected.remove(specialty)
+        else:
+            selected.append(specialty)
+        await state.update_data(specialties=selected)
+        await callback.answer()
+        await callback.message.edit_text(
+            specialty_panel_text(selected),
+            reply_markup=specialty_keyboard(selected),
+        )
+
+    @dp.callback_query(FilterForm.specialty, F.data == "filter:next")
+    async def filter_specialties_done(callback: CallbackQuery, state: FSMContext) -> None:
+        if not _callback_is_authorized(callback, settings):
+            await callback.answer("Not authorized.", show_alert=True)
+            return
+        data = await state.get_data()
+        selected = [item for item in data.get("specialties", []) if item in VALID_SPECIALTIES]
+        if not selected:
+            await callback.answer("Выберите хотя бы одну специальность.", show_alert=True)
+            return
+        grades = [item for item in data.get("grades", []) if item in VALID_GRADES]
         await state.set_state(FilterForm.grade)
         await callback.answer()
-        specialty_label = SPECIALTY_LABELS_RU.get(specialty, specialty)
-        await callback.message.answer(
-            f"Специальность: {specialty_label}.\n\nШаг 2/2 — выберите грейд:",
-            reply_markup=grade_keyboard(),
+        await callback.message.edit_text(
+            grade_panel_text(grades),
+            reply_markup=grade_keyboard(grades),
         )
 
-    @dp.callback_query(FilterForm.grade, F.data.startswith("grade:"))
-    async def filter_grade_chosen(callback: CallbackQuery, state: FSMContext) -> None:
+    @dp.callback_query(FilterForm.grade, F.data.startswith("fgrade:"))
+    async def filter_grade_toggled(callback: CallbackQuery, state: FSMContext) -> None:
         if not _callback_is_authorized(callback, settings):
             await callback.answer("Not authorized.", show_alert=True)
             return
-        grade = normalize_grade((callback.data or "").removeprefix("grade:"))
-        await state.update_data(grade=grade)
+        grade = (callback.data or "").removeprefix("fgrade:").strip().lower()
+        if grade not in VALID_GRADES:
+            await callback.answer("Неизвестный грейд.", show_alert=True)
+            return
+        data = await state.get_data()
+        selected = [item for item in data.get("grades", []) if item in VALID_GRADES]
+        if grade in selected:
+            selected.remove(grade)
+        else:
+            selected.append(grade)
+        await state.update_data(grades=selected)
+        await callback.answer()
+        await callback.message.edit_text(
+            grade_panel_text(selected),
+            reply_markup=grade_keyboard(selected),
+        )
+
+    @dp.callback_query(FilterForm.grade, F.data == "filter:back")
+    async def filter_back_to_specialties(callback: CallbackQuery, state: FSMContext) -> None:
+        if not _callback_is_authorized(callback, settings):
+            await callback.answer("Not authorized.", show_alert=True)
+            return
+        data = await state.get_data()
+        selected = [item for item in data.get("specialties", []) if item in VALID_SPECIALTIES]
+        await state.set_state(FilterForm.specialty)
+        await callback.answer()
+        await callback.message.edit_text(
+            specialty_panel_text(selected),
+            reply_markup=specialty_keyboard(selected),
+        )
+
+    @dp.callback_query(FilterForm.grade, F.data == "filter:next")
+    async def filter_grades_done(callback: CallbackQuery, state: FSMContext) -> None:
+        if not _callback_is_authorized(callback, settings):
+            await callback.answer("Not authorized.", show_alert=True)
+            return
+        data = await state.get_data()
+        selected_specialties = [item for item in data.get("specialties", []) if item in VALID_SPECIALTIES]
+        selected_grades = [item for item in data.get("grades", []) if item in VALID_GRADES]
+        if not selected_grades:
+            await callback.answer("Выберите хотя бы один грейд.", show_alert=True)
+            return
         await state.set_state(FilterForm.confirm)
         await callback.answer()
-        data = await state.get_data()
         preview = VacancyFilter(
-            specialty=normalize_specialty(data.get("specialty")),
-            grade=grade,
+            specialties=tuple(selected_specialties),
+            grades=tuple(selected_grades),
         )
-        await callback.message.answer(
+        await callback.message.edit_text(
             f"Применить фильтр «{format_filter_text(preview)}»?\n"
-            "Парситься будут только вакансии под эту специальность и грейд.",
+            "Парситься будут только вакансии под эти специальности и грейды.",
             reply_markup=filter_confirm_keyboard(),
         )
 
@@ -746,15 +859,15 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
         data = await state.get_data()
         try:
             saved = store.set_vacancy_filter(
-                normalize_specialty(data.get("specialty")),
-                normalize_grade(data.get("grade")),
+                data.get("specialties", []),
+                data.get("grades", []),
             )
         except ValueError as exc:
             await callback.answer(str(exc), show_alert=True)
             return
         await state.clear()
         await callback.answer("Фильтр применён.")
-        await callback.message.answer(
+        await callback.message.edit_text(
             f"✅ Фильтр применён: {format_filter_text(saved)}.\n"
             "Теперь парсятся только подходящие вакансии. Посмотреть можно через /status, "
             "изменить — через /filters."
@@ -765,11 +878,13 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
         if not _callback_is_authorized(callback, settings):
             await callback.answer("Not authorized.", show_alert=True)
             return
+        data = await state.get_data()
+        selected = [item for item in data.get("specialties", []) if item in VALID_SPECIALTIES]
         await state.set_state(FilterForm.specialty)
         await callback.answer()
-        await callback.message.answer(
-            "Шаг 1/2 — выберите специальность:",
-            reply_markup=specialty_keyboard(),
+        await callback.message.edit_text(
+            specialty_panel_text(selected),
+            reply_markup=specialty_keyboard(selected),
         )
 
     @dp.message(Command("whoami"))
@@ -785,7 +900,7 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
 
         active_filter = store.get_vacancy_filter()
         text = message.text or message.caption or ""
-        if not looks_like_vacancy_message(text, active_filter.specialty, active_filter.grade):
+        if not looks_like_vacancy_message(text, active_filter.specialties, active_filter.grades):
             await message.reply(
                 "I skipped this message because it does not look like an allowed "
                 f"{format_filter_text(active_filter)} vacancy."
@@ -801,7 +916,7 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             await message.reply("Скопировал сообщение в канал.")
             return
 
-        vacancy = parse_publishable_message(text, active_filter.specialty, active_filter.grade)
+        vacancy = parse_publishable_message(text, active_filter.specialties, active_filter.grades)
         if not vacancy.url:
             origin_url = forwarded_public_post_url(message)
             if origin_url:

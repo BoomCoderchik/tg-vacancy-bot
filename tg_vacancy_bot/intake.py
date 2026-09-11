@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from .sources.filters import evaluate_vacancy_policy
 
 
 def looks_like_vacancy_message(
     text: str,
-    specialty: str | None = None,
-    grade: str | None = None,
+    specialty: str | Iterable[str] | None = None,
+    grade: str | Iterable[str] | None = None,
 ) -> bool:
     normalized = " ".join((text or "").split())
     if len(normalized) < 24:

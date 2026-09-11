@@ -108,7 +108,7 @@ async def poll_once() -> None:
                 logging.exception("%s: source fetch failed", adapter.name)
                 continue
             filtered = filter_fresh_vacancies(
-                filter_it_vacancies(vacancies, active_filter.specialty, active_filter.grade),
+                filter_it_vacancies(vacancies, active_filter.specialties, active_filter.grades),
                 max_age_hours=source_settings.source_max_age_hours,
                 current_time=datetime.now(UTC),
             )
@@ -245,7 +245,7 @@ async def preview_sources(settings, source_name: str | None = None, limit: int =
             lines.append(f"{adapter.name}: fetch failed: {exc}")
             continue
         filtered = filter_fresh_vacancies(
-            filter_it_vacancies(vacancies, active_filter.specialty, active_filter.grade),
+            filter_it_vacancies(vacancies, active_filter.specialties, active_filter.grades),
             max_age_hours=settings.source_max_age_hours,
             current_time=datetime.now(UTC),
         )
@@ -255,8 +255,8 @@ async def preview_sources(settings, source_name: str | None = None, limit: int =
                 vacancy,
                 evaluate_vacancy_policy(
                     " ".join([vacancy.title, vacancy.description]),
-                    active_filter.specialty,
-                    active_filter.grade,
+                    active_filter.specialties,
+                    active_filter.grades,
                 ),
             )
             for vacancy in vacancies

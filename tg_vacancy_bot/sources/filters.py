@@ -177,6 +177,26 @@ def normalize_grade(value: str | None) -> str:
     return normalized if normalized in VALID_GRADES else DEFAULT_GRADE
 
 
+def normalize_specialties(value: str | Iterable[str] | None) -> list[str]:
+    """Normalize one specialty or a list of them; fall back to the default."""
+    if value is None:
+        return [DEFAULT_SPECIALTY]
+    items = [value] if isinstance(value, str) else list(value)
+    cleaned = [item.strip().lower() for item in items if item and item.strip()]
+    valid = [item for item in cleaned if item in VALID_SPECIALTIES]
+    return valid or [DEFAULT_SPECIALTY]
+
+
+def normalize_grades(value: str | Iterable[str] | None) -> list[str]:
+    """Normalize one grade or a list of them; fall back to the default."""
+    if value is None:
+        return [DEFAULT_GRADE]
+    items = [value] if isinstance(value, str) else list(value)
+    cleaned = [item.strip().lower() for item in items if item and item.strip()]
+    valid = [item for item in cleaned if item in VALID_GRADES]
+    return valid or [DEFAULT_GRADE]
+
+
 def specialty_matches(text: str, specialty: str) -> bool:
     if specialty == "frontend_fullstack":
         return bool(FRONTEND_ROLE_RE.search(text) or FULLSTACK_ROLE_RE.search(text))
@@ -224,37 +244,42 @@ class VacancyPolicyDecision:
 
 def evaluate_vacancy_policy(
     text: str,
-    specialty: str | None = None,
-    grade: str | None = None,
+    specialty: str | Iterable[str] | None = None,
+    grade: str | Iterable[str] | None = None,
 ) -> VacancyPolicyDecision:
-    """Apply the channel policy for the selected specialty and grade.
+    """Apply the channel policy for the selected specialties and grades.
 
-    Defaults preserve the historic Junior Frontend/Fullstack behaviour so
-    existing callers and tests keep working. The post must contain a hiring
-    signal, explicit role evidence for ``specialty``, and a level marker for
-    ``grade``. Courses/mentorship and a mismatched seniority attached to the
-    role are rejected with a diagnostic reason.
+    Each of ``specialty``/``grade`` accepts a single value or a list of them.
+    A post is allowed when any selected specialty matches the role and any
+    selected grade matches the level without a mismatched seniority attached
+    to the role. Defaults preserve the historic Junior Frontend/Fullstack
+    behaviour so existing callers and tests keep working.
     """
 
-    active_specialty = normalize_specialty(specialty) if specialty is not None else DEFAULT_SPECIALTY
-    active_grade = normalize_grade(grade) if grade is not None else DEFAULT_GRADE
-    is_default = active_specialty == DEFAULT_SPECIALTY and active_grade == DEFAULT_GRADE
+    active_specialties = normalize_specialties(specialty)
+    active_grades = normalize_grades(grade)
+    is_default = active_specialties == [DEFAULT_SPECIALTY] and active_grades == [DEFAULT_GRADE]
 
     normalized = " ".join((text or "").split())
     if EXCLUDED_CONTEXT_RE.search(normalized):
         return VacancyPolicyDecision(False, "excluded_context")
-    if not specialty_matches(normalized, active_specialty):
+    if not any(specialty_matches(normalized, item) for item in active_specialties):
         if is_default:
             return VacancyPolicyDecision(False, "no_frontend_fullstack_role")
         return VacancyPolicyDecision(False, "no_specialty_role")
-    if not grade_matches(normalized, active_grade):
+    passed_grades = [
+        item
+        for item in active_grades
+        if grade_matches(normalized, item) and not excluded_seniority_for_grade(normalized, item)
+    ]
+    if not passed_grades:
+        if any(grade_matches(normalized, item) for item in active_grades):
+            if is_default:
+                return VacancyPolicyDecision(False, "non_junior_seniority_for_role")
+            return VacancyPolicyDecision(False, "excluded_seniority_for_grade")
         if is_default:
             return VacancyPolicyDecision(False, "no_junior_level_evidence")
         return VacancyPolicyDecision(False, "no_grade_evidence")
-    if excluded_seniority_for_grade(normalized, active_grade):
-        if is_default:
-            return VacancyPolicyDecision(False, "non_junior_seniority_for_role")
-        return VacancyPolicyDecision(False, "excluded_seniority_for_grade")
     if not HIRING_INTENT_RE.search(normalized):
         return VacancyPolicyDecision(False, "no_hiring_intent")
     return VacancyPolicyDecision(True, "")
@@ -262,19 +287,19 @@ def evaluate_vacancy_policy(
 
 def filter_it_vacancies(
     vacancies: Iterable[Vacancy],
-    specialty: str | None = None,
-    grade: str | None = None,
+    specialty: str | Iterable[str] | None = None,
+    grade: str | Iterable[str] | None = None,
 ) -> list[Vacancy]:
-    """Keep only vacancies matching the selected specialty/grade policy."""
+    """Keep only vacancies matching the selected specialties/grades policy."""
 
-    active_specialty = normalize_specialty(specialty) if specialty is not None else DEFAULT_SPECIALTY
-    active_grade = normalize_grade(grade) if grade is not None else DEFAULT_GRADE
+    active_specialties = normalize_specialties(specialty)
+    active_grades = normalize_grades(grade)
     return [
         vacancy
         for vacancy in vacancies
         if evaluate_vacancy_policy(
             " ".join([vacancy.title, vacancy.description]),
-            active_specialty,
-            active_grade,
+            active_specialties,
+            active_grades,
         ).allowed
     ]

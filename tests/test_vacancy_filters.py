@@ -71,14 +71,35 @@ def test_filter_it_vacancies_uses_specialty_and_grade() -> None:
     assert [vacancy.title for vac in backend_middle for vacancy in [vac]] == ["Middle Backend Developer"]
 
 
+def test_multi_specialty_and_grade_filter() -> None:
+    frontend_junior = "We are hiring a Junior Frontend Developer. React. Join our team!"
+    backend_middle = "Ищем Middle Backend разработчика в команду. Python."
+    senior_backend = "We are hiring a Senior Backend Developer. Join our team!"
+    assert evaluate_vacancy_policy(
+        frontend_junior, ["frontend", "backend"], ["junior", "middle"]
+    ).allowed is True
+    assert evaluate_vacancy_policy(
+        backend_middle, ["frontend", "backend"], ["junior", "middle"]
+    ).allowed is True
+    assert evaluate_vacancy_policy(
+        senior_backend, ["frontend", "backend"], ["junior", "middle"]
+    ).allowed is False
+    assert evaluate_vacancy_policy(
+        senior_backend, ["backend"], ["middle", "senior"]
+    ).allowed is True
+
+
 def test_vacancy_filter_storage_roundtrip(tmp_path) -> None:
     store = VacancyStore(str(tmp_path / "vacancies.sqlite3"))
     assert store.get_vacancy_filter() == VacancyFilter(
-        specialty="frontend_fullstack", grade="junior"
+        specialties=("frontend_fullstack",), grades=("junior",)
     )
-    saved = store.set_vacancy_filter("backend", "middle")
-    assert saved == VacancyFilter(specialty="backend", grade="middle")
+    saved = store.set_vacancy_filter(["backend", "frontend"], ["middle", "junior"])
+    assert saved == VacancyFilter(specialties=("backend", "frontend"), grades=("middle", "junior"))
     assert store.get_vacancy_filter() == saved
+    # Single values keep working and are stored as one-element selections.
+    saved_single = store.set_vacancy_filter("backend", "middle")
+    assert saved_single == VacancyFilter(specialties=("backend",), grades=("middle",))
 
 
 def test_vacancy_filter_storage_rejects_unknown(tmp_path) -> None:
