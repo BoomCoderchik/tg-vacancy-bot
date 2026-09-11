@@ -131,7 +131,7 @@ def test_store_migrates_and_persists_operator_profile(tmp_path) -> None:
 
     assert store.get_operator_profile(42) == profile
     with sqlite3.connect(database_path) as connection:
-        assert connection.execute("SELECT version FROM schema_migrations").fetchall() == [(1,), (2,), (3,)]
+        assert connection.execute("SELECT version FROM schema_migrations").fetchall() == [(1,), (2,), (3,), (4,)]
 
 
 def test_store_updates_and_deletes_operator_profile(tmp_path) -> None:

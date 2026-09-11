@@ -61,6 +61,14 @@ class Vacancy:
 
 
 @dataclass(frozen=True)
+class VacancyFilter:
+    """Global user-selected vacancy filter (specialty + grade)."""
+
+    specialty: str = "frontend_fullstack"
+    grade: str = "junior"
+
+
+@dataclass(frozen=True)
 class OperatorProfile:
     """Private application data owned by one authorized Telegram operator."""
 

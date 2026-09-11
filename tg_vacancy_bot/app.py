@@ -95,6 +95,7 @@ async def poll_once() -> None:
         total = 0
         published = 0
         max_publish = source_settings.source_max_publish_per_poll
+        active_filter = store.get_vacancy_filter()
         for warning in source_configuration_warnings(source_settings):
             logging.warning(warning)
         for adapter in build_adapters(source_settings):
@@ -107,7 +108,7 @@ async def poll_once() -> None:
                 logging.exception("%s: source fetch failed", adapter.name)
                 continue
             filtered = filter_fresh_vacancies(
-                filter_it_vacancies(vacancies),
+                filter_it_vacancies(vacancies, active_filter.specialty, active_filter.grade),
                 max_age_hours=source_settings.source_max_age_hours,
                 current_time=datetime.now(UTC),
             )
@@ -236,6 +237,7 @@ async def preview_sources(settings, source_name: str | None = None, limit: int =
         return "\n".join(lines)
 
     per_source_limit = max(limit, 0)
+    active_filter = VacancyStore(settings.database_path).get_vacancy_filter()
     for adapter in adapters:
         try:
             vacancies = await adapter.fetch()
@@ -243,13 +245,20 @@ async def preview_sources(settings, source_name: str | None = None, limit: int =
             lines.append(f"{adapter.name}: fetch failed: {exc}")
             continue
         filtered = filter_fresh_vacancies(
-            filter_it_vacancies(vacancies),
+            filter_it_vacancies(vacancies, active_filter.specialty, active_filter.grade),
             max_age_hours=settings.source_max_age_hours,
             current_time=datetime.now(UTC),
         )
         lines.append(f"{adapter.name}: fetched={len(vacancies)} filtered={len(filtered)}")
         decisions = [
-            (vacancy, evaluate_vacancy_policy(" ".join([vacancy.title, vacancy.description])))
+            (
+                vacancy,
+                evaluate_vacancy_policy(
+                    " ".join([vacancy.title, vacancy.description]),
+                    active_filter.specialty,
+                    active_filter.grade,
+                ),
+            )
             for vacancy in vacancies
         ]
         rejections = [(vacancy, decision) for vacancy, decision in decisions if not decision.allowed]

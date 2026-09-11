@@ -104,7 +104,7 @@ def test_publish_new_retries_after_telegram_flood_control(monkeypatch) -> None:
     assert publisher.bot.calls == 2
 
 
-def test_publish_new_adds_application_button(monkeypatch) -> None:
+def test_publish_new_without_application_button(monkeypatch) -> None:
     publisher = build_publisher()
     vacancy = Vacancy(title="Python Engineer", description="Remote Python role", source="Fake")
 
@@ -114,6 +114,4 @@ def test_publish_new_adds_application_button(monkeypatch) -> None:
     monkeypatch.setattr("tg_vacancy_bot.publisher.localize_vacancy_description", fake_localize)
 
     assert asyncio.run(publisher.publish_new([vacancy])) == 1
-    button = publisher.bot.reply_markups[0].inline_keyboard[0][0]
-    assert button.text == "Откликнуться"
-    assert button.callback_data.startswith("apply:")
+    assert publisher.bot.reply_markups[0] is None

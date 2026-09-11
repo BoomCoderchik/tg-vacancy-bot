@@ -84,6 +84,8 @@ class Settings(BaseSettings):
     source_poll_interval_seconds: int = Field(default=900, alias="SOURCE_POLL_INTERVAL_SECONDS")
     source_max_publish_per_poll: int = Field(default=20, alias="SOURCE_MAX_PUBLISH_PER_POLL")
     source_max_age_hours: int = Field(default=48, alias="SOURCE_MAX_AGE_HOURS")
+    vacancy_default_specialty: str = Field(default="frontend_fullstack", alias="VACANCY_DEFAULT_SPECIALTY")
+    vacancy_default_grade: str = Field(default="junior", alias="VACANCY_DEFAULT_GRADE")
     localize_descriptions: bool = Field(default=False, alias="LOCALIZE_DESCRIPTIONS")
 
     enable_linkedin_post_search: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SEARCH")

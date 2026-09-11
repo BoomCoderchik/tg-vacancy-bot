@@ -8,7 +8,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 from uuid import uuid4
 
-from .models import Application, ApplicationStatus, OperatorProfile, Vacancy
+from .models import Application, ApplicationStatus, OperatorProfile, Vacancy, VacancyFilter
 
 
 class VacancyStore:
@@ -46,6 +46,7 @@ class VacancyStore:
             self._apply_profile_migration(conn)
             self._apply_application_migration(conn)
             self._apply_queue_resume_migration(conn)
+            self._apply_vacancy_filter_migration(conn)
 
     @staticmethod
     def _apply_profile_migration(conn: sqlite3.Connection) -> None:
@@ -114,6 +115,26 @@ class VacancyStore:
         conn.execute("INSERT INTO schema_migrations (version) VALUES (?)", (version,))
 
     @staticmethod
+    def _apply_vacancy_filter_migration(conn: sqlite3.Connection) -> None:
+        version = 4
+        if conn.execute("SELECT 1 FROM schema_migrations WHERE version = ?", (version,)).fetchone():
+            return
+        conn.execute(
+            """
+            CREATE TABLE vacancy_filters (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                specialty TEXT NOT NULL DEFAULT 'frontend_fullstack',
+                grade TEXT NOT NULL DEFAULT 'junior',
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO vacancy_filters (id, specialty, grade) VALUES (1, 'frontend_fullstack', 'junior')"
+        )
+        conn.execute("INSERT INTO schema_migrations (version) VALUES (?)", (version,))
+
+    @staticmethod
     def fingerprint(vacancy: Vacancy) -> str:
         digest = hashlib.sha256(vacancy.identity_source.encode("utf-8")).hexdigest()
         return digest[:32]
@@ -148,6 +169,46 @@ class VacancyStore:
                 "SELECT url FROM published_vacancies WHERE fingerprint = ?", (vacancy_id,)
             ).fetchone()
         return row["url"] if row else None
+
+    def get_vacancy_filter(self) -> VacancyFilter:
+        """Return the global specialty/grade filter, falling back to defaults."""
+        from .sources.filters import DEFAULT_GRADE, DEFAULT_SPECIALTY, normalize_grade, normalize_specialty
+
+        with self._connect() as conn:
+            try:
+                row = conn.execute("SELECT specialty, grade FROM vacancy_filters WHERE id = 1").fetchone()
+            except sqlite3.OperationalError:
+                return VacancyFilter(specialty=DEFAULT_SPECIALTY, grade=DEFAULT_GRADE)
+        if row is None:
+            return VacancyFilter(specialty=DEFAULT_SPECIALTY, grade=DEFAULT_GRADE)
+        return VacancyFilter(
+            specialty=normalize_specialty(row["specialty"]),
+            grade=normalize_grade(row["grade"]),
+        )
+
+    def set_vacancy_filter(self, specialty: str, grade: str) -> VacancyFilter:
+        """Persist the global specialty/grade filter after validating values."""
+        from .sources.filters import VALID_GRADES, VALID_SPECIALTIES, normalize_grade, normalize_specialty
+
+        active_specialty = normalize_specialty(specialty)
+        active_grade = normalize_grade(grade)
+        if specialty.strip().lower() not in VALID_SPECIALTIES:
+            raise ValueError(f"Unknown specialty: {specialty}")
+        if grade.strip().lower() not in VALID_GRADES:
+            raise ValueError(f"Unknown grade: {grade}")
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO vacancy_filters (id, specialty, grade, updated_at)
+                VALUES (1, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(id) DO UPDATE SET
+                    specialty = excluded.specialty,
+                    grade = excluded.grade,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (active_specialty, active_grade),
+            )
+        return VacancyFilter(specialty=active_specialty, grade=active_grade)
 
     def application_queue_counts(self) -> tuple[int, int]:
         """Return non-sensitive queue counters for operational diagnostics."""

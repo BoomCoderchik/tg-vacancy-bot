@@ -1,5 +1,26 @@
 # План единой фильтрации вакансий для Telegram-канала
 
+## Выбор специальности и грейда (обновлено 2026-09-11)
+
+Фильтр больше не захардкожен на Junior Frontend/Fullstack. Активный фильтр —
+глобальный (один `TARGET_CHAT_ID`): специальность + грейд, хранится в SQLite
+(`vacancy_filters`, одна строка `id=1`), дефолт — `frontend_fullstack`/`junior`.
+
+- Команда `/filters` (только `OPERATOR_USER_IDS`): шаг 1 — специальность
+  (`frontend`, `backend`, `fullstack`, `frontend_fullstack`, `mobile`, `qa`,
+  `devops`, `data`, `design`), шаг 2 — грейд (`intern`, `junior`, `middle`,
+  `senior`, `lead`), затем подтверждение «Применить».
+- `/status` показывает активный фильтр (`Vacancy filter: Backend • Middle`).
+- Реализация: `evaluate_vacancy_policy(text, specialty, grade)` и
+  `filter_it_vacancies(vacancies, specialty, grade)` в
+  `tg_vacancy_bot/sources/filters.py`; старые вызовы с одним аргументом
+  работают как раньше (дефолт junior frontend/fullstack).
+- Фильтр применяется везде: ручной intake (`intake.py`, `bot.py`), фоновый
+  поллинг (`source_polling.py`), `poll-once` и `preview-sources` (`app.py`).
+- Кнопка «Откликнуться» больше не прикрепляется к публикуемым карточкам
+  (`source_polling.py`, `publisher.py`, `bot.py`); очередь заявок и `/profile`
+  продолжают работать для ранее созданных колбэков.
+
 ## Действующая политика (обновлено 2026-08-25)
 
 Канал публикует только посты, где реально ищут Junior-разработчиков

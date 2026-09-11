@@ -7,11 +7,12 @@ from datetime import UTC, datetime
 from aiogram import Bot
 from aiogram.enums import ParseMode
 
-from .application_buttons import application_button
 from .config import Settings
 from .description_localization import localize_vacancy_description
 from .formatting import format_vacancy_card
+from .models import VacancyFilter
 from .sources import build_adapters, filter_it_vacancies, source_configuration_warnings
+from .sources.filters import DEFAULT_GRADE, DEFAULT_SPECIALTY
 from .sources.freshness import filter_fresh_vacancies
 from .storage import VacancyStore
 
@@ -20,6 +21,17 @@ logger = logging.getLogger(__name__)
 
 def utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def resolve_active_filter(store: VacancyStore) -> VacancyFilter:
+    """Return the stored global filter, falling back to defaults for legacy stores."""
+    getter = getattr(store, "get_vacancy_filter", None)
+    if callable(getter):
+        try:
+            return getter()
+        except Exception:
+            logger.warning("Could not read stored vacancy filter; using defaults.", exc_info=True)
+    return VacancyFilter(specialty=DEFAULT_SPECIALTY, grade=DEFAULT_GRADE)
 
 
 async def poll_sources_once(bot: Bot, settings: Settings, store: VacancyStore) -> int:
@@ -36,8 +48,9 @@ async def poll_sources_once(bot: Bot, settings: Settings, store: VacancyStore) -
             logger.exception("%s: source fetch failed", adapter.name)
             continue
 
+        active_filter = resolve_active_filter(store)
         publishable_vacancies = filter_fresh_vacancies(
-            filter_it_vacancies(vacancies),
+            filter_it_vacancies(vacancies, active_filter.specialty, active_filter.grade),
             max_age_hours=settings.source_max_age_hours,
             current_time=utcnow(),
         )
@@ -60,7 +73,6 @@ async def poll_sources_once(bot: Bot, settings: Settings, store: VacancyStore) -
                 text=format_vacancy_card(localized_vacancy),
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True,
-                reply_markup=application_button(localized_vacancy, queued=settings.application_queue_enabled),
             )
             if store.mark_published(vacancy):
                 published += 1
