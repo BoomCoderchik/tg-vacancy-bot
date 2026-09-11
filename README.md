@@ -329,7 +329,8 @@ Messages that do not look like allowed development/design/AI vacancies are skipp
 - `/start`: for an incomplete operator profile, prompts to fill in fields and upload a resume; otherwise shows forwarding instructions.
 - `/help`: shows forwarding instructions.
 - `/whoami`: returns your Telegram user ID for `OPERATOR_USER_IDS`.
-- `/status`: shows the active forwarding mode, target chat, polling interval, and enabled sources without exposing secrets.
+- `/status`: shows the active forwarding mode, target chat, polling interval, current vacancy filter, and enabled sources without exposing secrets.
+- `/filters`: operators-only vacancy filter setup. Step 1 — pick a specialty (Frontend, Backend, Fullstack, Mobile, QA, DevOps, Data, Design), step 2 — pick a grade (Стажёр, Junior, Middle, Senior, Lead), then confirm. Only matching vacancies are parsed from now on; check the active filter with `/status`.
 - `/profile`: private operator profile: view/edit job preferences, upload or replace a resume, or delete the profile.
 - `/queue_resume`: attach this caption to a PDF/DOCX sent privately while queue mode is active; the next GitHub Actions run registers or replaces the queue resume.
 - `/queue_resume_id`: legacy private operator-only command that shows the saved Telegram `file_id`; it is no longer needed for normal queue setup.
@@ -341,16 +342,10 @@ and aggregate SQLite counts without consuming updates or printing secrets.
 long polling and the scheduled `getUpdates` queue must not use the same bot token
 at the same time.
 
-Every normalized vacancy card now includes an `Откликнуться` button. It keeps
-only a short vacancy ID in Telegram and resolves the original URL from SQLite;
-the button is intentionally unavailable for `FORWARDED_MODE=copy`, because a
-copied third-party message cannot safely receive the normalized card markup.
-After the button is processed, the bot sends the operator a persistent private
-`Отклик подготовлен` message and then a factual result message. It says
-`Отклик отправлен` only for a confirmed `submitted` status; prepared, manual,
-incomplete-profile, cancelled, and failed attempts are explicitly reported as
-not sent. The operator must have opened the bot's private chat first so Telegram
-can deliver these notifications.
+Parsed vacancy cards are published without an `Откликнуться` button.
+The application queue, `/profile`, and `/queue_resume` keep working for
+previously created callbacks and manual runs; publishing simply no longer
+attaches a button to new cards.
 
 ## Application Queue
 

@@ -2,7 +2,7 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 
 from tg_vacancy_bot.config import Settings
-from tg_vacancy_bot.models import Vacancy
+from tg_vacancy_bot.models import Vacancy, VacancyFilter
 from tg_vacancy_bot.source_polling import poll_sources_once
 
 
@@ -25,6 +25,9 @@ class FakeStore:
     def mark_published(self, vacancy: Vacancy) -> bool:
         self.published.append(vacancy)
         return True
+
+    def get_vacancy_filter(self) -> VacancyFilter:
+        return VacancyFilter(specialty="frontend_fullstack", grade="junior")
 
 
 class FakeAdapter:

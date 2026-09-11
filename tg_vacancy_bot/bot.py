@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from html import escape
 from io import BytesIO
 import logging
@@ -14,7 +15,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from .access_control import is_authorized_user
-from .application_buttons import APPLICATION_CALLBACK_PREFIX, application_button
+from .application_buttons import APPLICATION_CALLBACK_PREFIX
 from .browser_worker import BrowserWorker
 from .config import Settings
 from .description_localization import localize_vacancy_description
@@ -22,7 +23,17 @@ from .formatting import format_vacancy_card
 from .intake import looks_like_vacancy_message
 from .preview import parse_publishable_message
 from .runtime_lock import SingleInstanceLock, bot_run_lock_path
-from .models import ApplicationStatus, OperatorProfile
+from .models import ApplicationStatus, OperatorProfile, VacancyFilter
+from .sources.filters import (
+    DEFAULT_GRADE,
+    DEFAULT_SPECIALTY,
+    GRADE_LABELS_RU,
+    SPECIALTY_LABELS_RU,
+    VALID_GRADES,
+    VALID_SPECIALTIES,
+    normalize_grade,
+    normalize_specialty,
+)
 from .profile_flow import (
     CANCEL_TEXT,
     DONE_TEXT,
@@ -56,7 +67,48 @@ class ProfileForm(StatesGroup):
     resume = State()
 
 
-def build_status_text(settings: Settings) -> str:
+class FilterForm(StatesGroup):
+    specialty = State()
+    grade = State()
+    confirm = State()
+
+
+def format_filter_text(vacancy_filter: VacancyFilter | None = None) -> str:
+    specialty = normalize_specialty(vacancy_filter.specialty if vacancy_filter else DEFAULT_SPECIALTY)
+    grade = normalize_grade(vacancy_filter.grade if vacancy_filter else DEFAULT_GRADE)
+    specialty_label = SPECIALTY_LABELS_RU.get(specialty, specialty)
+    grade_label = GRADE_LABELS_RU.get(grade, grade)
+    return f"{specialty_label} • {grade_label}"
+
+
+def specialty_keyboard() -> InlineKeyboardMarkup:
+    buttons = [
+        InlineKeyboardButton(text=SPECIALTY_LABELS_RU[specialty], callback_data=f"filter:{specialty}")
+        for specialty in VALID_SPECIALTIES
+    ]
+    rows = [buttons[index : index + 2] for index in range(0, len(buttons), 2)]
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def grade_keyboard() -> InlineKeyboardMarkup:
+    buttons = [
+        InlineKeyboardButton(text=GRADE_LABELS_RU[grade], callback_data=f"grade:{grade}")
+        for grade in VALID_GRADES
+    ]
+    rows = [buttons[index : index + 2] for index in range(0, len(buttons), 2)]
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def filter_confirm_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Применить", callback_data="filter:confirm")],
+            [InlineKeyboardButton(text="↩️ Изменить", callback_data="filter:restart")],
+        ]
+    )
+
+
+def build_status_text(settings: Settings, vacancy_filter: VacancyFilter | None = None) -> str:
     source_states = [
         f"LinkedInPosts={_linkedin_post_search_state(settings)}",
         f"LinkedInPostScraper={_linkedin_post_scraper_state(settings)}",
@@ -67,10 +119,11 @@ def build_status_text(settings: Settings) -> str:
         [
             "TG Vacancy Bot status",
             f"Forwarded mode: {settings.forwarded_mode}",
-        f"Target chat: {settings.target_chat_id or 'not configured'}",
-        f"Operator allowlist: {'on' if settings.operator_user_ids else 'off'}",
-        f"Description localization: {'on' if settings.localize_descriptions else 'off'}",
-        f"Source polling interval: {settings.source_poll_interval_seconds}s",
+            f"Target chat: {settings.target_chat_id or 'not configured'}",
+            f"Vacancy filter: {format_filter_text(vacancy_filter)}",
+            f"Operator allowlist: {'on' if settings.operator_user_ids else 'off'}",
+            f"Description localization: {'on' if settings.localize_descriptions else 'off'}",
+            f"Source polling interval: {settings.source_poll_interval_seconds}s",
             "Sources: " + ", ".join(source_states),
         ]
     )
@@ -628,7 +681,90 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
         if not _message_is_authorized(message, settings):
             await message.reply("Not authorized.")
             return
-        await message.answer(build_status_text(settings))
+        await message.answer(build_status_text(settings, store.get_vacancy_filter()))
+
+    @dp.message(Command("filters"))
+    async def filters_command(message: Message, state: FSMContext) -> None:
+        if not _message_is_authorized(message, settings):
+            await message.reply("Not authorized.")
+            return
+        await state.clear()
+        await state.set_state(FilterForm.specialty)
+        current = store.get_vacancy_filter()
+        await message.answer(
+            f"Текущий фильтр: {format_filter_text(current)}.\n\n"
+            "Шаг 1/2 — выберите специальность, вакансии которой нужно парсить:",
+            reply_markup=specialty_keyboard(),
+        )
+
+    @dp.callback_query(FilterForm.specialty, F.data.startswith("filter:"))
+    async def filter_specialty_chosen(callback: CallbackQuery, state: FSMContext) -> None:
+        if not _callback_is_authorized(callback, settings):
+            await callback.answer("Not authorized.", show_alert=True)
+            return
+        specialty = normalize_specialty((callback.data or "").removeprefix("filter:"))
+        await state.update_data(specialty=specialty)
+        await state.set_state(FilterForm.grade)
+        await callback.answer()
+        specialty_label = SPECIALTY_LABELS_RU.get(specialty, specialty)
+        await callback.message.answer(
+            f"Специальность: {specialty_label}.\n\nШаг 2/2 — выберите грейд:",
+            reply_markup=grade_keyboard(),
+        )
+
+    @dp.callback_query(FilterForm.grade, F.data.startswith("grade:"))
+    async def filter_grade_chosen(callback: CallbackQuery, state: FSMContext) -> None:
+        if not _callback_is_authorized(callback, settings):
+            await callback.answer("Not authorized.", show_alert=True)
+            return
+        grade = normalize_grade((callback.data or "").removeprefix("grade:"))
+        await state.update_data(grade=grade)
+        await state.set_state(FilterForm.confirm)
+        await callback.answer()
+        data = await state.get_data()
+        preview = VacancyFilter(
+            specialty=normalize_specialty(data.get("specialty")),
+            grade=grade,
+        )
+        await callback.message.answer(
+            f"Применить фильтр «{format_filter_text(preview)}»?\n"
+            "Парситься будут только вакансии под эту специальность и грейд.",
+            reply_markup=filter_confirm_keyboard(),
+        )
+
+    @dp.callback_query(FilterForm.confirm, F.data == "filter:confirm")
+    async def filter_confirmed(callback: CallbackQuery, state: FSMContext) -> None:
+        if not _callback_is_authorized(callback, settings):
+            await callback.answer("Not authorized.", show_alert=True)
+            return
+        data = await state.get_data()
+        try:
+            saved = store.set_vacancy_filter(
+                normalize_specialty(data.get("specialty")),
+                normalize_grade(data.get("grade")),
+            )
+        except ValueError as exc:
+            await callback.answer(str(exc), show_alert=True)
+            return
+        await state.clear()
+        await callback.answer("Фильтр применён.")
+        await callback.message.answer(
+            f"✅ Фильтр применён: {format_filter_text(saved)}.\n"
+            "Теперь парсятся только подходящие вакансии. Посмотреть можно через /status, "
+            "изменить — через /filters."
+        )
+
+    @dp.callback_query(FilterForm.confirm, F.data == "filter:restart")
+    async def filter_restart(callback: CallbackQuery, state: FSMContext) -> None:
+        if not _callback_is_authorized(callback, settings):
+            await callback.answer("Not authorized.", show_alert=True)
+            return
+        await state.set_state(FilterForm.specialty)
+        await callback.answer()
+        await callback.message.answer(
+            "Шаг 1/2 — выберите специальность:",
+            reply_markup=specialty_keyboard(),
+        )
 
     @dp.message(Command("whoami"))
     async def whoami(message: Message) -> None:
@@ -641,9 +777,13 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             await message.reply("Not authorized.")
             return
 
+        active_filter = store.get_vacancy_filter()
         text = message.text or message.caption or ""
-        if not looks_like_vacancy_message(text):
-            await message.reply("I skipped this message because it does not look like an allowed development vacancy.")
+        if not looks_like_vacancy_message(text, active_filter.specialty, active_filter.grade):
+            await message.reply(
+                "I skipped this message because it does not look like an allowed "
+                f"{format_filter_text(active_filter)} vacancy."
+            )
             return
 
         if settings.forwarded_mode == "copy":
@@ -655,7 +795,7 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             await message.reply("Скопировал сообщение в канал.")
             return
 
-        vacancy = parse_publishable_message(text)
+        vacancy = parse_publishable_message(text, active_filter.specialty, active_filter.grade)
         if not vacancy.url:
             origin_url = forwarded_public_post_url(message)
             if origin_url:
@@ -677,7 +817,6 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             text=card,
             parse_mode=ParseMode.HTML,
             disable_web_page_preview=True,
-            reply_markup=application_button(vacancy, queued=settings.application_queue_enabled),
         )
         store.mark_published(vacancy)
         await message.reply("Опубликовал вакансию в канал.")
@@ -722,6 +861,11 @@ async def _cancel_profile_edit(message: Message, state: FSMContext) -> bool:
 
 def _message_is_authorized(message: Message, settings: Settings) -> bool:
     user_id = message.from_user.id if message.from_user else None
+    return is_authorized_user(user_id, settings.operator_user_ids)
+
+
+def _callback_is_authorized(callback: CallbackQuery, settings: Settings) -> bool:
+    user_id = callback.from_user.id if callback.from_user else None
     return is_authorized_user(user_id, settings.operator_user_ids)
 
 
