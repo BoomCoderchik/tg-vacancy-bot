@@ -5,6 +5,19 @@ from tg_vacancy_bot.application_diagnostics import ApplicationQueueDiagnostics
 from tg_vacancy_bot.app import main, poll_once
 from tg_vacancy_bot.config import Settings, get_settings
 from tg_vacancy_bot.models import Vacancy
+from tg_vacancy_bot.storage import VacancyStore as RealVacancyStore
+
+
+@pytest.fixture(autouse=True)
+def _isolated_vacancy_store(tmp_path, monkeypatch) -> None:
+    """Keep CLI tests off the production database (active user filter)."""
+
+    isolated_path = tmp_path / "isolated-vacancies.sqlite3"
+
+    def _isolated_store(_path: str = "") -> RealVacancyStore:
+        return RealVacancyStore(str(isolated_path))
+
+    monkeypatch.setattr("tg_vacancy_bot.app.VacancyStore", _isolated_store)
 
 
 def test_main_reports_missing_runtime_config(capsys, monkeypatch, tmp_path) -> None:
