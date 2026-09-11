@@ -22,6 +22,7 @@ from .linkedin_diagnostics import collect_linkedin_diagnostics, format_linkedin_
 from .preview import parse_publishable_message, preview_message_card_async
 from .publisher import TelegramPublisher
 from .sources import build_adapters, filter_it_vacancies, source_configuration_warnings
+from .sources.filter_queries import apply_filter_queries
 from .sources.filters import evaluate_vacancy_policy
 from .sources.freshness import filter_fresh_vacancies
 from .storage import VacancyStore
@@ -84,7 +85,12 @@ async def poll_once() -> None:
     settings.require_runtime()
     logging.basicConfig(level=logging.INFO)
     store = VacancyStore(settings.database_path)
-    source_settings = settings.model_copy(update={"localize_descriptions": True})
+    active_filter = store.get_vacancy_filter()
+    source_settings = apply_filter_queries(
+        settings.model_copy(update={"localize_descriptions": True}),
+        active_filter.specialties,
+        active_filter.grades,
+    )
     publisher = TelegramPublisher(
         source_settings,
         store,
@@ -95,7 +101,6 @@ async def poll_once() -> None:
         total = 0
         published = 0
         max_publish = source_settings.source_max_publish_per_poll
-        active_filter = store.get_vacancy_filter()
         for warning in source_configuration_warnings(source_settings):
             logging.warning(warning)
         for adapter in build_adapters(source_settings):
@@ -179,10 +184,11 @@ def main(argv: Sequence[str] | None = None) -> None:
             return
 
         if args.command == "diagnose-linkedin":
+            active = VacancyStore(settings.database_path).get_vacancy_filter()
             diagnostic_settings = (
                 settings.model_copy(update={"linkedin_post_headless_query": ""})
                 if args.use_default_profile
-                else settings
+                else apply_filter_queries(settings, active.specialties, active.grades)
             )
             report = asyncio.run(collect_linkedin_diagnostics(diagnostic_settings, limit=args.limit))
             write_stdout(format_linkedin_diagnostics(report, show_limit=args.show_limit))
@@ -228,6 +234,8 @@ def format_source_check(settings) -> str:
 
 async def preview_sources(settings, source_name: str | None = None, limit: int = 5) -> str:
     lines = ["Source preview"]
+    active_filter = VacancyStore(settings.database_path).get_vacancy_filter()
+    settings = apply_filter_queries(settings, active_filter.specialties, active_filter.grades)
     lines.extend(f"WARNING: {warning}" for warning in source_configuration_warnings(settings))
     adapters = build_adapters(settings)
     if source_name:
@@ -237,7 +245,6 @@ async def preview_sources(settings, source_name: str | None = None, limit: int =
         return "\n".join(lines)
 
     per_source_limit = max(limit, 0)
-    active_filter = VacancyStore(settings.database_path).get_vacancy_filter()
     for adapter in adapters:
         try:
             vacancies = await adapter.fetch()
