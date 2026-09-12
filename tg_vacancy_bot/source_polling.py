@@ -7,11 +7,13 @@ from datetime import UTC, datetime
 from aiogram import Bot
 from aiogram.enums import ParseMode
 
-from .application_buttons import application_button
 from .config import Settings
 from .description_localization import localize_vacancy_description
 from .formatting import format_vacancy_card
+from .models import VacancyFilter
 from .sources import build_adapters, filter_it_vacancies, source_configuration_warnings
+from .sources.filter_queries import apply_filter_queries
+from .sources.filters import normalize_grades, normalize_specialties
 from .sources.freshness import filter_fresh_vacancies
 from .storage import VacancyStore
 
@@ -22,7 +24,37 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+def filter_from_environment(settings: Settings | None) -> VacancyFilter | None:
+    """Build the filter from VACANCY_FILTER_* env vars, or None when unset."""
+    if settings is None:
+        return None
+    if not settings.vacancy_filter_specialties_raw and not settings.vacancy_filter_grades_raw:
+        return None
+    specialties = [item.strip() for item in settings.vacancy_filter_specialties_raw.split(",") if item.strip()]
+    grades = [item.strip() for item in settings.vacancy_filter_grades_raw.split(",") if item.strip()]
+    return VacancyFilter(
+        specialties=tuple(normalize_specialties(specialties or None)),
+        grades=tuple(normalize_grades(grades or None)),
+    )
+
+
+def resolve_active_filter(store: VacancyStore, settings: Settings | None = None) -> VacancyFilter:
+    """Return the stored global filter, falling back to defaults for legacy stores."""
+    env_filter = filter_from_environment(settings)
+    if env_filter is not None:
+        return env_filter
+    getter = getattr(store, "get_vacancy_filter", None)
+    if callable(getter):
+        try:
+            return getter()
+        except Exception:
+            logger.warning("Could not read stored vacancy filter; using defaults.", exc_info=True)
+    return VacancyFilter()
+
+
 async def poll_sources_once(bot: Bot, settings: Settings, store: VacancyStore) -> int:
+    active_filter = resolve_active_filter(store, settings)
+    settings = apply_filter_queries(settings, active_filter.specialties, active_filter.grades)
     published = 0
     max_publish = settings.source_max_publish_per_poll
     localization_settings = settings.model_copy(update={"localize_descriptions": True})
@@ -37,7 +69,7 @@ async def poll_sources_once(bot: Bot, settings: Settings, store: VacancyStore) -
             continue
 
         publishable_vacancies = filter_fresh_vacancies(
-            filter_it_vacancies(vacancies),
+            filter_it_vacancies(vacancies, active_filter.specialties, active_filter.grades),
             max_age_hours=settings.source_max_age_hours,
             current_time=utcnow(),
         )
@@ -60,7 +92,6 @@ async def poll_sources_once(bot: Bot, settings: Settings, store: VacancyStore) -
                 text=format_vacancy_card(localized_vacancy),
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True,
-                reply_markup=application_button(localized_vacancy, queued=settings.application_queue_enabled),
             )
             if store.mark_published(vacancy):
                 published += 1

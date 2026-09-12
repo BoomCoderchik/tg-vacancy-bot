@@ -21,7 +21,9 @@ from .env_setup import init_env_file
 from .linkedin_diagnostics import collect_linkedin_diagnostics, format_linkedin_diagnostics
 from .preview import parse_publishable_message, preview_message_card_async
 from .publisher import TelegramPublisher
+from .source_polling import resolve_active_filter
 from .sources import build_adapters, filter_it_vacancies, source_configuration_warnings
+from .sources.filter_queries import apply_filter_queries
 from .sources.filters import evaluate_vacancy_policy
 from .sources.freshness import filter_fresh_vacancies
 from .storage import VacancyStore
@@ -84,7 +86,12 @@ async def poll_once() -> None:
     settings.require_runtime()
     logging.basicConfig(level=logging.INFO)
     store = VacancyStore(settings.database_path)
-    source_settings = settings.model_copy(update={"localize_descriptions": True})
+    active_filter = resolve_active_filter(store, settings)
+    source_settings = apply_filter_queries(
+        settings.model_copy(update={"localize_descriptions": True}),
+        active_filter.specialties,
+        active_filter.grades,
+    )
     publisher = TelegramPublisher(
         source_settings,
         store,
@@ -107,7 +114,7 @@ async def poll_once() -> None:
                 logging.exception("%s: source fetch failed", adapter.name)
                 continue
             filtered = filter_fresh_vacancies(
-                filter_it_vacancies(vacancies),
+                filter_it_vacancies(vacancies, active_filter.specialties, active_filter.grades),
                 max_age_hours=source_settings.source_max_age_hours,
                 current_time=datetime.now(UTC),
             )
@@ -178,10 +185,11 @@ def main(argv: Sequence[str] | None = None) -> None:
             return
 
         if args.command == "diagnose-linkedin":
+            active = resolve_active_filter(VacancyStore(settings.database_path), settings)
             diagnostic_settings = (
                 settings.model_copy(update={"linkedin_post_headless_query": ""})
                 if args.use_default_profile
-                else settings
+                else apply_filter_queries(settings, active.specialties, active.grades)
             )
             report = asyncio.run(collect_linkedin_diagnostics(diagnostic_settings, limit=args.limit))
             write_stdout(format_linkedin_diagnostics(report, show_limit=args.show_limit))
@@ -227,6 +235,8 @@ def format_source_check(settings) -> str:
 
 async def preview_sources(settings, source_name: str | None = None, limit: int = 5) -> str:
     lines = ["Source preview"]
+    active_filter = resolve_active_filter(VacancyStore(settings.database_path), settings)
+    settings = apply_filter_queries(settings, active_filter.specialties, active_filter.grades)
     lines.extend(f"WARNING: {warning}" for warning in source_configuration_warnings(settings))
     adapters = build_adapters(settings)
     if source_name:
@@ -243,13 +253,20 @@ async def preview_sources(settings, source_name: str | None = None, limit: int =
             lines.append(f"{adapter.name}: fetch failed: {exc}")
             continue
         filtered = filter_fresh_vacancies(
-            filter_it_vacancies(vacancies),
+            filter_it_vacancies(vacancies, active_filter.specialties, active_filter.grades),
             max_age_hours=settings.source_max_age_hours,
             current_time=datetime.now(UTC),
         )
         lines.append(f"{adapter.name}: fetched={len(vacancies)} filtered={len(filtered)}")
         decisions = [
-            (vacancy, evaluate_vacancy_policy(" ".join([vacancy.title, vacancy.description])))
+            (
+                vacancy,
+                evaluate_vacancy_policy(
+                    " ".join([vacancy.title, vacancy.description]),
+                    active_filter.specialties,
+                    active_filter.grades,
+                ),
+            )
             for vacancy in vacancies
         ]
         rejections = [(vacancy, decision) for vacancy, decision in decisions if not decision.allowed]

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from html import escape
 from io import BytesIO
 import logging
@@ -14,15 +15,24 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from .access_control import is_authorized_user
-from .application_buttons import APPLICATION_CALLBACK_PREFIX, application_button
+from .application_buttons import APPLICATION_CALLBACK_PREFIX
 from .browser_worker import BrowserWorker
 from .config import Settings
 from .description_localization import localize_vacancy_description
 from .formatting import format_vacancy_card
+from .github_filter_sync import sync_vacancy_filter_to_github
 from .intake import looks_like_vacancy_message
 from .preview import parse_publishable_message
 from .runtime_lock import SingleInstanceLock, bot_run_lock_path
-from .models import ApplicationStatus, OperatorProfile
+from .models import ApplicationStatus, OperatorProfile, VacancyFilter
+from .sources.filters import (
+    DEFAULT_GRADE,
+    DEFAULT_SPECIALTY,
+    GRADE_LABELS_RU,
+    SPECIALTY_LABELS_RU,
+    VALID_GRADES,
+    VALID_SPECIALTIES,
+)
 from .profile_flow import (
     CANCEL_TEXT,
     DONE_TEXT,
@@ -56,7 +66,91 @@ class ProfileForm(StatesGroup):
     resume = State()
 
 
-def build_status_text(settings: Settings) -> str:
+class FilterForm(StatesGroup):
+    specialty = State()
+    grade = State()
+    confirm = State()
+
+
+def format_filter_text(vacancy_filter: VacancyFilter | None = None) -> str:
+    if vacancy_filter and vacancy_filter.specialties:
+        specialties = [item for item in vacancy_filter.specialties if item in SPECIALTY_LABELS_RU]
+    else:
+        specialties = [DEFAULT_SPECIALTY]
+    if vacancy_filter and vacancy_filter.grades:
+        grades = [item for item in vacancy_filter.grades if item in GRADE_LABELS_RU]
+    else:
+        grades = [DEFAULT_GRADE]
+    specialty_labels = ", ".join(SPECIALTY_LABELS_RU[item] for item in specialties)
+    grade_labels = ", ".join(GRADE_LABELS_RU[item] for item in grades)
+    return f"{specialty_labels} • {grade_labels}"
+
+
+def format_selection_labels(selected: list[str], labels: dict[str, str]) -> str:
+    if not selected:
+        return "ничего не выбрано"
+    return ", ".join(labels.get(item, item) for item in selected)
+
+
+def specialty_panel_text(selected: list[str]) -> str:
+    return (
+        "Шаг 1/2 — специальности (можно выбрать несколько).\n"
+        f"Выбрано: {format_selection_labels(selected, SPECIALTY_LABELS_RU)}.\n\n"
+        "Нажимайте кнопки, чтобы отметить или снять выбор, затем — «Далее»."
+    )
+
+
+def grade_panel_text(selected: list[str]) -> str:
+    return (
+        "Шаг 2/2 — грейды (можно выбрать несколько).\n"
+        f"Выбрано: {format_selection_labels(selected, GRADE_LABELS_RU)}.\n\n"
+        "Нажимайте кнопки, чтобы отметить или снять выбор, затем — «Далее»."
+    )
+
+
+def specialty_keyboard(selected: list[str] | tuple[str, ...]) -> InlineKeyboardMarkup:
+    chosen = set(selected)
+    buttons = [
+        InlineKeyboardButton(
+            text=f"{'✅ ' if specialty in chosen else ''}{SPECIALTY_LABELS_RU[specialty]}",
+            callback_data=f"fspec:{specialty}",
+        )
+        for specialty in VALID_SPECIALTIES
+    ]
+    rows = [buttons[index : index + 2] for index in range(0, len(buttons), 2)]
+    rows.append([InlineKeyboardButton(text="➡️ Далее: грейды", callback_data="filter:next")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def grade_keyboard(selected: list[str] | tuple[str, ...]) -> InlineKeyboardMarkup:
+    chosen = set(selected)
+    buttons = [
+        InlineKeyboardButton(
+            text=f"{'✅ ' if grade in chosen else ''}{GRADE_LABELS_RU[grade]}",
+            callback_data=f"fgrade:{grade}",
+        )
+        for grade in VALID_GRADES
+    ]
+    rows = [buttons[index : index + 2] for index in range(0, len(buttons), 2)]
+    rows.append(
+        [
+            InlineKeyboardButton(text="↩️ Назад", callback_data="filter:back"),
+            InlineKeyboardButton(text="➡️ Далее", callback_data="filter:next"),
+        ]
+    )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def filter_confirm_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Применить", callback_data="filter:confirm")],
+            [InlineKeyboardButton(text="↩️ Изменить", callback_data="filter:restart")],
+        ]
+    )
+
+
+def build_status_text(settings: Settings, vacancy_filter: VacancyFilter | None = None) -> str:
     source_states = [
         f"LinkedInPosts={_linkedin_post_search_state(settings)}",
         f"LinkedInPostScraper={_linkedin_post_scraper_state(settings)}",
@@ -67,10 +161,11 @@ def build_status_text(settings: Settings) -> str:
         [
             "TG Vacancy Bot status",
             f"Forwarded mode: {settings.forwarded_mode}",
-        f"Target chat: {settings.target_chat_id or 'not configured'}",
-        f"Operator allowlist: {'on' if settings.operator_user_ids else 'off'}",
-        f"Description localization: {'on' if settings.localize_descriptions else 'off'}",
-        f"Source polling interval: {settings.source_poll_interval_seconds}s",
+            f"Target chat: {settings.target_chat_id or 'not configured'}",
+            f"Vacancy filter: {format_filter_text(vacancy_filter)}",
+            f"Operator allowlist: {'on' if settings.operator_user_ids else 'off'}",
+            f"Description localization: {'on' if settings.localize_descriptions else 'off'}",
+            f"Source polling interval: {settings.source_poll_interval_seconds}s",
             "Sources: " + ", ".join(source_states),
         ]
     )
@@ -605,21 +700,31 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
         await callback.answer(message, show_alert=True)
 
     @dp.message(Command("start"))
-    async def start(message: Message) -> None:
-        operator_user_id = profile_operator_from_message(message)
-        profile = store.get_operator_profile(operator_user_id) if operator_user_id is not None else None
-        if operator_user_id is not None and needs_profile_onboarding(profile):
-            await message.answer(profile_onboarding_text(profile), reply_markup=profile_menu())
+    async def start(message: Message, state: FSMContext) -> None:
+        if not _message_is_authorized(message, settings):
+            await message.answer(
+                "Пришли или перешли мне вакансию. Я опубликую ее тебе в личку "
+                "как карточку или скопирую оригинал, в зависимости от FORWARDED_MODE."
+            )
             return
+        await state.clear()
+        current = store.get_vacancy_filter()
+        await state.update_data(
+            specialties=list(current.specialties),
+            grades=list(current.grades),
+        )
+        await state.set_state(FilterForm.specialty)
         await message.answer(
-            "Пришли или перешли мне вакансию. Я опубликую ее в целевой канал "
-            "как карточку или скопирую оригинал, в зависимости от FORWARDED_MODE."
+            "Выбери, какие вакансии парсить.\n\n"
+            f"Текущий фильтр: {format_filter_text(current)}.\n\n"
+            f"{specialty_panel_text(list(current.specialties))}",
+            reply_markup=specialty_keyboard(list(current.specialties)),
         )
 
     @dp.message(Command("help"))
     async def help_command(message: Message) -> None:
         await message.answer(
-            "Пришли или перешли мне вакансию. Я опубликую ее в целевой канал "
+            "Пришли или перешли мне вакансию. Я опубликую ее тебе в личку "
             "как карточку или скопирую оригинал, в зависимости от FORWARDED_MODE."
         )
 
@@ -628,7 +733,163 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
         if not _message_is_authorized(message, settings):
             await message.reply("Not authorized.")
             return
-        await message.answer(build_status_text(settings))
+        await message.answer(build_status_text(settings, store.get_vacancy_filter()))
+
+    @dp.message(Command("filters"))
+    async def filters_command(message: Message, state: FSMContext) -> None:
+        if not _message_is_authorized(message, settings):
+            await message.reply("Not authorized.")
+            return
+        await state.clear()
+        current = store.get_vacancy_filter()
+        await state.update_data(
+            specialties=list(current.specialties),
+            grades=list(current.grades),
+        )
+        await state.set_state(FilterForm.specialty)
+        await message.answer(
+            f"Текущий фильтр: {format_filter_text(current)}.\n\n"
+            f"{specialty_panel_text(list(current.specialties))}",
+            reply_markup=specialty_keyboard(list(current.specialties)),
+        )
+
+    @dp.callback_query(FilterForm.specialty, F.data.startswith("fspec:"))
+    async def filter_specialty_toggled(callback: CallbackQuery, state: FSMContext) -> None:
+        if not _callback_is_authorized(callback, settings):
+            await callback.answer("Not authorized.", show_alert=True)
+            return
+        specialty = (callback.data or "").removeprefix("fspec:").strip().lower()
+        if specialty not in VALID_SPECIALTIES:
+            await callback.answer("Неизвестная специальность.", show_alert=True)
+            return
+        data = await state.get_data()
+        selected = [item for item in data.get("specialties", []) if item in VALID_SPECIALTIES]
+        if specialty in selected:
+            selected.remove(specialty)
+        else:
+            selected.append(specialty)
+        await state.update_data(specialties=selected)
+        await callback.answer()
+        await callback.message.edit_text(
+            specialty_panel_text(selected),
+            reply_markup=specialty_keyboard(selected),
+        )
+
+    @dp.callback_query(FilterForm.specialty, F.data == "filter:next")
+    async def filter_specialties_done(callback: CallbackQuery, state: FSMContext) -> None:
+        if not _callback_is_authorized(callback, settings):
+            await callback.answer("Not authorized.", show_alert=True)
+            return
+        data = await state.get_data()
+        selected = [item for item in data.get("specialties", []) if item in VALID_SPECIALTIES]
+        if not selected:
+            await callback.answer("Выберите хотя бы одну специальность.", show_alert=True)
+            return
+        grades = [item for item in data.get("grades", []) if item in VALID_GRADES]
+        await state.set_state(FilterForm.grade)
+        await callback.answer()
+        await callback.message.edit_text(
+            grade_panel_text(grades),
+            reply_markup=grade_keyboard(grades),
+        )
+
+    @dp.callback_query(FilterForm.grade, F.data.startswith("fgrade:"))
+    async def filter_grade_toggled(callback: CallbackQuery, state: FSMContext) -> None:
+        if not _callback_is_authorized(callback, settings):
+            await callback.answer("Not authorized.", show_alert=True)
+            return
+        grade = (callback.data or "").removeprefix("fgrade:").strip().lower()
+        if grade not in VALID_GRADES:
+            await callback.answer("Неизвестный грейд.", show_alert=True)
+            return
+        data = await state.get_data()
+        selected = [item for item in data.get("grades", []) if item in VALID_GRADES]
+        if grade in selected:
+            selected.remove(grade)
+        else:
+            selected.append(grade)
+        await state.update_data(grades=selected)
+        await callback.answer()
+        await callback.message.edit_text(
+            grade_panel_text(selected),
+            reply_markup=grade_keyboard(selected),
+        )
+
+    @dp.callback_query(FilterForm.grade, F.data == "filter:back")
+    async def filter_back_to_specialties(callback: CallbackQuery, state: FSMContext) -> None:
+        if not _callback_is_authorized(callback, settings):
+            await callback.answer("Not authorized.", show_alert=True)
+            return
+        data = await state.get_data()
+        selected = [item for item in data.get("specialties", []) if item in VALID_SPECIALTIES]
+        await state.set_state(FilterForm.specialty)
+        await callback.answer()
+        await callback.message.edit_text(
+            specialty_panel_text(selected),
+            reply_markup=specialty_keyboard(selected),
+        )
+
+    @dp.callback_query(FilterForm.grade, F.data == "filter:next")
+    async def filter_grades_done(callback: CallbackQuery, state: FSMContext) -> None:
+        if not _callback_is_authorized(callback, settings):
+            await callback.answer("Not authorized.", show_alert=True)
+            return
+        data = await state.get_data()
+        selected_specialties = [item for item in data.get("specialties", []) if item in VALID_SPECIALTIES]
+        selected_grades = [item for item in data.get("grades", []) if item in VALID_GRADES]
+        if not selected_grades:
+            await callback.answer("Выберите хотя бы один грейд.", show_alert=True)
+            return
+        await state.set_state(FilterForm.confirm)
+        await callback.answer()
+        preview = VacancyFilter(
+            specialties=tuple(selected_specialties),
+            grades=tuple(selected_grades),
+        )
+        await callback.message.edit_text(
+            f"Применить фильтр «{format_filter_text(preview)}»?\n"
+            "Парситься будут только вакансии под эти специальности и грейды.",
+            reply_markup=filter_confirm_keyboard(),
+        )
+
+    @dp.callback_query(FilterForm.confirm, F.data == "filter:confirm")
+    async def filter_confirmed(callback: CallbackQuery, state: FSMContext) -> None:
+        if not _callback_is_authorized(callback, settings):
+            await callback.answer("Not authorized.", show_alert=True)
+            return
+        data = await state.get_data()
+        try:
+            saved = store.set_vacancy_filter(
+                data.get("specialties", []),
+                data.get("grades", []),
+            )
+        except ValueError as exc:
+            await callback.answer(str(exc), show_alert=True)
+            return
+        await state.clear()
+        await callback.answer("Фильтр применён.")
+        ok, sync_message = await sync_vacancy_filter_to_github(saved, settings)
+        if not ok:
+            logger.warning("GitHub filter sync: %s", sync_message)
+        await callback.message.edit_text(
+            f"✅ Фильтр применён: {format_filter_text(saved)}.\n"
+            "Теперь парсятся только подходящие вакансии. Посмотреть можно через /status, "
+            "изменить — через /filters."
+        )
+
+    @dp.callback_query(FilterForm.confirm, F.data == "filter:restart")
+    async def filter_restart(callback: CallbackQuery, state: FSMContext) -> None:
+        if not _callback_is_authorized(callback, settings):
+            await callback.answer("Not authorized.", show_alert=True)
+            return
+        data = await state.get_data()
+        selected = [item for item in data.get("specialties", []) if item in VALID_SPECIALTIES]
+        await state.set_state(FilterForm.specialty)
+        await callback.answer()
+        await callback.message.edit_text(
+            specialty_panel_text(selected),
+            reply_markup=specialty_keyboard(selected),
+        )
 
     @dp.message(Command("whoami"))
     async def whoami(message: Message) -> None:
@@ -641,9 +902,13 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             await message.reply("Not authorized.")
             return
 
+        active_filter = store.get_vacancy_filter()
         text = message.text or message.caption or ""
-        if not looks_like_vacancy_message(text):
-            await message.reply("I skipped this message because it does not look like an allowed development vacancy.")
+        if not looks_like_vacancy_message(text, active_filter.specialties, active_filter.grades):
+            await message.reply(
+                "I skipped this message because it does not look like an allowed "
+                f"{format_filter_text(active_filter)} vacancy."
+            )
             return
 
         if settings.forwarded_mode == "copy":
@@ -652,10 +917,10 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
                 from_chat_id=message.chat.id,
                 message_id=message.message_id,
             )
-            await message.reply("Скопировал сообщение в канал.")
+            await message.reply("Скопировал сообщение тебе в личку.")
             return
 
-        vacancy = parse_publishable_message(text)
+        vacancy = parse_publishable_message(text, active_filter.specialties, active_filter.grades)
         if not vacancy.url:
             origin_url = forwarded_public_post_url(message)
             if origin_url:
@@ -677,10 +942,9 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             text=card,
             parse_mode=ParseMode.HTML,
             disable_web_page_preview=True,
-            reply_markup=application_button(vacancy, queued=settings.application_queue_enabled),
         )
         store.mark_published(vacancy)
-        await message.reply("Опубликовал вакансию в канал.")
+        await message.reply("Опубликовал вакансию тебе в личку.")
 
     return dp
 
@@ -725,6 +989,11 @@ def _message_is_authorized(message: Message, settings: Settings) -> bool:
     return is_authorized_user(user_id, settings.operator_user_ids)
 
 
+def _callback_is_authorized(callback: CallbackQuery, settings: Settings) -> bool:
+    user_id = callback.from_user.id if callback.from_user else None
+    return is_authorized_user(user_id, settings.operator_user_ids)
+
+
 async def run_bot(settings: Settings) -> None:
     settings.require_bot_polling()
     logging.basicConfig(level=logging.INFO)
@@ -737,6 +1006,8 @@ async def run_bot(settings: Settings) -> None:
             default=DefaultBotProperties(parse_mode=ParseMode.HTML),
         )
         dp = create_dispatcher(settings, store)
+        if settings.github_repository.strip() and settings.github_filter_sync_token.strip():
+            asyncio.create_task(_sync_filter_on_startup(settings, store))
         await send_profile_onboarding_reminders(bot, settings, store)
         polling_task = asyncio.create_task(poll_sources_forever(bot, settings, store))
 
@@ -753,3 +1024,16 @@ async def run_bot(settings: Settings) -> None:
 
 def run_bot_sync(settings: Settings) -> None:
     asyncio.run(run_bot(settings))
+
+
+async def _sync_filter_on_startup(settings: Settings, store: VacancyStore) -> None:
+    try:
+        active = store.get_vacancy_filter()
+    except Exception:
+        logger.exception("Could not read the stored filter for GitHub sync on startup.")
+        return
+    ok, message = await sync_vacancy_filter_to_github(active, settings)
+    if ok:
+        logger.info("GitHub filter sync on startup: %s", message)
+    else:
+        logger.warning("GitHub filter sync on startup: %s", message)

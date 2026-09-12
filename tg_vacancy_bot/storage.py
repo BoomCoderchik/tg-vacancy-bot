@@ -8,7 +8,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 from uuid import uuid4
 
-from .models import Application, ApplicationStatus, OperatorProfile, Vacancy
+from .models import Application, ApplicationStatus, OperatorProfile, Vacancy, VacancyFilter
 
 
 class VacancyStore:
@@ -46,6 +46,8 @@ class VacancyStore:
             self._apply_profile_migration(conn)
             self._apply_application_migration(conn)
             self._apply_queue_resume_migration(conn)
+            self._apply_vacancy_filter_migration(conn)
+            self._apply_vacancy_filter_list_migration(conn)
 
     @staticmethod
     def _apply_profile_migration(conn: sqlite3.Connection) -> None:
@@ -114,6 +116,42 @@ class VacancyStore:
         conn.execute("INSERT INTO schema_migrations (version) VALUES (?)", (version,))
 
     @staticmethod
+    def _apply_vacancy_filter_migration(conn: sqlite3.Connection) -> None:
+        version = 4
+        if conn.execute("SELECT 1 FROM schema_migrations WHERE version = ?", (version,)).fetchone():
+            return
+        conn.execute(
+            """
+            CREATE TABLE vacancy_filters (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                specialty TEXT NOT NULL DEFAULT 'frontend_fullstack',
+                grade TEXT NOT NULL DEFAULT 'junior',
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO vacancy_filters (id, specialty, grade) VALUES (1, 'frontend_fullstack', 'junior')"
+        )
+        conn.execute("INSERT INTO schema_migrations (version) VALUES (?)", (version,))
+
+    @staticmethod
+    def _apply_vacancy_filter_list_migration(conn: sqlite3.Connection) -> None:
+        version = 5
+        if conn.execute("SELECT 1 FROM schema_migrations WHERE version = ?", (version,)).fetchone():
+            return
+        conn.execute("ALTER TABLE vacancy_filters ADD COLUMN specialties_json TEXT")
+        conn.execute("ALTER TABLE vacancy_filters ADD COLUMN grades_json TEXT")
+        for row in conn.execute("SELECT id, specialty, grade FROM vacancy_filters").fetchall():
+            specialties_json = json.dumps([row["specialty"] or "frontend_fullstack"])
+            grades_json = json.dumps([row["grade"] or "junior"])
+            conn.execute(
+                "UPDATE vacancy_filters SET specialties_json = ?, grades_json = ? WHERE id = ?",
+                (specialties_json, grades_json, row["id"]),
+            )
+        conn.execute("INSERT INTO schema_migrations (version) VALUES (?)", (version,))
+
+    @staticmethod
     def fingerprint(vacancy: Vacancy) -> str:
         digest = hashlib.sha256(vacancy.identity_source.encode("utf-8")).hexdigest()
         return digest[:32]
@@ -148,6 +186,80 @@ class VacancyStore:
                 "SELECT url FROM published_vacancies WHERE fingerprint = ?", (vacancy_id,)
             ).fetchone()
         return row["url"] if row else None
+
+    def get_vacancy_filter(self) -> VacancyFilter:
+        """Return the global specialties/grades filter, falling back to defaults."""
+        from .sources.filters import (
+            DEFAULT_GRADE,
+            DEFAULT_SPECIALTY,
+            normalize_grades,
+            normalize_specialties,
+        )
+
+        with self._connect() as conn:
+            try:
+                row = conn.execute("SELECT * FROM vacancy_filters WHERE id = 1").fetchone()
+            except sqlite3.OperationalError:
+                return VacancyFilter()
+        if row is None:
+            return VacancyFilter()
+        try:
+            stored_specialties = json.loads(row["specialties_json"])
+            stored_grades = json.loads(row["grades_json"])
+        except (TypeError, ValueError, KeyError, IndexError):
+            stored_specialties = [row["specialty"]]
+            stored_grades = [row["grade"]]
+        if not isinstance(stored_specialties, list) or not stored_specialties:
+            stored_specialties = [DEFAULT_SPECIALTY]
+        if not isinstance(stored_grades, list) or not stored_grades:
+            stored_grades = [DEFAULT_GRADE]
+        return VacancyFilter(
+            specialties=tuple(normalize_specialties(stored_specialties)),
+            grades=tuple(normalize_grades(stored_grades)),
+        )
+
+    def set_vacancy_filter(
+        self,
+        specialties: str | list[str] | tuple[str, ...],
+        grades: str | list[str] | tuple[str, ...],
+    ) -> VacancyFilter:
+        """Persist the global specialties/grades filter after validating values."""
+        from .sources.filters import VALID_GRADES, VALID_SPECIALTIES
+
+        raw_specialties = [specialties] if isinstance(specialties, str) else list(specialties)
+        raw_grades = [grades] if isinstance(grades, str) else list(grades)
+        cleaned_specialties = [item.strip().lower() for item in raw_specialties if item.strip()]
+        cleaned_grades = [item.strip().lower() for item in raw_grades if item.strip()]
+        unknown_specialties = [item for item in cleaned_specialties if item not in VALID_SPECIALTIES]
+        unknown_grades = [item for item in cleaned_grades if item not in VALID_GRADES]
+        if unknown_specialties:
+            raise ValueError(f"Unknown specialties: {', '.join(unknown_specialties)}")
+        if unknown_grades:
+            raise ValueError(f"Unknown grades: {', '.join(unknown_grades)}")
+        if not cleaned_specialties:
+            raise ValueError("Select at least one specialty")
+        if not cleaned_grades:
+            raise ValueError("Select at least one grade")
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO vacancy_filters (id, specialty, grade, specialties_json, grades_json, updated_at)
+                VALUES (1, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(id) DO UPDATE SET
+                    specialty = excluded.specialty,
+                    grade = excluded.grade,
+                    specialties_json = excluded.specialties_json,
+                    grades_json = excluded.grades_json,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    cleaned_specialties[0],
+                    cleaned_grades[0],
+                    json.dumps(cleaned_specialties),
+                    json.dumps(cleaned_grades),
+                ),
+            )
+        return VacancyFilter(specialties=tuple(cleaned_specialties), grades=tuple(cleaned_grades))
 
     def application_queue_counts(self) -> tuple[int, int]:
         """Return non-sensitive queue counters for operational diagnostics."""

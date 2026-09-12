@@ -2,8 +2,8 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 
 from tg_vacancy_bot.config import Settings
-from tg_vacancy_bot.models import Vacancy
-from tg_vacancy_bot.source_polling import poll_sources_once
+from tg_vacancy_bot.models import Vacancy, VacancyFilter
+from tg_vacancy_bot.source_polling import poll_sources_once, resolve_active_filter
 
 
 class FakeBot:
@@ -25,6 +25,9 @@ class FakeStore:
     def mark_published(self, vacancy: Vacancy) -> bool:
         self.published.append(vacancy)
         return True
+
+    def get_vacancy_filter(self) -> VacancyFilter:
+        return VacancyFilter(specialties=("frontend_fullstack",), grades=("junior",))
 
 
 class FakeAdapter:
@@ -166,3 +169,34 @@ def test_poll_sources_once_keeps_deduplication_before_publish(monkeypatch) -> No
 
     assert published == 0
     assert bot.sent_messages == []
+
+
+def test_resolve_active_filter_uses_env_override_when_configured() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        VACANCY_FILTER_SPECIALTIES="backend,mobile",
+        VACANCY_FILTER_GRADES="senior,lead",
+    )
+    result = resolve_active_filter(FakeStore(), settings)
+    assert result.specialties == ("backend", "mobile")
+    assert result.grades == ("senior", "lead")
+
+
+def test_resolve_active_filter_drops_invalid_env_values() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        VACANCY_FILTER_SPECIALTIES="backend,whatever",
+        VACANCY_FILTER_GRADES="lead,middle,queen",
+    )
+    result = resolve_active_filter(FakeStore(), settings)
+    assert result.specialties == ("backend",)
+    assert result.grades == ("lead", "middle")
+
+
+def test_resolve_active_filter_falls_back_to_store_without_env_override() -> None:
+    settings = Settings(TELEGRAM_BOT_TOKEN="token", TARGET_CHAT_ID="@target")
+    result = resolve_active_filter(FakeStore(), settings)
+    assert result.specialties == ("frontend_fullstack",)
+    assert result.grades == ("junior",)

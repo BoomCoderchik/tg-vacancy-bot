@@ -206,6 +206,41 @@ This repository includes `.github/workflows/scheduled-source-polling.yml`, which
 source vacancies be parsed and published to Telegram even when your local
 server or laptop is off.
 
+### Scheduled parsing into the bot's private chat
+
+`.github/workflows/scheduled-bot-polling.yml` runs the same parser every 15
+minutes and publishes the filtered vacancies to the operator's private chat
+with the bot — that is, exactly "into the bot" itself. It uses its own SQLite
+deduplication cache, so it does not double-post from the channel scheduler's
+state.
+
+Two pieces keep this pipeline following your filter:
+
+- **Filter auto-sync.** When you change the filter with `/filters`, the bot
+  writes the selected specialties and grades into the GitHub Actions repository
+  variables `VACANCY_FILTER_SPECIALTIES` and `VACANCY_FILTER_GRADES` (the same
+  is attempted once on bot startup for the current stored filter). The scheduled
+  runner reads those variables, so your settings are honored automatically.
+  This requires two local `.env` values: `GITHUB_REPOSITORY=owner/repo` and
+  `GITHUB_FILTER_SYNC_TOKEN` — a fine-grained personal access token with the
+  **Actions > Variables: Read and write** permission for that repository. The
+  token is stored only in the local `.env` and never committed or logged.
+- **A dedicated target.** The bot-target workflow publishes through the
+  `BOT_TARGET_CHAT_ID` repository secret. Set it to the same numeric Telegram
+  user ID you already use as the local bot's `TARGET_CHAT_ID` (your private
+  chat). Until that secret exists, the workflow reports the missing
+  `TARGET_CHAT_ID` and does not publish.
+
+The workflow also passes `VACANCY_FILTER_SPECIALTIES`/`VACANCY_FILTER_GRADES`
+as an environment override, which `poll-once` uses instead of a stored SQLite
+filter. When the variables are empty, it falls back to the default
+junior frontend/fullstack filter. Use the separate cache key
+(`vacancy-bot-db-`) so channel and bot-target schedules never share dedup state.
+
+The buffer and publication limits still apply per run: `SOURCE_MAX_PUBLISH_PER_POLL`
+(default 20) caps each poll, and the per-target deduplication database is kept
+in the GitHub Actions cache.
+
 Configure the required repository secrets in GitHub before enabling production
 use:
 
@@ -326,10 +361,11 @@ Messages that do not look like allowed development/design/AI vacancies are skipp
 
 ## Bot Commands
 
-- `/start`: for an incomplete operator profile, prompts to fill in fields and upload a resume; otherwise shows forwarding instructions.
+- `/start`: сразу показывает кнопки выбора специальности и грейда для фильтра парсинга.
 - `/help`: shows forwarding instructions.
 - `/whoami`: returns your Telegram user ID for `OPERATOR_USER_IDS`.
-- `/status`: shows the active forwarding mode, target chat, polling interval, and enabled sources without exposing secrets.
+- `/status`: shows the active forwarding mode, target chat, polling interval, current vacancy filter, and enabled sources without exposing secrets.
+- `/filters`: operators-only vacancy filter setup. Step 1 — toggle specialties (Frontend, Backend, Fullstack, Mobile, QA, DevOps, Data, Design — several allowed, chosen ones show ✅), step 2 — toggle grades (Стажёр, Junior, Middle, Senior, Lead — several allowed), then confirm. Only matching vacancies are parsed from now on; check the active filter with `/status`.
 - `/profile`: private operator profile: view/edit job preferences, upload or replace a resume, or delete the profile.
 - `/queue_resume`: attach this caption to a PDF/DOCX sent privately while queue mode is active; the next GitHub Actions run registers or replaces the queue resume.
 - `/queue_resume_id`: legacy private operator-only command that shows the saved Telegram `file_id`; it is no longer needed for normal queue setup.
@@ -341,16 +377,10 @@ and aggregate SQLite counts without consuming updates or printing secrets.
 long polling and the scheduled `getUpdates` queue must not use the same bot token
 at the same time.
 
-Every normalized vacancy card now includes an `Откликнуться` button. It keeps
-only a short vacancy ID in Telegram and resolves the original URL from SQLite;
-the button is intentionally unavailable for `FORWARDED_MODE=copy`, because a
-copied third-party message cannot safely receive the normalized card markup.
-After the button is processed, the bot sends the operator a persistent private
-`Отклик подготовлен` message and then a factual result message. It says
-`Отклик отправлен` only for a confirmed `submitted` status; prepared, manual,
-incomplete-profile, cancelled, and failed attempts are explicitly reported as
-not sent. The operator must have opened the bot's private chat first so Telegram
-can deliver these notifications.
+Parsed vacancy cards are published without an `Откликнуться` button.
+The application queue, `/profile`, and `/queue_resume` keep working for
+previously created callbacks and manual runs; publishing simply no longer
+attaches a button to new cards.
 
 ## Application Queue
 
