@@ -206,6 +206,41 @@ This repository includes `.github/workflows/scheduled-source-polling.yml`, which
 source vacancies be parsed and published to Telegram even when your local
 server or laptop is off.
 
+### Scheduled parsing into the bot's private chat
+
+`.github/workflows/scheduled-bot-polling.yml` runs the same parser every 15
+minutes and publishes the filtered vacancies to the operator's private chat
+with the bot — that is, exactly "into the bot" itself. It uses its own SQLite
+deduplication cache, so it does not double-post from the channel scheduler's
+state.
+
+Two pieces keep this pipeline following your filter:
+
+- **Filter auto-sync.** When you change the filter with `/filters`, the bot
+  writes the selected specialties and grades into the GitHub Actions repository
+  variables `VACANCY_FILTER_SPECIALTIES` and `VACANCY_FILTER_GRADES` (the same
+  is attempted once on bot startup for the current stored filter). The scheduled
+  runner reads those variables, so your settings are honored automatically.
+  This requires two local `.env` values: `GITHUB_REPOSITORY=owner/repo` and
+  `GITHUB_FILTER_SYNC_TOKEN` — a fine-grained personal access token with the
+  **Actions > Variables: Read and write** permission for that repository. The
+  token is stored only in the local `.env` and never committed or logged.
+- **A dedicated target.** The bot-target workflow publishes through the
+  `BOT_TARGET_CHAT_ID` repository secret. Set it to the same numeric Telegram
+  user ID you already use as the local bot's `TARGET_CHAT_ID` (your private
+  chat). Until that secret exists, the workflow reports the missing
+  `TARGET_CHAT_ID` and does not publish.
+
+The workflow also passes `VACANCY_FILTER_SPECIALTIES`/`VACANCY_FILTER_GRADES`
+as an environment override, which `poll-once` uses instead of a stored SQLite
+filter. When the variables are empty, it falls back to the default
+junior frontend/fullstack filter. Use the separate cache key
+(`vacancy-bot-db-`) so channel and bot-target schedules never share dedup state.
+
+The buffer and publication limits still apply per run: `SOURCE_MAX_PUBLISH_PER_POLL`
+(default 20) caps each poll, and the per-target deduplication database is kept
+in the GitHub Actions cache.
+
 Configure the required repository secrets in GitHub before enabling production
 use:
 

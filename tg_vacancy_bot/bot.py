@@ -20,6 +20,7 @@ from .browser_worker import BrowserWorker
 from .config import Settings
 from .description_localization import localize_vacancy_description
 from .formatting import format_vacancy_card
+from .github_filter_sync import sync_vacancy_filter_to_github
 from .intake import looks_like_vacancy_message
 from .preview import parse_publishable_message
 from .runtime_lock import SingleInstanceLock, bot_run_lock_path
@@ -867,6 +868,9 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             return
         await state.clear()
         await callback.answer("Фильтр применён.")
+        ok, sync_message = await sync_vacancy_filter_to_github(saved, settings)
+        if not ok:
+            logger.warning("GitHub filter sync: %s", sync_message)
         await callback.message.edit_text(
             f"✅ Фильтр применён: {format_filter_text(saved)}.\n"
             "Теперь парсятся только подходящие вакансии. Посмотреть можно через /status, "
@@ -1002,6 +1006,8 @@ async def run_bot(settings: Settings) -> None:
             default=DefaultBotProperties(parse_mode=ParseMode.HTML),
         )
         dp = create_dispatcher(settings, store)
+        if settings.github_repository.strip() and settings.github_filter_sync_token.strip():
+            asyncio.create_task(_sync_filter_on_startup(settings, store))
         await send_profile_onboarding_reminders(bot, settings, store)
         polling_task = asyncio.create_task(poll_sources_forever(bot, settings, store))
 
@@ -1018,3 +1024,16 @@ async def run_bot(settings: Settings) -> None:
 
 def run_bot_sync(settings: Settings) -> None:
     asyncio.run(run_bot(settings))
+
+
+async def _sync_filter_on_startup(settings: Settings, store: VacancyStore) -> None:
+    try:
+        active = store.get_vacancy_filter()
+    except Exception:
+        logger.exception("Could not read the stored filter for GitHub sync on startup.")
+        return
+    ok, message = await sync_vacancy_filter_to_github(active, settings)
+    if ok:
+        logger.info("GitHub filter sync on startup: %s", message)
+    else:
+        logger.warning("GitHub filter sync on startup: %s", message)

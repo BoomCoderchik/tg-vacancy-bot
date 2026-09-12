@@ -1,0 +1,103 @@
+name: Scheduled bot-target vacancy source polling
+
+on:
+  schedule:
+    - cron: "5 * * * *"
+    - cron: "20 * * * *"
+    - cron: "35 * * * *"
+    - cron: "50 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: poll-bot-vacancy-sources
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      # Private chat of the operator. Put the same numeric Telegram user ID as
+      # the local bot's TARGET_CHAT_ID into the BOT_TARGET_CHAT_ID secret.
+      TARGET_CHAT_ID: ${{ secrets.BOT_TARGET_CHAT_ID }}
+      OPERATOR_USER_IDS: ${{ secrets.OPERATOR_USER_IDS }}
+      FORWARDED_MODE: normalize
+      DATABASE_PATH: data/vacancies.sqlite3
+      APPLICATION_QUEUE_ENABLED: "false"
+      SOURCE_POLL_INTERVAL_SECONDS: "0"
+      SOURCE_MAX_PUBLISH_PER_POLL: ${{ secrets.SOURCE_MAX_PUBLISH_PER_POLL || '20' }}
+      SOURCE_MAX_AGE_HOURS: ${{ secrets.SOURCE_MAX_AGE_HOURS || '48' }}
+      # Active filter chosen by the operator in /filters. The local bot pushes
+      # these GitHub Actions variables whenever /filters changes and once on
+      # startup, so the scheduled parser always follows the stored filter.
+      VACANCY_FILTER_SPECIALTIES: ${{ vars.VACANCY_FILTER_SPECIALTIES }}
+      VACANCY_FILTER_GRADES: ${{ vars.VACANCY_FILTER_GRADES }}
+      ENABLE_LINKEDIN_POST_SEARCH: ${{ secrets.ENABLE_LINKEDIN_POST_SEARCH || 'false' }}
+      SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
+      LINKEDIN_POST_SEARCH_QUERY: ${{ secrets.LINKEDIN_POST_SEARCH_QUERY || '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR hiring OR "ищем" OR "ищет") ("junior frontend developer" OR "junior fullstack developer" OR frontend OR fullstack)' }}
+      LINKEDIN_POST_SEARCH_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SEARCH_RESULTS_WANTED || '10' }}
+      ENABLE_LINKEDIN_POST_SCRAPER: ${{ secrets.ENABLE_LINKEDIN_POST_SCRAPER || 'false' }}
+      LINKEDIN_POST_SCRAPER_QUERY: ${{ secrets.LINKEDIN_POST_SCRAPER_QUERY || '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR hiring OR "ищем" OR "ищет") ("junior frontend developer" OR "junior fullstack developer" OR frontend OR fullstack)' }}
+      LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS: ${{ secrets.LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS || 'bing_rss,duckduckgo,bing,duckduckgo_lite,mojeek' }}
+      LINKEDIN_POST_SCRAPER_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SCRAPER_RESULTS_WANTED || '100' }}
+      ENABLE_LINKEDIN_POST_APIFY: ${{ secrets.ENABLE_LINKEDIN_POST_APIFY || 'false' }}
+      APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
+      # Guest job listings read LinkedIn itself and need no key, so they are
+      # on by default for the scheduled parser.
+      ENABLE_LINKEDIN_JOBS_GUEST: ${{ secrets.ENABLE_LINKEDIN_JOBS_GUEST || 'true' }}
+      LINKEDIN_JOBS_GUEST_KEYWORDS: ${{ secrets.LINKEDIN_JOBS_GUEST_KEYWORDS }}
+      LINKEDIN_JOBS_GUEST_RESULTS_WANTED: ${{ secrets.LINKEDIN_JOBS_GUEST_RESULTS_WANTED || '30' }}
+      LINKEDIN_POST_APIFY_ACTOR: ${{ secrets.LINKEDIN_POST_APIFY_ACTOR || 'harvestapi/linkedin-post-search' }}
+      LINKEDIN_POST_APIFY_SEARCH_QUERIES: ${{ secrets.LINKEDIN_POST_APIFY_SEARCH_QUERIES }}
+      LINKEDIN_POST_APIFY_POSTED_LIMIT: ${{ secrets.LINKEDIN_POST_APIFY_POSTED_LIMIT || '24h' }}
+      LINKEDIN_POST_APIFY_MAX_POSTS: ${{ secrets.LINKEDIN_POST_APIFY_MAX_POSTS || '25' }}
+      LINKEDIN_POST_APIFY_TIMEOUT_SECONDS: ${{ secrets.LINKEDIN_POST_APIFY_TIMEOUT_SECONDS || '240' }}
+      ENABLE_LINKEDIN_POST_HEADLESS: ${{ secrets.ENABLE_LINKEDIN_POST_HEADLESS || 'false' }}
+      LINKEDIN_HEADLESS_ACCESS_AUTHORIZED: ${{ secrets.LINKEDIN_HEADLESS_ACCESS_AUTHORIZED || 'false' }}
+      LINKEDIN_HEADLESS_PERMISSION_REFERENCE: ${{ secrets.LINKEDIN_HEADLESS_PERMISSION_REFERENCE }}
+      LINKEDIN_POST_HEADLESS_QUERY: ${{ secrets.LINKEDIN_POST_HEADLESS_QUERY }}
+      LINKEDIN_POST_HEADLESS_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_HEADLESS_RESULTS_WANTED || '10' }}
+      LINKEDIN_POST_SEARCH_INTENTS_PER_CYCLE: ${{ secrets.LINKEDIN_POST_SEARCH_INTENTS_PER_CYCLE || '6' }}
+      LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS: ${{ secrets.LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS || '20' }}
+      # Source vacancies always pass through localization before publication.
+      LOCALIZE_DESCRIPTIONS: "true"
+      # Groq is the supported default localization provider: its free tier
+      # covers the parser's load and OpenRouter's free pool is unreliable.
+      LOCALIZATION_PROVIDER: ${{ secrets.LOCALIZATION_PROVIDER || 'groq' }}
+      LOCALIZATION_MAX_PER_POLL: ${{ secrets.LOCALIZATION_MAX_PER_POLL || '20' }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || 'gpt-4.1-mini' }}
+      OPENAI_FALLBACK_MODELS: ${{ secrets.OPENAI_FALLBACK_MODELS }}
+      OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      GROQ_MODEL: ${{ secrets.GROQ_MODEL || 'openai/gpt-oss-120b' }}
+      GROQ_FALLBACK_MODELS: ${{ secrets.GROQ_FALLBACK_MODELS || 'openai/gpt-oss-20b' }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Restore deduplication database
+        uses: actions/cache@v5
+        with:
+          path: data/
+          key: vacancy-bot-db-${{ github.run_id }}
+          restore-keys: |
+            vacancy-bot-db-
+
+      - name: Install bot
+        run: pip install .
+
+      - name: Print active filter
+        run: |
+          echo "Parsing specialties: ${VACANCY_FILTER_SPECIALTIES:-defaults}; grades: ${VACANCY_FILTER_GRADES:-defaults}"
+
+      - name: Poll and publish new vacancies
+        run: python -m tg_vacancy_bot.app poll-once

@@ -59,6 +59,8 @@
   - Requires `TELEGRAM_BOT_TOKEN` and `TARGET_CHAT_ID` for real publishing.
   - Supports optional `OPERATOR_USER_IDS` for publish access control.
   - Controls source polling with `SOURCE_POLL_INTERVAL_SECONDS`, `SOURCE_MAX_PUBLISH_PER_POLL`, and `SOURCE_MAX_AGE_HOURS`.
+   - Accepts an optional filter override for scheduled/CLI runs through `VACANCY_FILTER_SPECIALTIES` and `VACANCY_FILTER_GRADES` (comma-separated values that win over the stored filter when present).
+   - Supports optional auto-sync of the operator-chosen filter to GitHub Actions repository variables through `GITHUB_FILTER_SYNC_TOKEN` and `GITHUB_REPOSITORY`.
   - Supports localization for manual messages and requires it for every source vacancy before publication.
   - Supports optional OpenAI/OpenAI-compatible description localization with `LOCALIZE_DESCRIPTIONS`, `LOCALIZATION_PROVIDER`, `OPENAI_*`, and the built-in Groq mode (`GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_FALLBACK_MODELS`).
   - Supports opt-in, globally scoped LinkedIn hiring-post search with `ENABLE_LINKEDIN_POST_SEARCH`, `SERPAPI_API_KEY`, `LINKEDIN_POST_SEARCH_QUERY`, and `LINKEDIN_POST_SEARCH_RESULTS_WANTED`.
@@ -117,6 +119,13 @@
   - Publishes only source vacancies that pass the unified vacancy filtering policy.
   - Always runs source descriptions through the localization boundary before publication; if the provider fails, logs the error and publishes the original description rather than losing the vacancy.
   - Filters dated source vacancies by `SOURCE_MAX_AGE_HOURS` before publishing while preserving undated vacancies for dedupe-based handling.
+  - Resolves the active filter from the `VACANCY_FILTER_*` environment override first, then the stored filter, then defaults (`resolve_active_filter`).
+  - Deduplication is per-target: the channel and private-chat GitHub Actions schedules keep separate SQLite caches of the same cacheable `data/` directory.
+
+- `tg_vacancy_bot/github_filter_sync.py`
+  - Pushes the operator-chosen `VacancyFilter` into GitHub Actions repository variables (`VACANCY_FILTER_SPECIALTIES`, `VACANCY_FILTER_GRADES`) through the GitHub REST API so scheduled `poll-once` runs follow `/filters`.
+  - Runs on every `/filters` confirmation and once best-effort at bot startup.
+  - Always skips cleanly when `GITHUB_FILTER_SYNC_TOKEN` or `GITHUB_REPOSITORY` are not configured, and never logs credentials. The token is stored only in the local `.env`.
 
 - `tg_vacancy_bot/storage.py`
   - SQLite deduplication by stable vacancy fingerprint.
