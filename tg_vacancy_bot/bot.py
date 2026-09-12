@@ -1006,8 +1006,7 @@ async def run_bot(settings: Settings) -> None:
             default=DefaultBotProperties(parse_mode=ParseMode.HTML),
         )
         dp = create_dispatcher(settings, store)
-        if settings.github_repository.strip() and settings.github_filter_sync_token.strip():
-            asyncio.create_task(_sync_filter_on_startup(settings, store))
+        asyncio.create_task(_sync_filter_on_startup(settings, store))
         await send_profile_onboarding_reminders(bot, settings, store)
         polling_task = asyncio.create_task(poll_sources_forever(bot, settings, store))
 

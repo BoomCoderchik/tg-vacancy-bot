@@ -3,6 +3,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+import shutil
+import subprocess
 import urllib.request
 from urllib.error import HTTPError
 
@@ -14,6 +17,7 @@ logger = logging.getLogger(__name__)
 GITHUB_API_BASE = "https://api.github.com"
 VARIABLE_SPECIALTIES = "VACANCY_FILTER_SPECIALTIES"
 VARIABLE_GRADES = "VACANCY_FILTER_GRADES"
+_GITHUB_HOST = "github.com"
 
 
 def _call_api(method: str, url: str, token: str, payload: dict) -> tuple[int, str]:
@@ -57,28 +61,105 @@ def _set_repository_variable(
     return False, f"failed to sync GitHub variable {name} (HTTP {status})"
 
 
+def _detect_repository_from_git(workdir: str | os.PathLike | None = None) -> str | None:
+    """Read ``owner/repo`` from ``git remote get-url origin`` when available."""
+    try:
+        result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            cwd=workdir or os.getcwd(),
+        )
+        raw = (result.stdout or "").strip()
+    except Exception:
+        return None
+    if "github.com" not in raw.lower():
+        return None
+    after = raw.split("://", 1)[1] if "://" in raw else raw
+    if "@" in after:
+        after = after.rsplit("@", 1)[1]
+    if after.lower().startswith(_GITHUB_HOST + "/"):
+        path = after[len(_GITHUB_HOST):].strip("/")
+    elif after.lower().startswith(_GITHUB_HOST + ":"):
+        path = after[len(_GITHUB_HOST):].strip().lstrip(":").strip()
+    else:
+        return None
+    path = path.removesuffix(".git").strip("/")
+    if "/" not in path:
+        return None
+    return path
+
+
+def _run_gh(owner: str, repo: str, name: str, value: str) -> tuple[bool, str]:
+    """Run ``gh variable set`` using the session's GitHub authentication.
+
+    The ``GH_TOKEN``/``GITHUB_TOKEN`` environment variables are cleared so an
+    unrelated or stale env token cannot shadow the authenticated CLI session.
+    """
+    args = ["gh", "variable", "set", name, "--repo", f"{owner}/{repo}", "--body", value]
+    env = dict(os.environ)
+    env["GH_TOKEN"] = ""
+    env["GITHUB_TOKEN"] = ""
+    try:
+        result = subprocess.run(
+            args,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=env,
+        )
+    except FileNotFoundError:
+        return False, "gh CLI is not installed"
+    except subprocess.TimeoutExpired:
+        return False, f"gh variable set {name} timed out"
+    detail = ((result.stderr or "").strip() or (result.stdout or "").strip())[:300]
+    if result.returncode == 0:
+        return True, f"synced GitHub variable {name}={value}"
+    return False, f"failed to run gh variable set {name} (exit {result.returncode}): {detail}"
+
+
+def _gh_available() -> bool:
+    return shutil.which("gh") is not None
+
+
 def sync_vacancy_filter_to_github_sync(
     vacancy_filter: VacancyFilter,
     settings: Settings,
+    workdir: str | os.PathLike | None = None,
 ) -> tuple[bool, str]:
-    token = settings.github_filter_sync_token.strip()
     repository = settings.github_repository.strip().strip("/")
-    if not token or not repository or "/" not in repository:
-        return False, "skipped: GITHUB_FILTER_SYNC_TOKEN and GITHUB_REPOSITORY are not configured"
+    if "/" not in repository:
+        repository = _detect_repository_from_git(workdir) or ""
+    if "/" not in repository:
+        return False, (
+            "skipped: no GitHub repository detected - set GITHUB_REPOSITORY "
+            "or point the git origin at github.com"
+        )
 
     owner, repo = repository.split("/", 1)
     repo = repo.removesuffix(".git").strip()
     if not owner or not repo:
-        return False, "skipped: GITHUB_REPOSITORY must look like owner/repo"
+        return False, "skipped: GitHub repository must look like owner/repo"
 
     values = {
         VARIABLE_SPECIALTIES: ",".join(vacancy_filter.specialties),
         VARIABLE_GRADES: ",".join(vacancy_filter.grades),
     }
+    token = settings.github_filter_sync_token.strip()
+
     results: list[str] = []
     ok = True
     for name, value in values.items():
-        success, message = _set_repository_variable(owner, repo, token, name, value)
+        if token:
+            success, message = _set_repository_variable(owner, repo, token, name, value)
+        elif _gh_available():
+            success, message = _run_gh(owner, repo, name, value)
+        else:
+            return False, (
+                "skipped: no GITHUB_FILTER_SYNC_TOKEN and no gh CLI available "
+                "to update GitHub variables"
+            )
         ok = ok and success
         if not success:
             logger.warning("GitHub filter sync: %s", message)
