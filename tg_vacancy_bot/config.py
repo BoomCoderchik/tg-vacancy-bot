@@ -86,6 +86,18 @@ class Settings(BaseSettings):
     source_max_age_hours: int = Field(default=48, alias="SOURCE_MAX_AGE_HOURS")
     vacancy_default_specialty: str = Field(default="frontend_fullstack", alias="VACANCY_DEFAULT_SPECIALTY")
     vacancy_default_grade: str = Field(default="junior", alias="VACANCY_DEFAULT_GRADE")
+    # Scheduled GitHub Actions runs cannot read the local SQLite filter, so the
+    # active filter can also be supplied through the environment. When present,
+    # these comma-separated values override the stored filter for CLI polling
+    # commands and source previews.
+    vacancy_filter_specialties_raw: str = Field(default="", alias="VACANCY_FILTER_SPECIALTIES")
+    vacancy_filter_grades_raw: str = Field(default="", alias="VACANCY_FILTER_GRADES")
+    # Optional auto-sync of the operator-chosen filter to GitHub Actions
+    # repository variables. A fine-grained personal access token with the
+    # Actions > Variables read/write repository permission is stored only in
+    # the local .env and never committed or logged.
+    github_filter_sync_token: str = Field(default="", alias="GITHUB_FILTER_SYNC_TOKEN")
+    github_repository: str = Field(default="", alias="GITHUB_REPOSITORY")
     localize_descriptions: bool = Field(default=False, alias="LOCALIZE_DESCRIPTIONS")
 
     enable_linkedin_post_search: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SEARCH")

@@ -21,6 +21,7 @@ from .env_setup import init_env_file
 from .linkedin_diagnostics import collect_linkedin_diagnostics, format_linkedin_diagnostics
 from .preview import parse_publishable_message, preview_message_card_async
 from .publisher import TelegramPublisher
+from .source_polling import resolve_active_filter
 from .sources import build_adapters, filter_it_vacancies, source_configuration_warnings
 from .sources.filter_queries import apply_filter_queries
 from .sources.filters import evaluate_vacancy_policy
@@ -85,7 +86,7 @@ async def poll_once() -> None:
     settings.require_runtime()
     logging.basicConfig(level=logging.INFO)
     store = VacancyStore(settings.database_path)
-    active_filter = store.get_vacancy_filter()
+    active_filter = resolve_active_filter(store, settings)
     source_settings = apply_filter_queries(
         settings.model_copy(update={"localize_descriptions": True}),
         active_filter.specialties,
@@ -184,7 +185,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             return
 
         if args.command == "diagnose-linkedin":
-            active = VacancyStore(settings.database_path).get_vacancy_filter()
+            active = resolve_active_filter(VacancyStore(settings.database_path), settings)
             diagnostic_settings = (
                 settings.model_copy(update={"linkedin_post_headless_query": ""})
                 if args.use_default_profile
@@ -234,7 +235,7 @@ def format_source_check(settings) -> str:
 
 async def preview_sources(settings, source_name: str | None = None, limit: int = 5) -> str:
     lines = ["Source preview"]
-    active_filter = VacancyStore(settings.database_path).get_vacancy_filter()
+    active_filter = resolve_active_filter(VacancyStore(settings.database_path), settings)
     settings = apply_filter_queries(settings, active_filter.specialties, active_filter.grades)
     lines.extend(f"WARNING: {warning}" for warning in source_configuration_warnings(settings))
     adapters = build_adapters(settings)
