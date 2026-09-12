@@ -31,7 +31,7 @@ Automatic polling is limited to LinkedIn hiring posts.
   - Keeps only posts whose body contains both a hiring signal and a supported development role.
 
 - `LinkedInJobsGuestAdapter`
-  - Opt-in with `ENABLE_LINKEDIN_JOBS_GUEST=true`.
+  - Off by default for the bot-target pipeline; opt-in with `ENABLE_LINKEDIN_JOBS_GUEST=true`.
   - Reads LinkedIn's own public, logged-out job listings through the guest search endpoint and public job pages; no account, key, or protection bypass is involved.
   - Searches each configured keyword (`LINKEDIN_JOBS_GUEST_KEYWORDS`) within the freshness window, keeps only listings whose title carries junior-level and frontend/fullstack evidence, then reads the public job page for the real posting text.
   - Works from any IP that can reach LinkedIn directly, including datacenter runners where search engines block scraping.

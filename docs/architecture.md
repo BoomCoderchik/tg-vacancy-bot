@@ -60,7 +60,7 @@
   - Supports optional `OPERATOR_USER_IDS` for publish access control.
   - Controls source polling with `SOURCE_POLL_INTERVAL_SECONDS`, `SOURCE_MAX_PUBLISH_PER_POLL`, and `SOURCE_MAX_AGE_HOURS`.
    - Accepts an optional filter override for scheduled/CLI runs through `VACANCY_FILTER_SPECIALTIES` and `VACANCY_FILTER_GRADES` (comma-separated values that win over the stored filter when present).
-   - Supports optional auto-sync of the operator-chosen filter to GitHub Actions repository variables through `GITHUB_FILTER_SYNC_TOKEN` and `GITHUB_REPOSITORY`.
+   - Supports optional auto-sync of the operator-chosen filter to GitHub Actions repository variables. Uses the authenticated `gh` CLI by default and auto-detects the repository from `git remote origin`; a fine-grained PAT via `GITHUB_FILTER_SYNC_TOKEN`/`GITHUB_REPOSITORY` is only an alternative for machines without a `gh` session.
   - Supports localization for manual messages and requires it for every source vacancy before publication.
   - Supports optional OpenAI/OpenAI-compatible description localization with `LOCALIZE_DESCRIPTIONS`, `LOCALIZATION_PROVIDER`, `OPENAI_*`, and the built-in Groq mode (`GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_FALLBACK_MODELS`).
   - Supports opt-in, globally scoped LinkedIn hiring-post search with `ENABLE_LINKEDIN_POST_SEARCH`, `SERPAPI_API_KEY`, `LINKEDIN_POST_SEARCH_QUERY`, and `LINKEDIN_POST_SEARCH_RESULTS_WANTED`.
@@ -123,9 +123,10 @@
   - Deduplication is per-target: the channel and private-chat GitHub Actions schedules keep separate SQLite caches of the same cacheable `data/` directory.
 
 - `tg_vacancy_bot/github_filter_sync.py`
-  - Pushes the operator-chosen `VacancyFilter` into GitHub Actions repository variables (`VACANCY_FILTER_SPECIALTIES`, `VACANCY_FILTER_GRADES`) through the GitHub REST API so scheduled `poll-once` runs follow `/filters`.
+  - Pushes the operator-chosen `VacancyFilter` into GitHub Actions repository variables (`VACANCY_FILTER_SPECIALTIES`, `VACANCY_FILTER_GRADES`) so scheduled `poll-once` runs follow `/filters`.
+  - Syncs through the authenticated `gh` CLI (`gh variable set`) when no token is set and `gh` is available, and through the GitHub REST API when `GITHUB_FILTER_SYNC_TOKEN` is configured. The repository comes from `GITHUB_REPOSITORY` or is auto-detected from `git remote origin`.
   - Runs on every `/filters` confirmation and once best-effort at bot startup.
-  - Always skips cleanly when `GITHUB_FILTER_SYNC_TOKEN` or `GITHUB_REPOSITORY` are not configured, and never logs credentials. The token is stored only in the local `.env`.
+  - Always skips cleanly when the repository cannot be determined and no sync channel is available, and never logs credentials. Any token is stored only in the local `.env`.
 
 - `tg_vacancy_bot/storage.py`
   - SQLite deduplication by stable vacancy fingerprint.
@@ -216,6 +217,6 @@ The project permits four automatic LinkedIn adapters across four opt-in paths:
 - `LinkedInPostScraperAdapter`, enabled only with `ENABLE_LINKEDIN_POST_SCRAPER=true`, scrapes public search-result HTML (Bing RSS, DuckDuckGo HTML, Bing HTML, DuckDuckGo Lite, Mojeek) for LinkedIn post URLs such as `linkedin.com/posts/...` and maps title/snippet/link into `Vacancy` with role-normalized titles when search titles are hashtag-heavy.
 - `LinkedInPostApifyAdapter`, enabled only with `ENABLE_LINKEDIN_POST_APIFY=true` and `APIFY_API_TOKEN`, runs the configured Apify Actor, maps full post-body results into `Vacancy`, and applies deterministic hiring-intent/role matching before common filtering and SQLite deduplication.
 - `LinkedInPostHeadlessAdapter`, enabled only when the headless flag and documented permission gate are both satisfied, discovers public LinkedIn post links through configured SerpApi search when a key exists, then best-effort lightweight HTTP providers (Bing RSS, DuckDuckGo HTML, Bing HTML, DuckDuckGo Lite, Mojeek, paginated Bing HTML), and finally reads Bing result pages inside the same clean browser context when HTTP discovery produced no candidates. The browser maps page text into `Vacancy` only when the final URL remains on a supported LinkedIn post path and no login or protection page is detected; guest reads are paced with jitter, retry 429/999 once after a backoff, retry a login-walled `/posts/` URL once through its public feed-update form, and fall back to the real public search result that discovered the link (title, snippet, activity-ID date) when direct reading stays blocked. While this pipeline is registered, standalone search/scraper adapters are not registered as parallel LinkedIn publishers.
-- `LinkedInJobsGuestAdapter`, enabled only with `ENABLE_LINKEDIN_JOBS_GUEST=true`, reads LinkedIn's own public logged-out job listings: guest search per configured keyword within the freshness window, junior/frontend/fullstack title prefilter, then polite paced reads of each public job page for the real posting text. It is independent of the search-engine discovery paths and works from any IP that can reach LinkedIn directly.
+- `LinkedInJobsGuestAdapter`, off by default for the bot-target pipeline and enabled only with `ENABLE_LINKEDIN_JOBS_GUEST=true`, reads LinkedIn's own public logged-out job listings: guest search per configured keyword within the freshness window, junior/frontend/fullstack title prefilter, then polite paced reads of each public job page for the real posting text. It is independent of the search-engine discovery paths and works from any IP that can reach LinkedIn directly.
 
 All LinkedIn adapters are opt-in and do not use a LinkedIn account. If a provider blocks, rate-limits, lacks credentials, or returns no rows, the source path fails or returns no publishable vacancies; it must not create fake vacancies or placeholder records. Every published headless vacancy is backed by a real public source: the post page itself or the public search result that indexed it.

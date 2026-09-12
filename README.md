@@ -143,10 +143,10 @@ Without `SERPAPI_API_KEY`, the report probes every configured free public search
 
 ## Guest LinkedIn Job Listings Parser
 
-Search engines rate-limit datacenter and flagged IPs, so discovery through them can return no rows even when LinkedIn itself is fully reachable. For that reason the bot also supports reading LinkedIn's own public guest job listings, which need no account, no API key, and no protection bypass:
+Search engines rate-limit datacenter and flagged IPs, so discovery through them can return no rows even when LinkedIn itself is fully reachable. For that reason the bot can also read LinkedIn's own public guest job listings, which need no account, no API key, and no protection bypass. The operator prefers hiring-post discovery and keeps Guest off by default; enable it only when needed:
 
 ```dotenv
-ENABLE_LINKEDIN_JOBS_GUEST=true
+ENABLE_LINKEDIN_JOBS_GUEST=false
 LINKEDIN_JOBS_GUEST_KEYWORDS=junior frontend developer||junior fullstack developer||intern frontend developer||trainee fullstack developer||джуниор фронтенд разработчик||стажер фронтенд разработчик
 LINKEDIN_JOBS_GUEST_RESULTS_WANTED=30
 ```
@@ -221,10 +221,11 @@ Two pieces keep this pipeline following your filter:
   variables `VACANCY_FILTER_SPECIALTIES` and `VACANCY_FILTER_GRADES` (the same
   is attempted once on bot startup for the current stored filter). The scheduled
   runner reads those variables, so your settings are honored automatically.
-  This requires two local `.env` values: `GITHUB_REPOSITORY=owner/repo` and
-  `GITHUB_FILTER_SYNC_TOKEN` — a fine-grained personal access token with the
-  **Actions > Variables: Read and write** permission for that repository. The
-  token is stored only in the local `.env` and never committed or logged.
+  No token has to be managed: the bot uses the already authenticated `gh` CLI
+  on this machine (`gh variable set`) and auto-detects the repository from
+  `git remote origin`. An optional `GITHUB_FILTER_SYNC_TOKEN` (fine-grained PAT,
+  **Actions > Variables: Read and write**) is only an alternative for machines
+  without a usable `gh` session. Credentials are never committed or logged.
 - **A dedicated target.** The bot-target workflow publishes through the
   `BOT_TARGET_CHAT_ID` repository secret. Set it to the same numeric Telegram
   user ID you already use as the local bot's `TARGET_CHAT_ID` (your private
