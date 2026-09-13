@@ -16,7 +16,8 @@ HIRING_INTENT_RE = re.compile(
     r"open\s+(?:role|position|vacancy)|new\s+(?:vacancy|role)|job\s+opening|"
     r"vacanc\w+|apply\s+now|dm\s+me|send\s+(?:us\s+|your\s+)?(?:cv|resume)|(?:cv|resume)\s+to|"
     r"ищем|ищет\w*|нанима\w*|нанять|приглашаем|в\s+(?:нашу\s+)?команду|"
-    r"вакансия\w*|требуется|требуются|нужен[аыи]?\b|розыск|открыт[аоы]\s+(?:роль|позиция|вакансия)"
+    r"вакансия\w*|требуется|требуются|нужен[аыи]?\b|розыск|открыт[аоы]\s+(?:роль|позиция|вакансия)|"
+    r"vakansiya\w*|lavoz\w*|e'lon\s+qil\w*|ish\s+o'rn\w*"
     r")(?!\w)",
     re.IGNORECASE,
 )
