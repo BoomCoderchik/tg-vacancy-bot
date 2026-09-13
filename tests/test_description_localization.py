@@ -2,12 +2,18 @@ import asyncio
 
 import pytest
 
+import tg_vacancy_bot.description_localization as description_localization
 from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.description_localization import (
     OpenAIDescriptionLocalizer,
     localize_vacancy_description,
 )
 from tg_vacancy_bot.models import Vacancy
+
+
+@pytest.fixture(autouse=True)
+def _clear_localization_cache() -> None:
+    description_localization._localization_cache.clear()
 
 
 class FakeResponses:
@@ -118,7 +124,7 @@ def test_openai_localizer_requests_russian_compressed_description() -> None:
     assert "русский" in request["messages"][0]["content"].lower()
     assert "сожми" in request["messages"][0]["content"].lower()
     assert "не добавляй зарплату" in request["messages"][0]["content"].lower()
-    assert "только исходное описание" in request["messages"][0]["content"].lower()
+    assert "только факты из описания" in request["messages"][0]["content"].lower()
     assert request["messages"][1]["content"] == "Wir suchen einen Python Entwickler fuer Remote Backend Arbeit."
     assert request["max_tokens"] <= 300
 
@@ -257,6 +263,7 @@ def test_localize_vacancy_description_returns_vacancy_with_openai_text() -> None
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
         LOCALIZE_DESCRIPTIONS="true",
+        LOCALIZATION_PROVIDER="openai",
         OPENAI_API_KEY="test-key",
         OPENAI_MODEL="test-model",
         OPENAI_BASE_URL="https://openrouter.ai/api/v1",
@@ -285,6 +292,7 @@ def test_localize_vacancy_description_requires_openai_key_when_enabled() -> None
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
         LOCALIZE_DESCRIPTIONS="true",
+        LOCALIZATION_PROVIDER="openai",
         OPENAI_API_KEY="",
     )
     vacancy = Vacancy(title="Python Engineer", description="Remote role.", source="Telegram")
@@ -298,6 +306,7 @@ def test_localize_vacancy_description_skips_model_for_russian_text() -> None:
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
         LOCALIZE_DESCRIPTIONS="true",
+        LOCALIZATION_PROVIDER="openai",
         OPENAI_API_KEY="test-key",
     )
     vacancy = Vacancy(title="Python Engineer", description="Ищем Python разработчика.", source="LinkedIn")
