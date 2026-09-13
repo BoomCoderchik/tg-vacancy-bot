@@ -14,6 +14,8 @@ from tg_vacancy_bot.sources.filters import evaluate_vacancy_policy
         "We are hiring a Junior Fullstack Developer (React + Node.js) for our product team.",
         "Ищем стажера fullstack-разработчика без опыта. Python, Django, React.",
         "Join our team as a trainee full-stack engineer and start your IT career!",
+        "TRUSS GLOBAL TAS kompaniyasi Junior Full Stack Developer lavozimiga vakansiya e'lon qiladi.",
+        "Frontend vakansiya: Junior Frontend Developer (Angular) Talablar: 1+ yil tajriba.",
     ],
 )
 def test_junior_frontend_fullstack_posts_are_accepted(text: str) -> None:

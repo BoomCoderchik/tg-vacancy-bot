@@ -200,7 +200,7 @@ to keep that workflow enabled:
 
 ```dotenv
 ENABLE_RUSSIA_TELEGRAM=true
-RUSSIA_TELEGRAM_CHANNELS=itvacancy,it_vacancy,vakansii_it,superjob_it,hh_vacancies,frontend_vacancies,itjobs_ru,vakansii,remote_it,remote_work_ru,webdev_jobs,frontend_it,rabota_russia,it_vacancy_ru
+RUSSIA_TELEGRAM_CHANNELS=itvacancy,it_vacancy,vakansii_it,superjob_it,itjobs_ru,vakansii,remote_it,webdev_jobs,rabota_russia,it_vacancy_ru,frontend_vacancy,startup_jobs
 RUSSIA_TELEGRAM_MAX_POSTS_PER_CHANNEL=20
 ```
 
