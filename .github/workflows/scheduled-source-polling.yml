@@ -44,14 +44,16 @@ jobs:
       ENABLE_LINKEDIN_JOBS_GUEST: ${{ secrets.ENABLE_LINKEDIN_JOBS_GUEST || 'true' }}
       LINKEDIN_JOBS_GUEST_KEYWORDS: ${{ secrets.LINKEDIN_JOBS_GUEST_KEYWORDS }}
       LINKEDIN_JOBS_GUEST_RESULTS_WANTED: ${{ secrets.LINKEDIN_JOBS_GUEST_RESULTS_WANTED || '30' }}
-      # Russia-wide sources are opt-in; default off so the scheduled parser
-      # keeps the linkedin-only behavior until the owner enables them.
+      # Russia-wide sources are opt-in; the search stays off by default because
+      # the free public search providers are unreliable, but the public Telegram
+      # vacancy channels are on by default so the scheduled parser replenishes
+      # supply even when LinkedIn deduplication starves the pipeline.
       ENABLE_RUSSIA_SEARCH: ${{ secrets.ENABLE_RUSSIA_SEARCH || 'false' }}
       RUSSIA_SEARCH_RESULTS_WANTED: ${{ secrets.RUSSIA_SEARCH_RESULTS_WANTED || '50' }}
       RUSSIA_SEARCH_QUERY: ${{ secrets.RUSSIA_SEARCH_QUERY }}
       RUSSIA_SEARCH_PROVIDERS: ${{ secrets.RUSSIA_SEARCH_PROVIDERS || 'bing_rss,duckduckgo,bing,duckduckgo_lite,mojeek' }}
-      ENABLE_RUSSIA_TELEGRAM: ${{ secrets.ENABLE_RUSSIA_TELEGRAM || 'false' }}
-      RUSSIA_TELEGRAM_CHANNELS: ${{ secrets.RUSSIA_TELEGRAM_CHANNELS }}
+      ENABLE_RUSSIA_TELEGRAM: ${{ secrets.ENABLE_RUSSIA_TELEGRAM || 'true' }}
+      RUSSIA_TELEGRAM_CHANNELS: ${{ secrets.RUSSIA_TELEGRAM_CHANNELS || 'itvacancy,it_vacancy,vakansii_it,superjob_it,hh_vacancies,frontend_vacancies,itjobs_ru,vakansii,remote_it,remote_work_ru,webdev_jobs,frontend_it,rabota_russia,it_vacancy_ru' }}
       RUSSIA_TELEGRAM_MAX_POSTS_PER_CHANNEL: ${{ secrets.RUSSIA_TELEGRAM_MAX_POSTS_PER_CHANNEL || '20' }}
       LINKEDIN_POST_APIFY_ACTOR: ${{ secrets.LINKEDIN_POST_APIFY_ACTOR || 'harvestapi/linkedin-post-search' }}
       LINKEDIN_POST_APIFY_SEARCH_QUERIES: ${{ secrets.LINKEDIN_POST_APIFY_SEARCH_QUERIES }}
