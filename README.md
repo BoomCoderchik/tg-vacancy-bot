@@ -193,11 +193,14 @@ and deduplication.
 ## Public Telegram Vacancy Channels
 
 To read vacancies from public Telegram channels (typical for the Russian
-market) without any token, account, or API, enable the channel source:
+market) without any token, account, or API, enable the channel source. The
+scheduled GitHub Actions parser already enables this source by default with a
+curated list of live public channels, so the simplest way to replenish supply is
+to keep that workflow enabled:
 
 ```dotenv
 ENABLE_RUSSIA_TELEGRAM=true
-RUSSIA_TELEGRAM_CHANNELS=hh_automata,remotejob_russia
+RUSSIA_TELEGRAM_CHANNELS=itvacancy,it_vacancy,vakansii_it,superjob_it,hh_vacancies,frontend_vacancies,itjobs_ru,vakansii,remote_it,remote_work_ru,webdev_jobs,frontend_it,rabota_russia,it_vacancy_ru
 RUSSIA_TELEGRAM_MAX_POSTS_PER_CHANNEL=20
 ```
 
