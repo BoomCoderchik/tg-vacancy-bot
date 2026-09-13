@@ -27,6 +27,8 @@ def test_build_adapters_registers_no_non_linkedin_sources_by_default() -> None:
         ENABLE_LINKEDIN_POST_SCRAPER=False,
         ENABLE_LINKEDIN_JOBS_GUEST=False,
         ENABLE_LINKEDIN_POST_HEADLESS=False,
+        ENABLE_RUSSIA_SEARCH=False,
+        ENABLE_RUSSIA_TELEGRAM=False,
     )
 
     assert build_adapters(settings) == []
@@ -40,6 +42,8 @@ def test_build_adapters_keeps_opt_in_linkedin_scraper() -> None:
         ENABLE_LINKEDIN_POST_SCRAPER=True,
         ENABLE_LINKEDIN_JOBS_GUEST=False,
         ENABLE_LINKEDIN_POST_HEADLESS=False,
+        ENABLE_RUSSIA_SEARCH=False,
+        ENABLE_RUSSIA_TELEGRAM=False,
     )
 
     assert [adapter.name for adapter in build_adapters(settings)] == ["LinkedIn Hiring Post Scraper"]
@@ -55,6 +59,8 @@ def test_build_adapters_registers_guest_jobs_independent_of_headless() -> None:
         LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=False,
         LINKEDIN_HEADLESS_PERMISSION_REFERENCE="",
         ENABLE_LINKEDIN_JOBS_GUEST=True,
+        ENABLE_RUSSIA_SEARCH=False,
+        ENABLE_RUSSIA_TELEGRAM=False,
     )
 
     assert [adapter.name for adapter in build_adapters(settings)] == ["LinkedIn Jobs (Guest)"]
@@ -70,6 +76,8 @@ def test_build_adapters_keeps_headless_disabled_without_authorized_access() -> N
         ENABLE_LINKEDIN_POST_HEADLESS=True,
         LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=False,
         SERPAPI_API_KEY="search-key",
+        ENABLE_RUSSIA_SEARCH=False,
+        ENABLE_RUSSIA_TELEGRAM=False,
     )
 
     assert build_adapters(settings) == []
@@ -86,6 +94,8 @@ def test_build_adapters_keeps_headless_disabled_without_permission_reference() -
         LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=True,
         LINKEDIN_HEADLESS_PERMISSION_REFERENCE="",
         SERPAPI_API_KEY="search-key",
+        ENABLE_RUSSIA_SEARCH=False,
+        ENABLE_RUSSIA_TELEGRAM=False,
     )
 
     assert build_adapters(settings) == []
@@ -102,6 +112,8 @@ def test_build_adapters_registers_only_headless_linkedin_pipeline_when_authorize
         LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=True,
         LINKEDIN_HEADLESS_PERMISSION_REFERENCE="linkedin-approval-123",
         SERPAPI_API_KEY="search-key",
+        ENABLE_RUSSIA_SEARCH=False,
+        ENABLE_RUSSIA_TELEGRAM=False,
     )
 
     assert [adapter.name for adapter in build_adapters(settings)] == [
