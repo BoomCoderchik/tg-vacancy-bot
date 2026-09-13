@@ -37,6 +37,7 @@ def test_preview_message_card_async_localizes_description() -> None:
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
         LOCALIZE_DESCRIPTIONS="true",
+        LOCALIZATION_PROVIDER="openai",
         OPENAI_API_KEY="test-key",
     )
 

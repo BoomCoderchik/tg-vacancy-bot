@@ -64,6 +64,20 @@ _LANGUAGES: tuple[str, str] = ("en", "ru")
 _MAX_QUOTED_PER_INTENT = 6
 _APIFY_MAX_LENGTH = 85
 
+# Domain priority hints for the future open web (non-LinkedIn) adapter. Not a
+# strict filter: only an ordering preference when reading search results.
+RU_JOB_DOMAIN_HINTS: tuple[str, ...] = (
+    "hh.ru",
+    "career.habr.com",
+    "career.habr.com/company",
+    "superjob.ru",
+    "getmatch.ru",
+    "vc.ru",
+    "teletype.in",
+    "remoters",
+    "remotejob",
+)
+
 
 def _expand_specialties(specialties: Iterable[str]) -> list[str]:
     """Expand the combined ``frontend_fullstack`` into its two families."""
@@ -85,6 +99,18 @@ def _active_grades(grades: str | Iterable[str] | None) -> list[str]:
     return normalize_grades(grades)
 
 
+def _quoted_combos(specialty: str, language: str, active_grades: list[str]) -> str:
+    """Build the ``"grade role" OR "grade role"`` snippet for one language."""
+
+    cores = ROLE_CORES.get(specialty, {}).get(language, [])
+    combos: list[str] = []
+    for grade in active_grades:
+        for grade_word in GRADE_WORDS.get(grade, {}).get(language, []):
+            for core in cores:
+                combos.append(f"{grade_word} {core}")
+    return " OR ".join(f'"{combo}"' for combo in combos[:_MAX_QUOTED_PER_INTENT])
+
+
 def build_search_intents(
     specialties: str | Iterable[str] | None,
     grades: str | Iterable[str] | None,
@@ -95,19 +121,39 @@ def build_search_intents(
     active_grades = _active_grades(grades)
     intents: list[SearchIntent] = []
     for specialty in active_specialties:
-        cores = ROLE_CORES.get(specialty)
-        if not cores:
+        if not ROLE_CORES.get(specialty):
             continue
         for language in _LANGUAGES:
-            combos: list[str] = []
-            for grade in active_grades:
-                for grade_word in GRADE_WORDS.get(grade, {}).get(language, []):
-                    for core in cores.get(language, []):
-                        combos.append(f"{grade_word} {core}")
-            quoted = " OR ".join(f'"{combo}"' for combo in combos[:_MAX_QUOTED_PER_INTENT])
+            quoted = _quoted_combos(specialty, language, active_grades)
             if not quoted:
                 continue
             query = f"{LINKEDIN_POST_SITE_SCOPE} {HIRING_INTENT[language]} ({quoted})"
+            intents.append(SearchIntent(family=specialty, language=language, query=query))
+    return tuple(intents)
+
+
+def build_russia_search_intents(
+    specialties: str | Iterable[str] | None,
+    grades: str | Iterable[str] | None,
+) -> tuple[SearchIntent, ...]:
+    """Build open-web (non-LinkedIn) search intents for Russian job sources.
+
+    Same (specialty x language) shape as ``build_search_intents`` but without
+    the ``site:linkedin.com`` scope: the queries target general web search
+    results that may point to hh.ru, SuperJob, Habr Career, and similar sites.
+    """
+
+    active_specialties = _active_specialties(specialties)
+    active_grades = _active_grades(grades)
+    intents: list[SearchIntent] = []
+    for specialty in active_specialties:
+        if not ROLE_CORES.get(specialty):
+            continue
+        for language in _LANGUAGES:
+            quoted = _quoted_combos(specialty, language, active_grades)
+            if not quoted:
+                continue
+            query = f"{HIRING_INTENT[language]} ({quoted})"
             intents.append(SearchIntent(family=specialty, language=language, query=query))
     return tuple(intents)
 
@@ -201,6 +247,10 @@ def apply_filter_queries(
         )
     if not (settings.linkedin_post_headless_query or "").strip():
         updates["linkedin_post_headless_query"] = site_query
+    if not settings.russia_search_query.strip():
+        updates["russia_search_query"] = build_site_query(
+            build_russia_search_intents(active_specialties, active_grades)
+        )
     if not updates:
         return settings
     return settings.model_copy(update=updates)

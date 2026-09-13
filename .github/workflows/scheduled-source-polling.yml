@@ -44,6 +44,15 @@ jobs:
       ENABLE_LINKEDIN_JOBS_GUEST: ${{ secrets.ENABLE_LINKEDIN_JOBS_GUEST || 'true' }}
       LINKEDIN_JOBS_GUEST_KEYWORDS: ${{ secrets.LINKEDIN_JOBS_GUEST_KEYWORDS }}
       LINKEDIN_JOBS_GUEST_RESULTS_WANTED: ${{ secrets.LINKEDIN_JOBS_GUEST_RESULTS_WANTED || '30' }}
+      # Russia-wide sources are opt-in; default off so the scheduled parser
+      # keeps the linkedin-only behavior until the owner enables them.
+      ENABLE_RUSSIA_SEARCH: ${{ secrets.ENABLE_RUSSIA_SEARCH || 'false' }}
+      RUSSIA_SEARCH_RESULTS_WANTED: ${{ secrets.RUSSIA_SEARCH_RESULTS_WANTED || '50' }}
+      RUSSIA_SEARCH_QUERY: ${{ secrets.RUSSIA_SEARCH_QUERY }}
+      RUSSIA_SEARCH_PROVIDERS: ${{ secrets.RUSSIA_SEARCH_PROVIDERS || 'bing_rss,duckduckgo,bing,duckduckgo_lite,mojeek' }}
+      ENABLE_RUSSIA_TELEGRAM: ${{ secrets.ENABLE_RUSSIA_TELEGRAM || 'false' }}
+      RUSSIA_TELEGRAM_CHANNELS: ${{ secrets.RUSSIA_TELEGRAM_CHANNELS }}
+      RUSSIA_TELEGRAM_MAX_POSTS_PER_CHANNEL: ${{ secrets.RUSSIA_TELEGRAM_MAX_POSTS_PER_CHANNEL || '20' }}
       LINKEDIN_POST_APIFY_ACTOR: ${{ secrets.LINKEDIN_POST_APIFY_ACTOR || 'harvestapi/linkedin-post-search' }}
       LINKEDIN_POST_APIFY_SEARCH_QUERIES: ${{ secrets.LINKEDIN_POST_APIFY_SEARCH_QUERIES }}
       LINKEDIN_POST_APIFY_POSTED_LIMIT: ${{ secrets.LINKEDIN_POST_APIFY_POSTED_LIMIT || '24h' }}

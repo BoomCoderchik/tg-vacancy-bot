@@ -7,6 +7,8 @@ from .adapters.linkedin_post_apify import LinkedInPostApifyAdapter
 from .adapters.linkedin_jobs_guest import LinkedInJobsGuestAdapter
 from .adapters.linkedin_post_scraper import LinkedInPostScraperAdapter
 from .adapters.linkedin_post_search import LinkedInPostSearchAdapter
+from .adapters.russia_vacancy_search import RussiaVacancySearchAdapter
+from .adapters.telegram_vacancy_channel import TelegramVacancyChannelAdapter
 from .base import SourceAdapter
 
 
@@ -30,6 +32,11 @@ def build_adapters(settings: Settings) -> list[SourceAdapter]:
     # search-engine discovery paths above and register whenever enabled.
     if settings.enable_linkedin_jobs_guest:
         adapters.append(LinkedInJobsGuestAdapter(settings))
+    # Russia-wide sources follow the operator's filter once registered.
+    if settings.enable_russia_search:
+        adapters.append(RussiaVacancySearchAdapter(settings))
+    if settings.enable_russia_telegram:
+        adapters.append(TelegramVacancyChannelAdapter(settings))
     return adapters
 
 
@@ -70,5 +77,9 @@ def source_configuration_warnings(settings: Settings) -> list[str]:
         warnings.append(
             "LinkedIn Headless access is marked authorized but LINKEDIN_HEADLESS_PERMISSION_REFERENCE is empty; "
             "direct page reading remains disabled until the approval reference is recorded."
+        )
+    if settings.enable_russia_telegram and not settings.russia_telegram_channels:
+        warnings.append(
+            "Russia Telegram Vacancy Channels source is enabled but RUSSIA_TELEGRAM_CHANNELS is empty."
         )
     return warnings
