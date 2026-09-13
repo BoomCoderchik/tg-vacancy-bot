@@ -247,6 +247,10 @@ def apply_filter_queries(
         )
     if not (settings.linkedin_post_headless_query or "").strip():
         updates["linkedin_post_headless_query"] = site_query
+    if not settings.russia_search_query.strip():
+        updates["russia_search_query"] = build_site_query(
+            build_russia_search_intents(active_specialties, active_grades)
+        )
     if not updates:
         return settings
     return settings.model_copy(update=updates)

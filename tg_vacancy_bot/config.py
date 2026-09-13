@@ -199,6 +199,22 @@ class Settings(BaseSettings):
         ge=1,
         le=6,
     )
+    # Russia internet-wide vacancy sources: free web search across the whole
+    # internet prioritizing Russian job domains, and public Telegram channels.
+    enable_russia_search: bool = Field(default=False, alias="ENABLE_RUSSIA_SEARCH")
+    russia_search_results_wanted: int = Field(default=50, alias="RUSSIA_SEARCH_RESULTS_WANTED", gt=0)
+    russia_search_query: str = Field(default="", alias="RUSSIA_SEARCH_QUERY")
+    russia_search_providers_raw: str = Field(
+        default=DEFAULT_LINKEDIN_POST_SCRAPER_PROVIDERS,
+        alias="RUSSIA_SEARCH_PROVIDERS",
+    )
+    enable_russia_telegram: bool = Field(default=False, alias="ENABLE_RUSSIA_TELEGRAM")
+    russia_telegram_channels_raw: str = Field(default="", alias="RUSSIA_TELEGRAM_CHANNELS")
+    russia_telegram_max_posts_per_channel: int = Field(
+        default=20,
+        alias="RUSSIA_TELEGRAM_MAX_POSTS_PER_CHANNEL",
+        gt=0,
+    )
     localization_max_per_poll: int = Field(default=12, alias="LOCALIZATION_MAX_PER_POLL")
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4.1-mini", alias="OPENAI_MODEL")
@@ -304,6 +320,38 @@ class Settings(BaseSettings):
             if query.strip()
         )
         return configured or DEFAULT_LINKEDIN_POST_APIFY_SEARCH_QUERIES
+
+    @property
+    def russia_search_providers(self) -> tuple[str, ...]:
+        aliases = {
+            "bing-rss": "bing_rss",
+            "bingrss": "bing_rss",
+            "bing_rss": "bing_rss",
+            "ddg": "duckduckgo",
+            "duck": "duckduckgo",
+            "duckduckgo": "duckduckgo",
+            "bing": "bing",
+            "ddg-lite": "duckduckgo_lite",
+            "ddg_lite": "duckduckgo_lite",
+            "duckduckgo-lite": "duckduckgo_lite",
+            "duckduckgo_lite": "duckduckgo_lite",
+            "mojeek": "mojeek",
+        }
+        providers = []
+        for raw_provider in self.russia_search_providers_raw.split(","):
+            provider = aliases.get(raw_provider.strip().lower())
+            if provider and provider not in providers:
+                providers.append(provider)
+        return tuple(providers or tuple(DEFAULT_LINKEDIN_POST_SCRAPER_PROVIDERS.split(",")))
+
+    @property
+    def russia_telegram_channels(self) -> tuple[str, ...]:
+        configured = tuple(
+            channel.strip().lstrip("@")
+            for channel in self.russia_telegram_channels_raw.split(",")
+            if channel.strip()
+        )
+        return configured or ()
 
     def require_runtime(self) -> None:
         missing = []

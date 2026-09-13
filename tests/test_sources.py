@@ -334,3 +334,46 @@ def test_filter_it_vacancies_rejects_policy_excluded_roles(title: str, descripti
 
     assert filter_it_vacancies(vacancies) == []
 
+
+def test_russia_sources_are_not_registered_by_default() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_LINKEDIN_POST_SEARCH=False,
+        ENABLE_LINKEDIN_POST_SCRAPER=False,
+        ENABLE_LINKEDIN_JOBS_GUEST=False,
+        ENABLE_LINKEDIN_POST_HEADLESS=False,
+        ENABLE_RUSSIA_SEARCH=False,
+        ENABLE_RUSSIA_TELEGRAM=False,
+    )
+
+    assert build_adapters(settings) == []
+
+
+def test_build_adapters_registers_russia_search_and_telegram_when_enabled() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_LINKEDIN_POST_SEARCH=False,
+        ENABLE_LINKEDIN_POST_SCRAPER=False,
+        ENABLE_LINKEDIN_JOBS_GUEST=False,
+        ENABLE_LINKEDIN_POST_HEADLESS=False,
+        ENABLE_RUSSIA_SEARCH=True,
+        ENABLE_RUSSIA_TELEGRAM=True,
+        RUSSIA_TELEGRAM_CHANNELS="@hh_automata,remotejob_it",
+    )
+
+    names = [adapter.name for adapter in build_adapters(settings)]
+    assert names == ["Russia Internet Search", "Telegram Vacancy Channels"]
+
+
+def test_russia_telegram_source_warns_without_channels() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_RUSSIA_SEARCH=True,
+        ENABLE_RUSSIA_TELEGRAM=True,
+    )
+
+    assert "RUSSIA_TELEGRAM_CHANNELS is empty" in " ".join(source_configuration_warnings(settings))
+

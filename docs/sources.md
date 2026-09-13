@@ -2,7 +2,10 @@
 
 ## Active Sources
 
-Automatic polling is limited to LinkedIn hiring posts.
+Automatic polling covers LinkedIn hiring posts and Russia-wide open-web
+vacancies that follow the operator's `/filters` selection.
+
+### LinkedIn sources
 
 - `LinkedInPostSearchAdapter`
   - Opt-in with `ENABLE_LINKEDIN_POST_SEARCH=true`.
@@ -36,14 +39,27 @@ Automatic polling is limited to LinkedIn hiring posts.
   - Searches each configured keyword (`LINKEDIN_JOBS_GUEST_KEYWORDS`) within the freshness window, keeps only listings whose title carries junior-level and frontend/fullstack evidence, then reads the public job page for the real posting text.
   - Works from any IP that can reach LinkedIn directly, including datacenter runners where search engines block scraping.
 
+### Russia-wide sources
+
+- `RussiaVacancySearchAdapter`
+  - Opt-in with `ENABLE_RUSSIA_SEARCH=true`.
+  - Searches the whole open web through the same free public search providers as the LinkedIn scraper (Bing RSS, DuckDuckGo HTML, Bing HTML, DuckDuckGo Lite, Mojeek; optional SerpApi is not used here). No `site:` restriction: Russian job domains (hh.ru, career.habr.com, superjob.ru, getmatch.ru, vc.ru, and others from `RU_JOB_DOMAIN_HINTS`) are only a result-ordering preference, never a domain filter.
+  - Queries are built from the active `/filters` selection (specialties × grades, Russian and English) when `RUSSIA_SEARCH_QUERY` is empty; a manual `||`-separated query always wins.
+  - Keeps only real `http(s)` pages, skips search-engine and LinkedIn domains, drops results without a title or snippet, maps dates through absolute and Russian/English relative date parsing, and passes undated results to the base layer.
+  - Skips anti-bot challenge pages instead of bypassing them; one failing provider never blocks the remaining providers.
+
+- `TelegramVacancyChannelAdapter`
+  - Opt-in with `ENABLE_RUSSIA_TELEGRAM=true` and a comma-separated `RUSSIA_TELEGRAM_CHANNELS` list of public channel usernames (no `@` needed).
+  - Reads only public channels through their public `https://t.me/s/<username>` preview page. No Telegram API token, account login, CAPTCHA handling, or protection bypass is involved; private or blocked channels are skipped, not bypassed.
+  - Maps each public post into a `Vacancy` with its post link, text, and best-effort publication date (from the post's ISO `time` attribute or a text fallback), capped per channel by `RUSSIA_TELEGRAM_MAX_POSTS_PER_CHANNEL`.
+  - Undated posts pass to the base layer; dated posts are filtered by the polling freshness window.
+
 ## Source Policy
 
-Every automatic source must produce real LinkedIn post URLs and real vacancy text. The bot does not log in to LinkedIn, store account cookies, create fake identities, perform CAPTCHA bypasses, publish placeholder vacancies, or invent fallback records. Every published headless vacancy is backed by a real public source: the post page itself or the public search result that indexed it. The Apify adapter is an explicitly enabled external hosted source; it sends only configured search input and reads the Actor's structured output. The selected Actor is independent from LinkedIn, so review its current terms, pricing, and behavior before enabling it.
-
-Every automatic LinkedIn vacancy needs a reliable publication date and must pass `LINKEDIN_POST_MAX_AGE_HOURS`, capped at 240 hours. All source vacancies pass through the common Junior Frontend/Fullstack vacancy filter, freshness filter, localization boundary, publication limit, and SQLite deduplication before Telegram publication.
+Every automatic source must produce real vacancy pages, post URLs, and real vacancy text. The bot does not log in to services, store account cookies, create fake identities, perform CAPTCHA bypasses, publish placeholder vacancies, or invent fallback records. LinkedIn hiring posts additionally require a reliable publication date and pass `LINKEDIN_POST_MAX_AGE_HOURS`, capped at 240 hours. All source vacancies pass through the common vacancy filter (the active `/filters` specialties and grades), freshness filter, localization boundary, publication limit, and SQLite deduplication before Telegram publication. The Russia-wide sources deliberately follow the base-layer freshness behavior: dated results older than `SOURCE_MAX_AGE_HOURS` are dropped, while undated results rely on source ordering, the per-poll publication limit, and SQLite deduplication.
 
 LinkedIn links can also enter through manual Telegram messages or forwards. Those messages use the normal forwarded-message parser and intake policy.
 
 ## Adding Sources
 
-New automatic sources are out of scope unless the owner explicitly changes the source policy. If that happens, add a real `SourceAdapter`, normalize into `Vacancy`, preserve deduplication and freshness handling, document required environment variables, and add focused tests.
+New automatic sources follow the project source-adapter contract: add a real `SourceAdapter`, normalize into `Vacancy`, preserve deduplication and freshness handling, document required environment variables, and add focused tests. The owner authorizes the linkedin, Russia internet-search, and public Telegram-channel source families; other automatic sources still need an explicit source-policy change.

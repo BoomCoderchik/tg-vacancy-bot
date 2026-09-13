@@ -14,6 +14,7 @@ The profile and queued-application foundations are documented in [`docs/applicat
 - Publishes only posts that really seek Junior Frontend or Fullstack developers: each post needs a hiring signal, explicit frontend/fullstack role evidence, and a junior or entry-level marker.
 - Stores message fingerprints in SQLite to avoid duplicates.
 - Includes opt-in LinkedIn hiring-post discovery through keyless public search-result scraping and permission-gated headless public-post parsing. A keyed SerpApi search remains available but is never required.
+- Includes opt-in Russia-wide vacancy discovery: a free open-web search across the whole internet prioritizing Russian job domains and public Telegram vacancy channels. Both sources follow the active `/filters` specialties and grades from the operator profile.
 - Polls configured public sources in the background while the bot is running.
 
 ## Profile storage foundation
@@ -156,6 +157,55 @@ The adapter searches LinkedIn's logged-out job-search endpoint for each `||`-sep
 This path works from any IP that can reach LinkedIn directly, including GitHub Actions runners, which makes it the most reliable automatic source. It reads public pages only: no login, cookies, proxies, or CAPTCHA handling are involved.
 
 Direct page reading is fail-closed: both `LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=true` and a non-empty `LINKEDIN_HEADLESS_PERMISSION_REFERENCE` are required. Set them only after receiving documented LinkedIn crawling permission or an approved access path. The adapter does not use a LinkedIn account, cookies, proxies, fake identities, scrolling automation, or any CAPTCHA/login/2FA bypass. It publishes only posts whose URL carries a reliable publication date no more than ten days old. When direct reading is refused by a login wall even after the feed-update retry, the vacancy falls back to the real public search result — title, snippet, and activity-ID date — that discovered the link instead of being dropped; protection pages and off-domain redirects are never bypassed. On GitHub Actions, Chromium is installed only when the same permission gate is satisfied.
+
+## Russia Internet-Wide Vacancy Search
+
+To find freshly published IT vacancies across the whole open web (not only
+LinkedIn), with Russian job boards and career pages as the priority, enable the
+free search source:
+
+```dotenv
+ENABLE_RUSSIA_SEARCH=true
+RUSSIA_SEARCH_RESULTS_WANTED=50
+RUSSIA_SEARCH_QUERY=
+RUSSIA_SEARCH_PROVIDERS=bing_rss,duckduckgo,bing,duckduckgo_lite,mojeek
+```
+
+This adapter uses the same keyless public search providers as the LinkedIn
+scraper (Bing RSS first, then DuckDuckGo HTML, Bing HTML, DuckDuckGo Lite, and
+Mojeek) without any `site:` restriction. Russian job domains
+(`hh.ru`, `career.habr.com`, `superjob.ru`, `getmatch.ru`, `vc.ru`, and others)
+are ordered first because they are already real vacancy surfaces; other real
+job pages across the internet still pass. Search-engine domains, LinkedIn, and
+results without a title or snippet are dropped.
+
+When `RUSSIA_SEARCH_QUERY` is empty, the queries are built automatically from
+your current `/filters` selection (each selected specialty × each selected
+grade, in Russian and English). A manually configured `||`-separated
+`RUSSIA_SEARCH_QUERY` always wins over auto-generation.
+
+Published results flow through the same common pipeline as every other source:
+the active `/filters` vacancy policy, freshness (dated results older than
+`SOURCE_MAX_AGE_HOURS` are dropped; undated results rely on the search order,
+the per-poll publish limit, and SQLite deduplication), localization boundary,
+and deduplication.
+
+## Public Telegram Vacancy Channels
+
+To read vacancies from public Telegram channels (typical for the Russian
+market) without any token, account, or API, enable the channel source:
+
+```dotenv
+ENABLE_RUSSIA_TELEGRAM=true
+RUSSIA_TELEGRAM_CHANNELS=hh_automata,remotejob_russia
+RUSSIA_TELEGRAM_MAX_POSTS_PER_CHANNEL=20
+```
+
+The adapter reads each public channel's public preview page
+(`https://t.me/s/<username>`) and maps the recent posts into vacancy cards with
+their post link and best-effort publication date. Private or blocked channels
+are skipped, never bypassed. Configure one account-free public channel list per
+bot; channel discovery through search is not part of this source.
 
 ## Required Telegram Setup
 
@@ -389,12 +439,14 @@ There are currently no source-specific automatic application form adapters. The 
 
 ## Removed Non-LinkedIn Sources
 
-Automatic polling no longer registers non-LinkedIn job-board or social sources.
-
-Only the LinkedIn post adapters described above can register as automatic public sources.
+Automatic polling no longer registers other non-LinkedIn job-board or social
+sources beyond the documented Russia-wide family. Only the LinkedIn post
+adapters and the two Russia-wide sources described above (`Russia Internet
+Search` and `Telegram Vacancy Channels`) can register as automatic public
+sources.
 
 ## LinkedIn Boundary
 
-This project permits four documented, opt-in LinkedIn paths: an optional keyed Google Search-backed public hiring-post search through SerpApi, free public search-result scraping, headless parsing of publicly available post pages found through public search engines, and reading LinkedIn's own public guest job listings. These are the only automatic public-source adapters. The bot does not log in with a LinkedIn account, use proxies or anti-bot bypasses, invent vacancies, or publish fabricated records. Every published item is backed by a real public source — either the post or job page itself, the public search result that indexed it, or LinkedIn's logged-out listing pages.
+This project permits four documented, opt-in LinkedIn paths: an optional keyed Google Search-backed public hiring-post search through SerpApi, free public search-result scraping, headless parsing of publicly available post pages found through public search engines, and reading LinkedIn's own public guest job listings. These are the only automatic LinkedIn adapters. The bot does not log in with a LinkedIn account, use proxies or anti-bot bypasses, invent vacancies, or publish fabricated records. Every published item is backed by a real public source — either the post or job page itself, the public search result that indexed it, or LinkedIn's logged-out listing pages. The separate Russia-wide sources add the whole open web (prioritizing Russian job domains) and public Telegram channels; they are independent of the LinkedIn boundary.
 
 LinkedIn links can also enter when an operator manually sends or forwards vacancy text containing a LinkedIn URL to the Telegram bot. In that case the normal forwarded-message parser can keep the URL and mark the vacancy source as `LinkedIn`.
