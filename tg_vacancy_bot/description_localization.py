@@ -27,14 +27,14 @@ LETTER_RE = re.compile(r"[A-Za-z\u0400-\u04FF]")
 MIN_RUSSIAN_CYRILLIC_RATIO = 0.35
 MAX_ORIGINAL_SIMILARITY = 0.82
 
-LOCALIZATION_INSTRUCTIONS = """
-Ты редактор Telegram-канала с IT-вакансиями.
-Переведи на русский и сожми только исходное описание вакансии из следующего сообщения.
-Не добавляй зарплату, бонусы, соцпакет, стек, график, компанию, локацию, требования или преимущества, если они не указаны прямо в исходном описании.
-Не используй сведения из заголовка, полей карточки, ссылки или своих предположений.
-Если в описании мало фактов, напиши короткий перевод только этих фактов.
-Пиши одним коротким абзацем до 2 предложений, без маркированных списков, вступлений и комментариев.
-""".strip()
+# In-memory cache for localized descriptions to avoid redundant API calls
+# Key: original description, Value: (localized_text, model_used)
+_localization_cache: dict[str, tuple[str, str]] = {}
+CACHE_MAX_ENTRIES = 128
+
+LOCALIZATION_INSTRUCTIONS = """Переведи описание вакансии на русский и сожми до 2 предложений.
+Не добавляй зарплату, бонусы, стек, график, компанию, локацию, требования или преимущества, если они не даны прямо в тексте.
+Пиши один короткий абзац без списков и вступлений, только факты из описания.""".strip()
 
 
 class DescriptionLocalizer(Protocol):
@@ -65,6 +65,14 @@ class OpenAIDescriptionLocalizer:
         self.client = client
 
     async def localize(self, description: str) -> str:
+        # Check cache first. A cached result is valid only when the model that
+        # produced it is part of the requested chain, so a different model or
+        # fallback set still triggers a fresh API call.
+        if description in _localization_cache:
+            cached_text, cached_model = _localization_cache[description]
+            if cached_model in (self.model, *self.fallback_models):
+                return cached_text
+
         errors: list[str] = []
         for model in unique_models((self.model, *self.fallback_models)):
             request_kwargs: dict[str, object] = {
@@ -92,6 +100,11 @@ class OpenAIDescriptionLocalizer:
             text = normalize_localized_description(content)
             rejection_reason = localized_description_rejection_reason(description, text)
             if rejection_reason is None:
+                # Cache the result keyed by the original description so that
+                # identical descriptions across polls avoid redundant calls.
+                if len(_localization_cache) >= CACHE_MAX_ENTRIES:
+                    _localization_cache.popitem(last=False)
+                _localization_cache[description] = (text, model)
                 return text
             errors.append(f"{model} {rejection_reason}")
 
