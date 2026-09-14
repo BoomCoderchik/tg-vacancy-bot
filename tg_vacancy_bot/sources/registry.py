@@ -7,6 +7,7 @@ from .adapters.linkedin_post_apify import LinkedInPostApifyAdapter
 from .adapters.linkedin_jobs_guest import LinkedInJobsGuestAdapter
 from .adapters.linkedin_post_scraper import LinkedInPostScraperAdapter
 from .adapters.linkedin_post_search import LinkedInPostSearchAdapter
+from .adapters.hh_vacancy_rss import HeadHunterRssAdapter
 from .adapters.russia_vacancy_search import RussiaVacancySearchAdapter
 from .adapters.telegram_vacancy_channel import TelegramVacancyChannelAdapter
 from .base import SourceAdapter
@@ -37,6 +38,9 @@ def build_adapters(settings: Settings) -> list[SourceAdapter]:
         adapters.append(RussiaVacancySearchAdapter(settings))
     if settings.enable_russia_telegram:
         adapters.append(TelegramVacancyChannelAdapter(settings))
+    # HeadHunter RSS reads the official public feed and needs no key.
+    if settings.enable_hhru_rss:
+        adapters.append(HeadHunterRssAdapter(settings))
     return adapters
 
 

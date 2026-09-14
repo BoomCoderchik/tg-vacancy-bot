@@ -55,6 +55,12 @@ jobs:
       ENABLE_RUSSIA_TELEGRAM: ${{ secrets.ENABLE_RUSSIA_TELEGRAM || 'true' }}
       RUSSIA_TELEGRAM_CHANNELS: ${{ secrets.RUSSIA_TELEGRAM_CHANNELS || 'itvacancy,it_vacancy,vakansii_it,superjob_it,itjobs_ru,vakansii,remote_it,webdev_jobs,rabota_russia,it_vacancy_ru,frontend_vacancy' }}
       RUSSIA_TELEGRAM_MAX_POSTS_PER_CHANNEL: ${{ secrets.RUSSIA_TELEGRAM_MAX_POSTS_PER_CHANNEL || '20' }}
+      # HeadHunter's official RSS search feed needs no API key, so it is on by
+      # default for the scheduled parser; the query auto-fills from the bot's
+      # specialty and grade filters unless HHRU_RSS_QUERY is set explicitly.
+      ENABLE_HHRU_RSS: ${{ secrets.ENABLE_HHRU_RSS || 'true' }}
+      HHRU_RSS_QUERY: ${{ secrets.HHRU_RSS_QUERY }}
+      HHRU_RSS_RESULTS_WANTED: ${{ secrets.HHRU_RSS_RESULTS_WANTED || '40' }}
       LINKEDIN_POST_APIFY_ACTOR: ${{ secrets.LINKEDIN_POST_APIFY_ACTOR || 'harvestapi/linkedin-post-search' }}
       LINKEDIN_POST_APIFY_SEARCH_QUERIES: ${{ secrets.LINKEDIN_POST_APIFY_SEARCH_QUERIES }}
       LINKEDIN_POST_APIFY_POSTED_LIMIT: ${{ secrets.LINKEDIN_POST_APIFY_POSTED_LIMIT || '24h' }}

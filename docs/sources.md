@@ -54,6 +54,13 @@ vacancies that follow the operator's `/filters` selection.
   - Maps each public post into a `Vacancy` with its post link, text, and best-effort publication date (from the post's ISO `time` attribute or a text fallback), capped per channel by `RUSSIA_TELEGRAM_MAX_POSTS_PER_CHANNEL`.
   - Undated posts pass to the base layer; dated posts are filtered by the polling freshness window.
 
+- `HeadHunterRssAdapter`
+  - Opt-in with `ENABLE_HHRU_RSS=true`.
+  - Reads HeadHunter's official public RSS search feed (`https://hh.ru/search/vacancy/rss`) with plain web-browser headers; no API key, account, or protection bypass is involved.
+  - Queries are built from the active `/filters` selection (specialties × grades, Russian and English, without job-board hiring-intent words) when `HHRU_RSS_QUERY` is empty; a manual `||`-separated query always wins.
+  - Maps each item's real publication date (`pubDate`, with the item's `Создана:` date as a fallback) and company, region, and salary from the item description.
+  - Results pass through the common polling freshness window; a failing query never blocks the remaining queries.
+
 ## Source Policy
 
 Every automatic source must produce real vacancy pages, post URLs, and real vacancy text. The bot does not log in to services, store account cookies, create fake identities, perform CAPTCHA bypasses, publish placeholder vacancies, or invent fallback records. LinkedIn hiring posts additionally require a reliable publication date and pass `LINKEDIN_POST_MAX_AGE_HOURS`, capped at 240 hours. All source vacancies pass through the common vacancy filter (the active `/filters` specialties and grades), freshness filter, localization boundary, publication limit, and SQLite deduplication before Telegram publication. The Russia-wide sources deliberately follow the base-layer freshness behavior: dated results older than `SOURCE_MAX_AGE_HOURS` are dropped, while undated results rely on source ordering, the per-poll publication limit, and SQLite deduplication.
