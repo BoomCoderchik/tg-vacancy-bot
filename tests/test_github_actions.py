@@ -21,7 +21,7 @@ def test_scheduled_polling_workflow_is_valid_yaml() -> None:
     # A glued YAML line would silently merge two env entries; make sure every
     # documented key survives parsing as its own entry.
     for key in (
-        "ENABLE_LINKEDIN_JOBS_GUEST",
+        "ENABLE_LINKEDIN_POST_GUEST",
         "LINKEDIN_POST_APIFY_ACTOR",
         "SERPAPI_API_KEY",
         "ENABLE_LINKEDIN_POST_HEADLESS",

@@ -155,7 +155,7 @@ def build_status_text(settings: Settings, vacancy_filter: VacancyFilter | None =
         f"LinkedInPosts={_linkedin_post_search_state(settings)}",
         f"LinkedInPostScraper={_linkedin_post_scraper_state(settings)}",
         f"LinkedInHeadless={_linkedin_headless_state(settings)}",
-        f"LinkedInJobsGuest={'on' if settings.enable_linkedin_jobs_guest else 'off'}",
+        f"LinkedInPostGuest={'on' if settings.enable_linkedin_post_guest else 'off'}",
     ]
     return "\n".join(
         [

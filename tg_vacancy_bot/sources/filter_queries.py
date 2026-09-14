@@ -218,28 +218,6 @@ def build_apify_queries(
     return queries[: max(limit, 0)]
 
 
-def build_guest_keywords(
-    specialties: str | Iterable[str] | None,
-    grades: str | Iterable[str] | None,
-    limit: int = 12,
-) -> list[str]:
-    """Build plain guest-job keywords (no boolean operators)."""
-
-    active_specialties = _active_specialties(specialties)
-    active_grades = _active_grades(grades)
-    keywords: list[str] = []
-    for language in _LANGUAGES:
-        for specialty in active_specialties:
-            cores = ROLE_CORES.get(specialty, {}).get(language, [])
-            for grade in active_grades:
-                for grade_word in GRADE_WORDS.get(grade, {}).get(language, []):
-                    for core in cores:
-                        candidate = f"{grade_word} {core}".lower()
-                        if candidate not in keywords:
-                            keywords.append(candidate)
-    return keywords[: max(limit, 0)]
-
-
 def apply_filter_queries(
     settings: Settings,
     specialties: str | Iterable[str] | None,
@@ -270,15 +248,10 @@ def apply_filter_queries(
         updates["linkedin_post_apify_search_queries_raw"] = "||".join(
             build_apify_queries(active_specialties, active_grades)
         )
-    if (
-        settings.linkedin_jobs_guest_keywords_raw
-        == fields["linkedin_jobs_guest_keywords_raw"].default
-    ):
-        updates["linkedin_jobs_guest_keywords_raw"] = "||".join(
-            build_guest_keywords(active_specialties, active_grades)
-        )
     if not (settings.linkedin_post_headless_query or "").strip():
         updates["linkedin_post_headless_query"] = site_query
+    if not (settings.linkedin_post_guest_query or "").strip():
+        updates["linkedin_post_guest_query"] = site_query
     if not settings.russia_search_query.strip():
         updates["russia_search_query"] = build_site_query(
             build_russia_search_intents(active_specialties, active_grades)
