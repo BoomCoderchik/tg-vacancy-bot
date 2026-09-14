@@ -210,6 +210,29 @@ their post link and best-effort publication date. Private or blocked channels
 are skipped, never bypassed. Configure one account-free public channel list per
 bot; channel discovery through search is not part of this source.
 
+## HeadHunter Official RSS
+
+To read vacancies from HeadHunter's official public RSS search feed (no API
+key, no account) inside the Russian market, enable the feed source. The
+scheduled GitHub Actions parser already enables this source by default, so the
+simplest way to replenish supply is to keep that workflow enabled:
+
+```dotenv
+ENABLE_HHRU_RSS=true
+HHRU_RSS_QUERY=
+HHRU_RSS_RESULTS_WANTED=40
+```
+
+When `HHRU_RSS_QUERY` is empty, the queries are built automatically from your
+current `/filters` selection (each selected specialty × each selected grade, in
+Russian and English). A manually configured `||`-separated `HHRU_RSS_QUERY`
+always wins over auto-generation. Each query is sent to HeadHunter's public
+`https://hh.ru/search/vacancy/rss?text=<query>` endpoint with ordinary web
+browser headers only. The adapter reads each item's real publication date,
+maps the company, region, and salary fields from the item description, and
+passes the rest through the common pipeline: vacancy policy, freshness filter,
+localization boundary, and SQLite deduplication.
+
 ## Required Telegram Setup
 
 1. Create a bot in [@BotFather](https://t.me/BotFather).

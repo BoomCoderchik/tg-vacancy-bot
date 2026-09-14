@@ -215,6 +215,11 @@ class Settings(BaseSettings):
         alias="RUSSIA_TELEGRAM_MAX_POSTS_PER_CHANNEL",
         gt=0,
     )
+    # HeadHunter's official public RSS feed needs no token, account, or API key
+    # and returns real Russian-market vacancies that match the operator filter.
+    enable_hhru_rss: bool = Field(default=False, alias="ENABLE_HHRU_RSS")
+    hhru_rss_query: str = Field(default="", alias="HHRU_RSS_QUERY")
+    hhru_rss_results_wanted: int = Field(default=40, alias="HHRU_RSS_RESULTS_WANTED", gt=0)
     localization_max_per_poll: int = Field(default=12, alias="LOCALIZATION_MAX_PER_POLL")
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4.1-mini", alias="OPENAI_MODEL")

@@ -158,6 +158,38 @@ def build_russia_search_intents(
     return tuple(intents)
 
 
+def build_hh_ru_rss_queries(
+    specialties: str | Iterable[str] | None,
+    grades: str | Iterable[str] | None,
+) -> tuple[str, ...]:
+    """Build full-text search strings for the official HeadHunter RSS feed.
+
+    HeadHunter indexes job titles and descriptions, not hiring-intent posts, so
+    these queries carry the role and grade words only (no ``ищем``/``hiring``
+    markers). Quoted phrases would force a literal exact phrase, so the combos
+    stay unquoted: HH's full-text search matches word presence. Each returned
+    query is fed to ``hh.ru/search/vacancy/rss?text=<query>``.
+    """
+
+    active_specialties = _active_specialties(specialties)
+    active_grades = _active_grades(grades)
+    queries: list[str] = []
+    for specialty in active_specialties:
+        if not ROLE_CORES.get(specialty):
+            continue
+        for language in _LANGUAGES:
+            words: list[str] = []
+            cores = ROLE_CORES.get(specialty, {}).get(language, [])
+            for grade in active_grades:
+                for grade_word in GRADE_WORDS.get(grade, {}).get(language, []):
+                    for core in cores:
+                        words.append(f"{grade_word} {core}")
+            if not words:
+                continue
+            queries.append(" OR ".join(words))
+    return tuple(queries)
+
+
 def build_site_query(intents: Iterable[SearchIntent]) -> str:
     """Join intent queries with the ``||`` fallback separator."""
 
@@ -250,6 +282,10 @@ def apply_filter_queries(
     if not settings.russia_search_query.strip():
         updates["russia_search_query"] = build_site_query(
             build_russia_search_intents(active_specialties, active_grades)
+        )
+    if not settings.hhru_rss_query.strip():
+        updates["hhru_rss_query"] = "||".join(
+            build_hh_ru_rss_queries(active_specialties, active_grades)
         )
     if not updates:
         return settings
