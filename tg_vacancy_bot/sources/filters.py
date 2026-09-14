@@ -165,8 +165,6 @@ _LEAD_NEAR_ROLE_RE = re.compile(
     re.IGNORECASE,
 )
 
-NONJUNIOR_SENIORITY_FOR_ROLE_RE = _HIGHER_SENIORITY_RE
-
 
 def normalize_specialty(value: str | None) -> str:
     normalized = (value or "").strip().lower()

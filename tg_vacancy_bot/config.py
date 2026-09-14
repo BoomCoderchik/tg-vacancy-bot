@@ -74,8 +74,6 @@ class Settings(BaseSettings):
     source_poll_interval_seconds: int = Field(default=900, alias="SOURCE_POLL_INTERVAL_SECONDS")
     source_max_publish_per_poll: int = Field(default=20, alias="SOURCE_MAX_PUBLISH_PER_POLL")
     source_max_age_hours: int = Field(default=48, alias="SOURCE_MAX_AGE_HOURS")
-    vacancy_default_specialty: str = Field(default="frontend_fullstack", alias="VACANCY_DEFAULT_SPECIALTY")
-    vacancy_default_grade: str = Field(default="junior", alias="VACANCY_DEFAULT_GRADE")
     # Scheduled GitHub Actions runs cannot read the local SQLite filter, so the
     # active filter can also be supplied through the environment. When present,
     # these comma-separated values override the stored filter for CLI polling
@@ -208,7 +206,6 @@ class Settings(BaseSettings):
     enable_hhru_rss: bool = Field(default=False, alias="ENABLE_HHRU_RSS")
     hhru_rss_query: str = Field(default="", alias="HHRU_RSS_QUERY")
     hhru_rss_results_wanted: int = Field(default=40, alias="HHRU_RSS_RESULTS_WANTED", gt=0)
-    localization_max_per_poll: int = Field(default=12, alias="LOCALIZATION_MAX_PER_POLL")
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4.1-mini", alias="OPENAI_MODEL")
     openai_fallback_models_raw: str = Field(default="", alias="OPENAI_FALLBACK_MODELS")
