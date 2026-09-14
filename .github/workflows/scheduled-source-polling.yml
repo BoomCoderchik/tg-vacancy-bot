@@ -79,7 +79,6 @@ jobs:
       # Groq is the supported default localization provider: its free tier
       # covers the parser's load and OpenRouter's free pool is unreliable.
       LOCALIZATION_PROVIDER: ${{ secrets.LOCALIZATION_PROVIDER || 'groq' }}
-      LOCALIZATION_MAX_PER_POLL: ${{ secrets.LOCALIZATION_MAX_PER_POLL || '20' }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || 'gpt-4.1-mini' }}
       OPENAI_FALLBACK_MODELS: ${{ secrets.OPENAI_FALLBACK_MODELS }}

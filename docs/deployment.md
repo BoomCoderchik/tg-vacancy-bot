@@ -179,9 +179,8 @@ Set these only if the matching LinkedIn feature is enabled:
 
 Optional secrets can override defaults, including `SOURCE_MAX_PUBLISH_PER_POLL`,
 `SOURCE_MAX_AGE_HOURS`, `ENABLE_LINKEDIN_POST_SCRAPER`,
-`ENABLE_LINKEDIN_POST_APIFY`, and `ENABLE_LINKEDIN_POST_HEADLESS`,
-`LOCALIZATION_PROVIDER`, and
-`LOCALIZATION_MAX_PER_POLL`. Set `OPENAI_API_KEY` for the default provider or
+`ENABLE_LINKEDIN_POST_APIFY`, and `ENABLE_LINKEDIN_POST_HEADLESS`, and
+`LOCALIZATION_PROVIDER`. Set `OPENAI_API_KEY` for the default provider or
 `GROQ_API_KEY` when `LOCALIZATION_PROVIDER=groq` to enable actual translation.
 The workflow still publishes a real vacancy with its original description if the selected provider is unavailable. The scheduled workflow installs Chromium for LinkedIn page reading only when the headless flag, authorization flag, and permission reference are all configured.
 
