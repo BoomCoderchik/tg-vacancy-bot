@@ -46,11 +46,11 @@ jobs:
       LINKEDIN_POST_SCRAPER_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SCRAPER_RESULTS_WANTED || '100' }}
       ENABLE_LINKEDIN_POST_APIFY: ${{ secrets.ENABLE_LINKEDIN_POST_APIFY || 'false' }}
       APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
-      # Guest job listings are off by default: the scheduled parser targets
+      # Guest post reading is off by default: the scheduled parser targets
       # LinkedIn hiring posts, primarily via the Headless discovery pipeline.
-      ENABLE_LINKEDIN_JOBS_GUEST: ${{ secrets.ENABLE_LINKEDIN_JOBS_GUEST || 'false' }}
-      LINKEDIN_JOBS_GUEST_KEYWORDS: ${{ secrets.LINKEDIN_JOBS_GUEST_KEYWORDS }}
-      LINKEDIN_JOBS_GUEST_RESULTS_WANTED: ${{ secrets.LINKEDIN_JOBS_GUEST_RESULTS_WANTED || '30' }}
+      ENABLE_LINKEDIN_POST_GUEST: ${{ secrets.ENABLE_LINKEDIN_POST_GUEST || 'false' }}
+      LINKEDIN_POST_GUEST_QUERY: ${{ secrets.LINKEDIN_POST_GUEST_QUERY }}
+      LINKEDIN_POST_GUEST_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_GUEST_RESULTS_WANTED || '30' }}
       # Russia-wide sources are opt-in; default off so the scheduled bot keeps
       # the configured source behavior until the owner enables them.
       ENABLE_RUSSIA_SEARCH: ${{ secrets.ENABLE_RUSSIA_SEARCH || 'false' }}

@@ -39,11 +39,12 @@ jobs:
       LINKEDIN_POST_SCRAPER_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SCRAPER_RESULTS_WANTED || '100' }}
       ENABLE_LINKEDIN_POST_APIFY: ${{ secrets.ENABLE_LINKEDIN_POST_APIFY || 'false' }}
       APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
-      # Guest job listings read LinkedIn itself and need no key, so they are
-      # on by default for the scheduled parser.
-      ENABLE_LINKEDIN_JOBS_GUEST: ${{ secrets.ENABLE_LINKEDIN_JOBS_GUEST || 'true' }}
-      LINKEDIN_JOBS_GUEST_KEYWORDS: ${{ secrets.LINKEDIN_JOBS_GUEST_KEYWORDS }}
-      LINKEDIN_JOBS_GUEST_RESULTS_WANTED: ${{ secrets.LINKEDIN_JOBS_GUEST_RESULTS_WANTED || '30' }}
+      # Guest post reading needs no key or browser: discovery uses the free
+      # public search providers and each post is read through LinkedIn's own
+      # public pages, so it is independent of keyed providers.
+      ENABLE_LINKEDIN_POST_GUEST: ${{ secrets.ENABLE_LINKEDIN_POST_GUEST || 'true' }}
+      LINKEDIN_POST_GUEST_QUERY: ${{ secrets.LINKEDIN_POST_GUEST_QUERY }}
+      LINKEDIN_POST_GUEST_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_GUEST_RESULTS_WANTED || '30' }}
       # Russia-wide sources are opt-in; the search stays off by default because
       # the free public search providers are unreliable, but the public Telegram
       # vacancy channels are on by default so the scheduled parser replenishes

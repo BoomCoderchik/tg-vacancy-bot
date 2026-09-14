@@ -47,16 +47,6 @@ DEFAULT_LINKEDIN_POST_APIFY_SEARCH_QUERIES = (
     "Ищем джуниор фулстек разработчика",
     "Ищем стажера фронтенд разработчика",
 )
-# Keyword searches for LinkedIn's public guest job listings. These are plain
-# keyword strings (no boolean operators), one per `||`-separated entry.
-DEFAULT_LINKEDIN_JOBS_GUEST_KEYWORDS = (
-    "junior frontend developer",
-    "junior fullstack developer",
-    "intern frontend developer",
-    "trainee fullstack developer",
-    "джуниор фронтенд разработчик",
-    "стажер фронтенд разработчик",
-)
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -102,16 +92,14 @@ class Settings(BaseSettings):
 
     enable_linkedin_post_search: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SEARCH")
     enable_linkedin_post_scraper: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_SCRAPER")
-    # LinkedIn's public guest job listings: no account, no key, and the only
-    # discovery path that keeps working when search engines block the host IP.
-    enable_linkedin_jobs_guest: bool = Field(default=False, alias="ENABLE_LINKEDIN_JOBS_GUEST")
-    linkedin_jobs_guest_keywords_raw: str = Field(
-        default="||".join(DEFAULT_LINKEDIN_JOBS_GUEST_KEYWORDS),
-        alias="LINKEDIN_JOBS_GUEST_KEYWORDS",
-    )
-    linkedin_jobs_guest_results_wanted: int = Field(
+    # LinkedIn's public guest post pages: no account, no key, and direct HTTP
+    # reading of LinkedIn's own pages that stays independent of keyed search
+    # providers once post URLs are discovered.
+    enable_linkedin_post_guest: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_GUEST")
+    linkedin_post_guest_query: str = Field(default="", alias="LINKEDIN_POST_GUEST_QUERY")
+    linkedin_post_guest_results_wanted: int = Field(
         default=30,
-        alias="LINKEDIN_JOBS_GUEST_RESULTS_WANTED",
+        alias="LINKEDIN_POST_GUEST_RESULTS_WANTED",
         gt=0,
     )
     enable_linkedin_post_apify: bool = Field(default=False, alias="ENABLE_LINKEDIN_POST_APIFY")
@@ -307,15 +295,6 @@ class Settings(BaseSettings):
             if provider and provider not in providers:
                 providers.append(provider)
         return tuple(providers or tuple(DEFAULT_LINKEDIN_POST_SCRAPER_PROVIDERS.split(",")))
-
-    @property
-    def linkedin_jobs_guest_keywords(self) -> tuple[str, ...]:
-        configured = tuple(
-            keyword.strip()
-            for keyword in self.linkedin_jobs_guest_keywords_raw.split("||")
-            if keyword.strip()
-        )
-        return configured or DEFAULT_LINKEDIN_JOBS_GUEST_KEYWORDS
 
     @property
     def linkedin_post_apify_search_queries(self) -> tuple[str, ...]:

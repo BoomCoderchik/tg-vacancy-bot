@@ -33,11 +33,12 @@ vacancies that follow the operator's `/filters` selection.
   - Reads the structured post body, direct LinkedIn post URL, author, and publication date.
   - Keeps only posts whose body contains both a hiring signal and a supported development role.
 
-- `LinkedInJobsGuestAdapter`
-  - Off by default for the bot-target pipeline; opt-in with `ENABLE_LINKEDIN_JOBS_GUEST=true`.
-  - Reads LinkedIn's own public, logged-out job listings through the guest search endpoint and public job pages; no account, key, or protection bypass is involved.
-  - Searches each configured keyword (`LINKEDIN_JOBS_GUEST_KEYWORDS`) within the freshness window, keeps only listings whose title carries junior-level and frontend/fullstack evidence, then reads the public job page for the real posting text.
-  - Works from any IP that can reach LinkedIn directly, including datacenter runners where search engines block scraping.
+- `LinkedInPostGuestAdapter`
+  - Off by default for the bot-target pipeline; opt-in with `ENABLE_LINKEDIN_POST_GUEST=true`.
+  - Discovers public post URLs through the same free public search providers as the scraper (Bing RSS, DuckDuckGo HTML, Bing HTML, DuckDuckGo Lite, Mojeek), then reads each post's own public linkedin.com page through ordinary guest HTTP; no account, key, browser, or protection bypass is involved.
+  - Queries are built from the active `/filters` selection (specialties × grades, Russian and English) when `LINKEDIN_POST_GUEST_QUERY` is empty; a manual `||`-separated query always wins.
+  - Reads the real post text and derives the publication date from the post's activity ID, keeping only posts within the common freshness window; when a post's guest page is behind a login wall, the still real, dated public search result that discovered the link is published instead.
+  - Retries a canonical `/posts/...` login redirect once through the public `/feed/update/urn:li:activity:...` form before skipping.
 
 ### Russia-wide sources
 
