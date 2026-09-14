@@ -3,7 +3,6 @@ from tg_vacancy_bot.sources.filter_queries import (
     RU_JOB_DOMAIN_HINTS,
     apply_filter_queries,
     build_apify_queries,
-    build_guest_keywords,
     build_hh_ru_rss_queries,
     build_russia_search_intents,
     build_search_intents,
@@ -43,13 +42,6 @@ def test_apify_queries_have_length_limit() -> None:
     assert all(len(query) <= 85 for query in queries)
     assert any(query.startswith("Hiring ") for query in queries)
     assert any(query.startswith("Ищем ") for query in queries)
-
-
-def test_guest_keywords_plain_format() -> None:
-    keywords = build_guest_keywords(("backend",), ("middle",))
-    assert "middle backend developer" in keywords
-    assert "мидл бэкенд-разработчик" in keywords
-    assert all("||" not in keyword and '"' not in keyword for keyword in keywords)
 
 
 def test_manual_query_is_not_overwritten() -> None:
@@ -168,3 +160,18 @@ def test_hh_rss_manual_query_is_not_overwritten() -> None:
     updated = apply_filter_queries(settings, ("frontend",), ("junior",))
 
     assert updated.hhru_rss_query == "custom hh query"
+
+
+def test_guest_post_query_generated_when_empty() -> None:
+    settings = _settings()
+    updated = apply_filter_queries(settings, ("frontend",), ("junior",))
+
+    assert updated.linkedin_post_guest_query
+    assert LINKEDIN_POST_SITE_SCOPE in updated.linkedin_post_guest_query
+
+
+def test_guest_post_manual_query_is_not_overwritten() -> None:
+    settings = _settings().model_copy(update={"linkedin_post_guest_query": "custom guest query"})
+    updated = apply_filter_queries(settings, ("frontend",), ("junior",))
+
+    assert updated.linkedin_post_guest_query == "custom guest query"

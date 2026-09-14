@@ -25,7 +25,7 @@ def test_build_adapters_registers_no_non_linkedin_sources_by_default() -> None:
         TARGET_CHAT_ID="@target",
         ENABLE_LINKEDIN_POST_SEARCH=False,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
-        ENABLE_LINKEDIN_JOBS_GUEST=False,
+        ENABLE_LINKEDIN_POST_GUEST=False,
         ENABLE_LINKEDIN_POST_HEADLESS=False,
         ENABLE_RUSSIA_SEARCH=False,
         ENABLE_RUSSIA_TELEGRAM=False,
@@ -40,7 +40,7 @@ def test_build_adapters_keeps_opt_in_linkedin_scraper() -> None:
         TARGET_CHAT_ID="@target",
         ENABLE_LINKEDIN_POST_SEARCH=False,
         ENABLE_LINKEDIN_POST_SCRAPER=True,
-        ENABLE_LINKEDIN_JOBS_GUEST=False,
+        ENABLE_LINKEDIN_POST_GUEST=False,
         ENABLE_LINKEDIN_POST_HEADLESS=False,
         ENABLE_RUSSIA_SEARCH=False,
         ENABLE_RUSSIA_TELEGRAM=False,
@@ -49,7 +49,7 @@ def test_build_adapters_keeps_opt_in_linkedin_scraper() -> None:
     assert [adapter.name for adapter in build_adapters(settings)] == ["LinkedIn Hiring Post Scraper"]
 
 
-def test_build_adapters_registers_guest_jobs_independent_of_headless() -> None:
+def test_build_adapters_registers_guest_posts_independent_of_headless() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",
         TARGET_CHAT_ID="@target",
@@ -58,12 +58,12 @@ def test_build_adapters_registers_guest_jobs_independent_of_headless() -> None:
         ENABLE_LINKEDIN_POST_HEADLESS=True,
         LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=False,
         LINKEDIN_HEADLESS_PERMISSION_REFERENCE="",
-        ENABLE_LINKEDIN_JOBS_GUEST=True,
+        ENABLE_LINKEDIN_POST_GUEST=True,
         ENABLE_RUSSIA_SEARCH=False,
         ENABLE_RUSSIA_TELEGRAM=False,
     )
 
-    assert [adapter.name for adapter in build_adapters(settings)] == ["LinkedIn Jobs (Guest)"]
+    assert [adapter.name for adapter in build_adapters(settings)] == ["LinkedIn Posts (Guest)"]
 
 
 def test_build_adapters_keeps_headless_disabled_without_authorized_access() -> None:
@@ -72,7 +72,7 @@ def test_build_adapters_keeps_headless_disabled_without_authorized_access() -> N
         TARGET_CHAT_ID="@target",
         ENABLE_LINKEDIN_POST_SEARCH=True,
         ENABLE_LINKEDIN_POST_SCRAPER=True,
-        ENABLE_LINKEDIN_JOBS_GUEST=False,
+        ENABLE_LINKEDIN_POST_GUEST=False,
         ENABLE_LINKEDIN_POST_HEADLESS=True,
         LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=False,
         SERPAPI_API_KEY="search-key",
@@ -89,7 +89,7 @@ def test_build_adapters_keeps_headless_disabled_without_permission_reference() -
         TARGET_CHAT_ID="@target",
         ENABLE_LINKEDIN_POST_SEARCH=False,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
-        ENABLE_LINKEDIN_JOBS_GUEST=False,
+        ENABLE_LINKEDIN_POST_GUEST=False,
         ENABLE_LINKEDIN_POST_HEADLESS=True,
         LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=True,
         LINKEDIN_HEADLESS_PERMISSION_REFERENCE="",
@@ -107,7 +107,7 @@ def test_build_adapters_registers_only_headless_linkedin_pipeline_when_authorize
         TARGET_CHAT_ID="@target",
         ENABLE_LINKEDIN_POST_SEARCH=True,
         ENABLE_LINKEDIN_POST_SCRAPER=True,
-        ENABLE_LINKEDIN_JOBS_GUEST=False,
+        ENABLE_LINKEDIN_POST_GUEST=False,
         ENABLE_LINKEDIN_POST_HEADLESS=True,
         LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=True,
         LINKEDIN_HEADLESS_PERMISSION_REFERENCE="linkedin-approval-123",
@@ -353,7 +353,7 @@ def test_russia_sources_are_not_registered_by_default() -> None:
         TARGET_CHAT_ID="@target",
         ENABLE_LINKEDIN_POST_SEARCH=False,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
-        ENABLE_LINKEDIN_JOBS_GUEST=False,
+        ENABLE_LINKEDIN_POST_GUEST=False,
         ENABLE_LINKEDIN_POST_HEADLESS=False,
         ENABLE_RUSSIA_SEARCH=False,
         ENABLE_RUSSIA_TELEGRAM=False,
@@ -368,7 +368,7 @@ def test_build_adapters_registers_russia_search_and_telegram_when_enabled() -> N
         TARGET_CHAT_ID="@target",
         ENABLE_LINKEDIN_POST_SEARCH=False,
         ENABLE_LINKEDIN_POST_SCRAPER=False,
-        ENABLE_LINKEDIN_JOBS_GUEST=False,
+        ENABLE_LINKEDIN_POST_GUEST=False,
         ENABLE_LINKEDIN_POST_HEADLESS=False,
         ENABLE_RUSSIA_SEARCH=True,
         ENABLE_RUSSIA_TELEGRAM=True,

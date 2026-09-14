@@ -142,21 +142,19 @@ tg-vacancy-bot diagnose-linkedin --use-default-profile --limit 10 --show-limit 5
 
 Without `SERPAPI_API_KEY`, the report probes every configured free public search provider per selected intent and shows which engines answer, return empty results, or fail with a safe error class (for example, `Http429` or `TimeoutError`), so search-engine blockages are visible without any API key. It never launches Playwright, creates a Telegram publisher, writes publication state, prints search snippets, or exposes API keys. To verify the full free pipeline end to end without publishing, run `tg-vacancy-bot preview-sources --source "LinkedIn Hiring Posts (Headless)"`.
 
-## Guest LinkedIn Job Listings Parser
+## Guest LinkedIn Post Parser
 
-Search engines rate-limit datacenter and flagged IPs, so discovery through them can return no rows even when LinkedIn itself is fully reachable. For that reason the bot can also read LinkedIn's own public guest job listings, which need no account, no API key, and no protection bypass. The operator prefers hiring-post discovery and keeps Guest off by default; enable it only when needed:
+Search engines often rate-limit datacenter and flagged IPs, so discovery through them can return no rows even when LinkedIn itself is fully reachable. For that reason the bot can also read LinkedIn's public guest pages directly for the posts that the shared free-provider discovery finds: no account, no API key, and no protection bypass:
 
 ```dotenv
-ENABLE_LINKEDIN_JOBS_GUEST=false
-LINKEDIN_JOBS_GUEST_KEYWORDS=junior frontend developer||junior fullstack developer||intern frontend developer||trainee fullstack developer||джуниор фронтенд разработчик||стажер фронтенд разработчик
-LINKEDIN_JOBS_GUEST_RESULTS_WANTED=30
+ENABLE_LINKEDIN_POST_GUEST=false
+LINKEDIN_POST_GUEST_QUERY=
+LINKEDIN_POST_GUEST_RESULTS_WANTED=30
 ```
 
-The adapter searches LinkedIn's logged-out job-search endpoint for each `||`-separated keyword within the configured freshness window (`LINKEDIN_POST_MAX_AGE_HOURS`), keeps only listings whose title already carries junior-level and frontend/fullstack evidence, then reads each public job page politely (paced, jittered requests) to extract the real posting text. Every vacancy still passes the common Junior Frontend/Fullstack policy filter, freshness filter, localization boundary, publication limit, and SQLite deduplication before publication.
+The adapter discovers LinkedIn post URLs (`linkedin.com/posts/...`, `linkedin.com/feed/update/...`) through the same free public search providers as the scraper (Bing RSS, DuckDuckGo HTML, Bing HTML, DuckDuckGo Lite, Mojeek), then reads each post's own public page through ordinary guest HTTP to extract the real post text and its activity-ID publication date. Queries are built from the active `/filters` selection when `LINKEDIN_POST_GUEST_QUERY` is empty. When a post's page is behind a login wall, the `/posts/...` URL is retried once through its public `/feed/update/urn:li:activity:...` form; a still-blocked post is published from the real, dated public search result that discovered it instead of being dropped. Every vacancy still passes the common Junior Frontend/Fullstack policy filter, freshness filter, localization boundary, publication limit, and SQLite deduplication before publication.
 
-This path works from any IP that can reach LinkedIn directly, including GitHub Actions runners, which makes it the most reliable automatic source. It reads public pages only: no login, cookies, proxies, or CAPTCHA handling are involved.
-
-Direct page reading is fail-closed: both `LINKEDIN_HEADLESS_ACCESS_AUTHORIZED=true` and a non-empty `LINKEDIN_HEADLESS_PERMISSION_REFERENCE` are required. Set them only after receiving documented LinkedIn crawling permission or an approved access path. The adapter does not use a LinkedIn account, cookies, proxies, fake identities, scrolling automation, or any CAPTCHA/login/2FA bypass. It publishes only posts whose URL carries a reliable publication date no more than ten days old. When direct reading is refused by a login wall even after the feed-update retry, the vacancy falls back to the real public search result — title, snippet, and activity-ID date — that discovered the link instead of being dropped; protection pages and off-domain redirects are never bypassed. On GitHub Actions, Chromium is installed only when the same permission gate is satisfied.
+Direct page reading stays fail-closed: no login, cookies, proxies, automation, or CAPTCHA handling are involved. Guest pages and protection screens are never bypassed.
 
 ## Russia Internet-Wide Vacancy Search
 

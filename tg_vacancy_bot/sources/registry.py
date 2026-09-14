@@ -4,7 +4,7 @@ from tg_vacancy_bot.config import Settings
 
 from .adapters.linkedin_post_headless import LinkedInPostHeadlessAdapter
 from .adapters.linkedin_post_apify import LinkedInPostApifyAdapter
-from .adapters.linkedin_jobs_guest import LinkedInJobsGuestAdapter
+from .adapters.linkedin_post_guest import LinkedInPostGuestAdapter
 from .adapters.linkedin_post_scraper import LinkedInPostScraperAdapter
 from .adapters.linkedin_post_search import LinkedInPostSearchAdapter
 from .adapters.hh_vacancy_rss import HeadHunterRssAdapter
@@ -29,10 +29,11 @@ def build_adapters(settings: Settings) -> list[SourceAdapter]:
         adapters.append(LinkedInPostApifyAdapter(settings))
     if headless_registered:
         adapters.append(LinkedInPostHeadlessAdapter(settings))
-    # Guest job listings read LinkedIn itself, so they are independent of the
-    # search-engine discovery paths above and register whenever enabled.
-    if settings.enable_linkedin_jobs_guest:
-        adapters.append(LinkedInJobsGuestAdapter(settings))
+    # Guest post reading stays independent of the browser-backed headless path
+    # and registers whenever enabled: it reads LinkedIn's own public pages
+    # through plain HTTP, so no permission boundary applies.
+    if settings.enable_linkedin_post_guest:
+        adapters.append(LinkedInPostGuestAdapter(settings))
     # Russia-wide sources follow the operator's filter once registered.
     if settings.enable_russia_search:
         adapters.append(RussiaVacancySearchAdapter(settings))

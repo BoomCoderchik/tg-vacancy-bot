@@ -238,98 +238,7 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
         return tuple(prioritized[:limit])
 
     async def _discover_free_post_urls(self, limit: int) -> tuple[LinkedInPostCandidate, ...]:
-        """Discover public post URLs without a keyed search provider.
-
-        Lightweight HTTP providers are used for discovery: Bing RSS, DuckDuckGo
-        HTML, then paginated Bing HTML, DuckDuckGo Lite, and Mojeek. The
-        browser is reserved for reading LinkedIn post pages themselves. A
-        protection screen ends that provider's attempt instead of being
-        bypassed. Undated results stay in the queue: the reader later derives
-        a reliable date from the activity ID or rejects the candidate.
-        """
-
-        if limit <= 0:
-            return ()
-        intents = select_cycle_intents(
-            select_search_intents(self.settings.linkedin_post_headless_query),
-            max_intents=self.settings.linkedin_post_search_intents_per_cycle,
-            cycle_index=_search_cycle_index(utcnow()),
-        )
-        seen_urls: set[str] = set()
-        dated: list[tuple[datetime, LinkedInPostCandidate]] = []
-        undated: list[LinkedInPostCandidate] = []
-
-        async with source_session(headers=BROWSER_HEADERS) as session:
-            for intent in intents:
-                if len(seen_urls) >= limit:
-                    break
-
-                try:
-                    rss_results = _rss_post_results(await _fetch_bing_rss(session, intent.query))
-                except Exception as exc:
-                    logger.warning("Bing RSS discovery failed: %s", type(exc).__name__)
-                    rss_results = []
-                _collect_search_results(
-                    rss_results,
-                    provider="bing_rss",
-                    query=intent,
-                    seen_urls=seen_urls,
-                    dated=dated,
-                    undated=undated,
-                    limit=limit,
-                )
-
-                await asyncio.sleep(_jittered_seconds(SEARCH_PAGE_DELAY_SECONDS))
-                html = await _fetch_provider_html(session, "duckduckgo", intent.query)
-                if html:
-                    _collect_search_results(
-                        _search_html_results(BeautifulSoup(html, "html.parser")),
-                        provider="duckduckgo",
-                        query=intent,
-                        seen_urls=seen_urls,
-                        dated=dated,
-                        undated=undated,
-                        limit=limit,
-                    )
-
-                for page_index in range(max(1, self.settings.linkedin_headless_discovery_pages)):
-                    if len(seen_urls) >= limit:
-                        break
-                    await asyncio.sleep(_jittered_seconds(SEARCH_PAGE_DELAY_SECONDS))
-                    html = await _fetch_bing_html(session, intent.query, first=1 + page_index * BING_PAGE_STEP)
-                    if not html or _looks_like_search_challenge(html):
-                        break
-                    before = len(seen_urls)
-                    _collect_search_results(
-                        _search_html_results(BeautifulSoup(html, "html.parser")),
-                        provider="bing",
-                        query=intent,
-                        seen_urls=seen_urls,
-                        dated=dated,
-                        undated=undated,
-                        limit=limit,
-                    )
-                    if len(seen_urls) == before:
-                        break
-
-                for provider in ("duckduckgo_lite", "mojeek"):
-                    if len(seen_urls) >= limit:
-                        break
-                    await asyncio.sleep(_jittered_seconds(SEARCH_PAGE_DELAY_SECONDS))
-                    html = await _fetch_provider_html(session, provider, intent.query)
-                    if not html:
-                        continue
-                    _collect_search_results(
-                        _search_html_results(BeautifulSoup(html, "html.parser")),
-                        provider=provider,
-                        query=intent,
-                        seen_urls=seen_urls,
-                        dated=dated,
-                        undated=undated,
-                        limit=limit,
-                    )
-
-        return tuple(_ordered_discovered_candidates(dated, undated)[:limit])
+        return await _discover_free_post_urls(self.settings, limit)
 
     async def _discover_browser_post_urls(self, context, limit: int) -> tuple[LinkedInPostCandidate, ...]:
         """Discover public post URLs by reading Bing result pages in a browser.
@@ -441,44 +350,7 @@ class LinkedInPostHeadlessAdapter(SourceAdapter):
         )
 
     async def _read_public_post_http(self, session, url: str) -> Vacancy | None:
-        """Read one public guest post through plain HTTP without a browser.
-
-        LinkedIn serves fully rendered guest pages to ordinary HTTP clients,
-        so this read avoids the automated-browser authwall entirely. It stays
-        fail-closed: an HTTP error, an off-domain redirect, a login wall, or
-        missing post text yields no vacancy and leaves the candidate to the
-        browser fallback.
-        """
-
-        try:
-            async with session.get(url) as response:
-                response.raise_for_status()
-                final_url = _canonicalize_linkedin_post_url(str(response.url))
-                if not final_url:
-                    return None
-                html = await response.text()
-        except Exception as exc:
-            logger.warning("LinkedIn guest HTTP read failed: %s", type(exc).__name__)
-            return None
-        if _requires_manual_access(html):
-            return None
-        description = _extract_post_text(html)
-        published_at = _published_at_from_activity_id(final_url)
-        if not description or published_at is None:
-            return None
-        title = _post_title(_html_page_title(html), description)
-        if not title:
-            return None
-        return Vacancy(
-            title=title,
-            description=description,
-            source=self.name,
-            url=final_url,
-            location=None,
-            stack=_stack_from_text(f"{title} {description}"),
-            published_at=published_at,
-            raw_text=f"{title} {description}",
-        )
+        return await _read_public_post_http(session, url, source=self.name)
 
 
 async def _fetch_provider_html(session, provider: str, query: str) -> str:
@@ -662,3 +534,144 @@ def _requires_manual_access(html: str) -> bool:
     # Public post pages include a sign-in form in the navigation. Treat a
     # password input as a login wall only when the page exposes no post text.
     return soup.select_one("input[type='password']") is not None and not _extract_post_text(html)
+
+
+async def _read_public_post_http(session, url: str, *, source: str) -> Vacancy | None:
+    """Read one public guest post through plain HTTP without a browser.
+
+    LinkedIn serves fully rendered guest pages to ordinary HTTP clients,
+    so this read avoids the automated-browser authwall entirely. It stays
+    fail-closed: an HTTP error, an off-domain redirect, a login wall, or
+    missing post text yields no vacancy.
+    """
+
+    try:
+        async with session.get(url) as response:
+            response.raise_for_status()
+            final_url = _canonicalize_linkedin_post_url(str(response.url))
+            if not final_url:
+                return None
+            html = await response.text()
+    except Exception as exc:
+        logger.warning("LinkedIn guest HTTP read failed: %s", type(exc).__name__)
+        return None
+    if _requires_manual_access(html):
+        return None
+    description = _extract_post_text(html)
+    published_at = _published_at_from_activity_id(final_url)
+    if not description or published_at is None:
+        return None
+    title = _post_title(_html_page_title(html), description)
+    if not title:
+        return None
+    return Vacancy(
+        title=title,
+        description=description,
+        source=source,
+        url=final_url,
+        location=None,
+        stack=_stack_from_text(f"{title} {description}"),
+        published_at=published_at,
+        raw_text=f"{title} {description}",
+    )
+
+
+async def _discover_free_post_urls(
+    settings: Settings,
+    limit: int,
+) -> tuple[LinkedInPostCandidate, ...]:
+    """Discover public post URLs without a keyed search provider.
+
+    Lightweight HTTP providers are used for discovery: Bing RSS, DuckDuckGo
+    HTML, then paginated Bing HTML, DuckDuckGo Lite, and Mojeek. A protection
+    screen ends that provider's attempt instead of being bypassed. Undated
+    results stay in the queue: the reader later derives a reliable date from
+    the activity ID or rejects the candidate.
+    """
+
+    if limit <= 0:
+        return ()
+    intents = select_cycle_intents(
+        select_search_intents(settings.linkedin_post_headless_query),
+        max_intents=settings.linkedin_post_search_intents_per_cycle,
+        cycle_index=_search_cycle_index(utcnow()),
+    )
+    seen_urls: set[str] = set()
+    dated: list[tuple[datetime, LinkedInPostCandidate]] = []
+    undated: list[LinkedInPostCandidate] = []
+
+    async with source_session(headers=BROWSER_HEADERS) as session:
+        for intent in intents:
+            if len(seen_urls) >= limit:
+                break
+
+            try:
+                rss_results = _rss_post_results(await _fetch_bing_rss(session, intent.query))
+            except Exception as exc:
+                logger.warning("Bing RSS discovery failed: %s", type(exc).__name__)
+                rss_results = []
+            _collect_search_results(
+                rss_results,
+                provider="bing_rss",
+                query=intent,
+                seen_urls=seen_urls,
+                dated=dated,
+                undated=undated,
+                limit=limit,
+            )
+
+            await asyncio.sleep(_jittered_seconds(SEARCH_PAGE_DELAY_SECONDS))
+            html = await _fetch_provider_html(session, "duckduckgo", intent.query)
+            if html:
+                _collect_search_results(
+                    _search_html_results(BeautifulSoup(html, "html.parser")),
+                    provider="duckduckgo",
+                    query=intent,
+                    seen_urls=seen_urls,
+                    dated=dated,
+                    undated=undated,
+                    limit=limit,
+                )
+
+            for page_index in range(max(1, settings.linkedin_headless_discovery_pages)):
+                if len(seen_urls) >= limit:
+                    break
+                await asyncio.sleep(_jittered_seconds(SEARCH_PAGE_DELAY_SECONDS))
+                html = await _fetch_bing_html(
+                    session,
+                    intent.query,
+                    first=1 + page_index * BING_PAGE_STEP,
+                )
+                if not html or _looks_like_search_challenge(html):
+                    break
+                before = len(seen_urls)
+                _collect_search_results(
+                    _search_html_results(BeautifulSoup(html, "html.parser")),
+                    provider="bing",
+                    query=intent,
+                    seen_urls=seen_urls,
+                    dated=dated,
+                    undated=undated,
+                    limit=limit,
+                )
+                if len(seen_urls) == before:
+                    break
+
+            for provider in ("duckduckgo_lite", "mojeek"):
+                if len(seen_urls) >= limit:
+                    break
+                await asyncio.sleep(_jittered_seconds(SEARCH_PAGE_DELAY_SECONDS))
+                html = await _fetch_provider_html(session, provider, intent.query)
+                if not html:
+                    continue
+                _collect_search_results(
+                    _search_html_results(BeautifulSoup(html, "html.parser")),
+                    provider=provider,
+                    query=intent,
+                    seen_urls=seen_urls,
+                    dated=dated,
+                    undated=undated,
+                    limit=limit,
+                )
+
+    return tuple(_ordered_discovered_candidates(dated, undated)[:limit])
