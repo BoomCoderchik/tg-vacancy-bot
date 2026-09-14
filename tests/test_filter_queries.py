@@ -4,6 +4,7 @@ from tg_vacancy_bot.sources.filter_queries import (
     apply_filter_queries,
     build_apify_queries,
     build_guest_keywords,
+    build_hh_ru_rss_queries,
     build_russia_search_intents,
     build_search_intents,
     build_site_query,
@@ -119,3 +120,51 @@ def test_russia_job_domain_hints_are_exported() -> None:
     assert RU_JOB_DOMAIN_HINTS
     assert RU_JOB_DOMAIN_HINTS[0] == "hh.ru"
     assert "superjob.ru" in RU_JOB_DOMAIN_HINTS
+
+
+def test_hh_rss_queries_have_role_grade_words_without_hiring_intent() -> None:
+    queries = build_hh_ru_rss_queries(("frontend",), ("junior",))
+
+    assert len(queries) == 2
+    en = next(query for query in queries if "Junior Frontend" in query)
+    ru = next(query for query in queries if "джуниор" in query)
+    assert "Junior Frontend Developer" in en
+    assert "OR" in en
+    assert "hiring" not in en.lower()
+    assert "ищем" not in en.lower()
+    assert "джуниор фронтенд-разработчик" in ru
+    assert "ищем" not in ru
+
+
+def test_hh_rss_queries_unquoted_for_fulltext() -> None:
+    queries = build_hh_ru_rss_queries(("fullstack",), ("junior", "intern"))
+
+    assert queries
+    for query in queries:
+        assert '"' not in query
+        assert "||" not in query
+
+
+def test_hh_rss_queries_empty_filter_falls_back_to_junior_frontend_fullstack() -> None:
+    queries = build_hh_ru_rss_queries((), ())
+
+    assert queries
+    joined = " ".join(queries)
+    assert "Junior Frontend" in joined
+    assert "Junior Fullstack" in joined
+    assert "OR" in joined
+
+
+def test_hh_rss_query_generated_when_empty() -> None:
+    settings = _settings()
+    updated = apply_filter_queries(settings, ("frontend",), ("junior",))
+
+    assert updated.hhru_rss_query
+    assert "||" in updated.hhru_rss_query
+
+
+def test_hh_rss_manual_query_is_not_overwritten() -> None:
+    settings = _settings().model_copy(update={"hhru_rss_query": "custom hh query"})
+    updated = apply_filter_queries(settings, ("frontend",), ("junior",))
+
+    assert updated.hhru_rss_query == "custom hh query"
