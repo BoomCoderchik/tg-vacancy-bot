@@ -12,7 +12,7 @@ Telegram bot for collecting IT vacancies from forwarded messages and public job 
 - Publishes only posts that really seek Junior Frontend or Fullstack developers: each post needs a hiring signal, explicit frontend/fullstack role evidence, and a junior or entry-level marker.
 - Stores message fingerprints in SQLite to avoid duplicates.
 - Includes opt-in LinkedIn hiring-post discovery through keyless public search-result scraping and permission-gated headless public-post parsing. A keyed SerpApi search remains available but is never required.
-- Includes opt-in Russia-wide vacancy discovery: a free open-web search across the whole internet prioritizing Russian job domains and public Telegram vacancy channels. Both sources follow the active `/filters` specialties and grades from the operator profile.
+- Includes opt-in Russia-wide vacancy discovery: a free open-web search across the whole internet prioritizing Russian job domains, public Telegram vacancy channels, HeadHunter's official RSS feed, plus five official Russian job-board APIs (HeadHunter JSON, Habr Career, SuperJob, Работа России open data, Zarplata.ru). All job-board sources follow the active `/filters` specialties and grades from the operator profile.
 - Polls configured public sources in the background while the bot is running.
 
 ## Profile storage foundation
@@ -222,6 +222,94 @@ maps the company, region, and salary fields from the item description, and
 passes the rest through the common pipeline: vacancy policy, freshness filter,
 localization boundary, and SQLite deduplication.
 
+## HeadHunter Public JSON API
+
+For structured salaries and exact publication timestamps instead of RSS text
+parsing, enable the official HeadHunter JSON search. It needs no API key, but
+hh.ru requires a `User-Agent` header with a **real contact email** — set yours:
+
+```dotenv
+ENABLE_HH_API=false
+HH_API_CONTACT_EMAIL=you@example.com
+HH_API_QUERY=
+HH_API_RESULTS_WANTED=40
+```
+
+Without `HH_API_CONTACT_EMAIL` the adapter stays disabled with a warning; the
+bot never forges the header. Queries auto-build from `/filters` when
+`HH_API_QUERY` is empty (same `||` rules as the RSS feed). Each item maps its
+real `published_at`, vacancy URL, employer, area, `snippet` text, and salary
+bounds through the common pipeline.
+
+## Habr Career Public JSON
+
+To read Russia's IT-only job board with per-vacancy qualification and skills,
+enable the public JSON feed that career.habr.com serves its own pages — no key
+or account:
+
+```dotenv
+ENABLE_HABR_API=false
+HABR_API_QUERY=
+HABR_API_RESULTS_WANTED=40
+```
+
+Queries auto-build from `/filters` when `HABR_API_QUERY` is empty. Each item
+maps its title, page URL, company, locations (or remote flag), `qualification`
+(Junior/Middle/...), divisions, skills (which become the card's stack), salary
+or predicted salary, and real publication date through the common pipeline.
+
+## SuperJob Public API
+
+To search SuperJob's official API v2, register a free application at
+superjob.ru and put its Secret key here (sent as the `X-Api-App-Id` header).
+Vacancy contacts are never requested, so no user authorization is involved:
+
+```dotenv
+ENABLE_SUPERJOB_API=false
+SUPERJOB_API_KEY=
+SUPERJOB_API_QUERY=
+SUPERJOB_API_RESULTS_WANTED=40
+```
+
+Without `SUPERJOB_API_KEY` the adapter stays disabled with a warning. Queries
+auto-build from `/filters` when `SUPERJOB_API_QUERY` is empty. Each result
+maps its profession, direct link, company, town, publication date, payment
+bounds, and duties/requirements text through the common pipeline.
+
+## Работа России Open Data
+
+To read the official government vacancy API (no key or account), enable the
+open-data source:
+
+```dotenv
+ENABLE_TRUDVSEM_API=false
+TRUDVSEM_API_QUERY=
+TRUDVSEM_API_RESULTS_WANTED=40
+```
+
+Queries auto-build from `/filters` when `TRUDVSEM_API_QUERY` is empty. Each
+vacancy maps its job name, card URL, employer, region, modification date,
+salary, duties, requirements, and skills through the common pipeline. Contact
+details from the payload (phones, emails, contact persons) are never published.
+Note that this registry skews toward state and regional employers, so it
+complements rather than replaces the commercial job boards.
+
+## Zarplata.ru Public API
+
+To search Zarplata.ru's official JSON API (no key or account), enable:
+
+```dotenv
+ENABLE_ZP_API=false
+ZP_API_QUERY=
+ZP_API_RESULTS_WANTED=40
+```
+
+Queries auto-build from `/filters` when `ZP_API_QUERY` is empty. Each item
+maps its real publication date, vacancy URL, employer, area, snippet text, and
+salary bounds through the common pipeline. The provider captcha-limits
+anonymous calls, so failures are skipped with a warning instead of being
+bypassed — expect lower yield from this source than from the keyed ones.
+
 ## Required Telegram Setup
 
 1. Create a bot in [@BotFather](https://t.me/BotFather).
@@ -427,16 +515,17 @@ Messages that do not look like allowed development/design/AI vacancies are skipp
 - `/filters`: operators-only vacancy filter setup. Step 1 — toggle specialties (Frontend, Backend, Fullstack, Mobile, QA, DevOps, Data, Design — several allowed, chosen ones show ✅), step 2 — toggle grades (Стажёр, Junior, Middle, Senior, Lead — several allowed), then confirm. Only matching vacancies are parsed from now on; check the active filter with `/status`.
 - `/profile`: private operator profile: view/edit job preferences, upload or replace a resume, or delete the profile.
 
-## Removed Non-LinkedIn Sources
+## Non-LinkedIn Sources
 
-Automatic polling no longer registers other non-LinkedIn job-board or social
-sources beyond the documented Russia-wide family. Only the LinkedIn post
-adapters and the two Russia-wide sources described above (`Russia Internet
-Search` and `Telegram Vacancy Channels`) can register as automatic public
-sources.
+Automatic polling registers the LinkedIn post adapters and the Russia-wide
+family: open-web search, public Telegram channels, HeadHunter RSS, and the
+five official Russian job-board APIs described above (HeadHunter JSON, Habr
+Career, SuperJob, Работа России open data, Zarplata.ru). Other non-LinkedIn
+job-board or social sources are not registered; adding one needs an explicit
+source-policy change per `docs/sources.md`.
 
 ## LinkedIn Boundary
 
-This project permits four documented, opt-in LinkedIn paths: an optional keyed Google Search-backed public hiring-post search through SerpApi, free public search-result scraping, headless parsing of publicly available post pages found through public search engines, and reading LinkedIn's own public guest job listings. These are the only automatic LinkedIn adapters. The bot does not log in with a LinkedIn account, use proxies or anti-bot bypasses, invent vacancies, or publish fabricated records. Every published item is backed by a real public source — either the post or job page itself, the public search result that indexed it, or LinkedIn's logged-out listing pages. The separate Russia-wide sources add the whole open web (prioritizing Russian job domains) and public Telegram channels; they are independent of the LinkedIn boundary.
+This project permits four documented, opt-in LinkedIn paths: an optional keyed Google Search-backed public hiring-post search through SerpApi, free public search-result scraping, headless parsing of publicly available post pages found through public search engines, and reading LinkedIn's own public guest job listings. These are the only automatic LinkedIn adapters. The bot does not log in with a LinkedIn account, use proxies or anti-bot bypasses, invent vacancies, or publish fabricated records. Every published item is backed by a real public source — either the post or job page itself, the public search result that indexed it, or LinkedIn's logged-out listing pages. The separate Russia-wide sources add the whole open web (prioritizing Russian job domains), public Telegram channels, HeadHunter's official feed and JSON API, and the Habr Career, SuperJob, Работа России, and Zarplata.ru official APIs; they are independent of the LinkedIn boundary.
 
 LinkedIn links can also enter when an operator manually sends or forwards vacancy text containing a LinkedIn URL to the Telegram bot. In that case the normal forwarded-message parser can keep the URL and mark the vacancy source as `LinkedIn`.

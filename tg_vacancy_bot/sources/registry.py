@@ -8,6 +8,11 @@ from .adapters.linkedin_post_guest import LinkedInPostGuestAdapter
 from .adapters.linkedin_post_scraper import LinkedInPostScraperAdapter
 from .adapters.linkedin_post_search import LinkedInPostSearchAdapter
 from .adapters.hh_vacancy_rss import HeadHunterRssAdapter
+from .adapters.hh_vacancy_api import HeadHunterApiAdapter
+from .adapters.habr_vacancy_api import HabrVacancyApiAdapter
+from .adapters.superjob_vacancy_api import SuperJobApiAdapter
+from .adapters.trudvsem_vacancy_api import TrudvsemApiAdapter
+from .adapters.zp_vacancy_api import ZarplataApiAdapter
 from .adapters.russia_vacancy_search import RussiaVacancySearchAdapter
 from .adapters.telegram_vacancy_channel import TelegramVacancyChannelAdapter
 from .base import SourceAdapter
@@ -42,6 +47,21 @@ def build_adapters(settings: Settings) -> list[SourceAdapter]:
     # HeadHunter RSS reads the official public feed and needs no key.
     if settings.enable_hhru_rss:
         adapters.append(HeadHunterRssAdapter(settings))
+    # HeadHunter JSON API needs a real contact email in the User-Agent header.
+    if settings.enable_hh_api and settings.hh_api_contact_email.strip():
+        adapters.append(HeadHunterApiAdapter(settings))
+    # Habr Career public JSON needs no key; it serves the site's own pages.
+    if settings.enable_habr_api:
+        adapters.append(HabrVacancyApiAdapter(settings))
+    # SuperJob API needs a free registered application key.
+    if settings.enable_superjob_api and settings.superjob_api_key.strip():
+        adapters.append(SuperJobApiAdapter(settings))
+    # Работа России open data needs no key.
+    if settings.enable_trudvsem_api:
+        adapters.append(TrudvsemApiAdapter(settings))
+    # Zarplata.ru public API needs no key; anonymous calls are captcha-limited.
+    if settings.enable_zp_api:
+        adapters.append(ZarplataApiAdapter(settings))
     return adapters
 
 
@@ -86,5 +106,19 @@ def source_configuration_warnings(settings: Settings) -> list[str]:
     if settings.enable_russia_telegram and not settings.russia_telegram_channels:
         warnings.append(
             "Russia Telegram Vacancy Channels source is enabled but RUSSIA_TELEGRAM_CHANNELS is empty."
+        )
+    if settings.enable_hh_api and not settings.hh_api_contact_email.strip():
+        warnings.append(
+            "HeadHunter API source is enabled but HH_API_CONTACT_EMAIL is empty; "
+            "hh.ru requires a real contact email in the User-Agent header."
+        )
+    if settings.enable_superjob_api and not settings.superjob_api_key.strip():
+        warnings.append(
+            "SuperJob API source is enabled but SUPERJOB_API_KEY is missing."
+        )
+    if settings.enable_zp_api:
+        warnings.append(
+            "Zarplata.ru API source is enabled; anonymous calls are captcha-limited "
+            "by the provider and failures are skipped without bypassing protection."
         )
     return warnings

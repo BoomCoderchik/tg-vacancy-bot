@@ -260,6 +260,21 @@ def apply_filter_queries(
         updates["hhru_rss_query"] = "||".join(
             build_hh_ru_rss_queries(active_specialties, active_grades)
         )
+    # The job-board JSON APIs below share the same full-text search semantics
+    # as the HeadHunter feed (role and grade words, no hiring-intent markers),
+    # so they reuse the same auto-built queries unless configured manually.
+    job_board_query = "||".join(
+        build_hh_ru_rss_queries(active_specialties, active_grades)
+    )
+    for field in (
+        "hh_api_query",
+        "habr_api_query",
+        "superjob_api_query",
+        "trudvsem_api_query",
+        "zp_api_query",
+    ):
+        if not getattr(settings, field).strip():
+            updates[field] = job_board_query
     if not updates:
         return settings
     return settings.model_copy(update=updates)
