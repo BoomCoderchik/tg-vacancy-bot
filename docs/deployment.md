@@ -162,9 +162,7 @@ no-server path for 15-minute polling. It is not a true always-on bot process,
 so forwarded Telegram messages are not handled while no server is running, and
 GitHub may delay scheduled jobs during platform load.
 
-This workflow is limited to source parsing and publication. It sets
-`APPLICATION_QUEUE_ENABLED=false` and does not process application-button
-callbacks, even if an old repository secret with that name still exists.
+This workflow is limited to source parsing and publication.
 
 Required GitHub repository secrets:
 

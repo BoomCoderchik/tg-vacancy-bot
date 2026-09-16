@@ -2,8 +2,6 @@
 
 Telegram bot for collecting IT vacancies from forwarded messages and public job sources, then publishing them to a target Telegram channel in a compact card format.
 
-The profile and queued-application foundations are documented in [`docs/application-queue.md`](docs/application-queue.md).
-
 ## What Works Now
 
 - Accepts messages forwarded or sent to the bot.
@@ -20,7 +18,7 @@ The profile and queued-application foundations are documented in [`docs/applicat
 ## Profile storage foundation
 
 The first foundation stage for the private operator profile is available in the
-application storage layer. It persists one profile per Telegram operator, with
+storage layer. It persists one profile per Telegram operator, with
 contact and job-preference fields plus extensible fields. Original PDF/DOCX
 resumes are stored only in a local directory (not in Git, logs, or the public
 channel). Configure it with:
@@ -35,13 +33,6 @@ fields step by step, upload or replace a PDF/DOCX resume, and delete the
 profile. This command requires an explicit `OPERATOR_USER_IDS` allowlist;
 unlisted users cannot read or change this private data. Extracting resume text
 is scheduled for the next task in the implementation plan.
-
-When the bot starts, it sends each configured operator whose profile is missing
-a full name, email, or resume a private onboarding prompt with buttons to fill
-in the fields and upload the resume. `/start` shows the same prompt until those
-required application details are complete. An operator must have opened a
-private chat with the bot first, because Telegram does not allow bots to start
-a new chat with a user.
 
 ## Near-Real-Time Parser Mode
 
@@ -333,13 +324,6 @@ server against the same Telegram channel at the same time unless they share the
 same deduplication database. Otherwise, both schedulers can publish the same new
 vacancy before either one sees the other's SQLite state.
 
-The scheduled source-polling workflow is intentionally limited to source
-parsing and Telegram vacancy publication. It sets `APPLICATION_QUEUE_ENABLED`
-to `false` even if an old repository secret with that name exists, so the
-15-minute parser cannot accidentally drain Telegram callback updates or run the
-application queue. See [`docs/application-queue.md`](docs/application-queue.md)
-if you later decide to run application processing through a separate scheduler.
-
 To check which sources are configured without publishing anything:
 
 ```powershell
@@ -442,24 +426,6 @@ Messages that do not look like allowed development/design/AI vacancies are skipp
 - `/status`: shows the active forwarding mode, target chat, polling interval, current vacancy filter, and enabled sources without exposing secrets.
 - `/filters`: operators-only vacancy filter setup. Step 1 — toggle specialties (Frontend, Backend, Fullstack, Mobile, QA, DevOps, Data, Design — several allowed, chosen ones show ✅), step 2 — toggle grades (Стажёр, Junior, Middle, Senior, Lead — several allowed), then confirm. Only matching vacancies are parsed from now on; check the active filter with `/status`.
 - `/profile`: private operator profile: view/edit job preferences, upload or replace a resume, or delete the profile.
-- `/queue_resume`: attach this caption to a PDF/DOCX sent privately while queue mode is active; the next GitHub Actions run registers or replaces the queue resume.
-- `/queue_resume_id`: legacy private operator-only command that shows the saved Telegram `file_id`; it is no longer needed for normal queue setup.
-
-For queue troubleshooting, `tg-vacancy-bot diagnose-application-queue` reports
-the public bot identity, pending Telegram update count, queue-resume presence,
-and aggregate SQLite counts without consuming updates or printing secrets.
-`run` and `run-web` now fail fast when `APPLICATION_QUEUE_ENABLED=true`, because
-long polling and the scheduled `getUpdates` queue must not use the same bot token
-at the same time.
-
-Parsed vacancy cards are published without an `Откликнуться` button.
-The application queue, `/profile`, and `/queue_resume` keep working for
-previously created callbacks and manual runs; publishing simply no longer
-attaches a button to new cards.
-
-## Application Queue
-
-There are currently no source-specific automatic application form adapters. The queue remains for delayed callbacks and private resume storage, but unsupported forms are always reported as manual.
 
 ## Removed Non-LinkedIn Sources
 
