@@ -62,6 +62,41 @@ vacancies that follow the operator's `/filters` selection.
   - Maps each item's real publication date (`pubDate`, with the item's `Создана:` date as a fallback) and company, region, and salary from the item description.
   - Results pass through the common polling freshness window; a failing query never blocks the remaining queries.
 
+- `HeadHunterApiAdapter`
+  - Opt-in with `ENABLE_HH_API=true` plus a real contact email in `HH_API_CONTACT_EMAIL`.
+  - Reads HeadHunter's official public JSON vacancy search (`https://api.hh.ru/vacancies`, anonymous, ordered by publication time). hh.ru requires a `User-Agent` with a real contact email; without it the adapter stays disabled with a warning, and forged headers are never used.
+  - Queries are built from the active `/filters` selection when `HH_API_QUERY` is empty; a manual `||`-separated query always wins.
+  - Maps each item's real `published_at`, `alternate_url`, employer, area, `snippet` requirement/responsibility text, and structured salary bounds.
+  - Results pass through the common polling freshness window; a failing query never blocks the remaining queries.
+
+- `HabrVacancyApiAdapter`
+  - Opt-in with `ENABLE_HABR_API=true`.
+  - Reads the same public JSON feed that career.habr.com serves its own vacancy pages (`https://career.habr.com/api/frontend/vacancies`, IT-only, sorted by date); no API key, account, or protection bypass is involved.
+  - Queries are built from the active `/filters` selection when `HABR_API_QUERY` is empty; a manual `||`-separated query always wins.
+  - Maps each item's title, page URL, company, locations (or remote flag), `qualification`, divisions, skills (which become the vacancy `stack`), salary or predicted salary, and real `publishedDate`.
+  - Results pass through the common polling freshness window; a failing query never blocks the remaining queries.
+
+- `SuperJobApiAdapter`
+  - Opt-in with `ENABLE_SUPERJOB_API=true` plus a free registered application key in `SUPERJOB_API_KEY` (sent as the `X-Api-App-Id` header).
+  - Reads the official SuperJob API v2 vacancy search (`https://api.superjob.ru/2.0/vacancies/`, ordered by publication date). Vacancy contacts are never requested, so no user authorization is involved.
+  - Queries are built from the active `/filters` selection when `SUPERJOB_API_QUERY` is empty; a manual `||`-separated query always wins.
+  - Maps each object's profession, direct link, company, town, unixtime `date_published`, payment bounds with currency, and duties/requirements/conditions text.
+  - API error envelopes and failing queries are skipped with a warning and never block the remaining queries.
+
+- `TrudvsemApiAdapter`
+  - Opt-in with `ENABLE_TRUDVSEM_API=true`.
+  - Reads the official «Работа России» government open-data JSON API (`https://opendata.trudvsem.ru/api/v1/vacancies`) with plain GET requests; no key, account, or protection bypass is involved.
+  - Queries are built from the active `/filters` selection when `TRUDVSEM_API_QUERY` is empty; a manual `||`-separated query always wins.
+  - Maps each vacancy's job name, card URL, employer, region, `date_modify` (with `creation-date` as a fallback), salary string and bounds, duties, requirements, and skills. Contact details from the payload (phones, emails, contact persons) are never mapped into published cards.
+  - Results pass through the common polling freshness window; a failing query never blocks the remaining queries.
+
+- `ZarplataApiAdapter`
+  - Opt-in with `ENABLE_ZP_API=true`.
+  - Reads the official Zarplata.ru JSON vacancy search (`https://api.zarplata.ru/vacancies`) with plain anonymous GET requests; no key, account, or protection bypass is involved. The provider captcha-limits anonymous calls, so error and captcha answers are skipped with a warning instead of being bypassed.
+  - Queries are built from the active `/filters` selection when `ZP_API_QUERY` is empty; a manual `||`-separated query always wins.
+  - Maps each item's real `published_at` (with `created_at` as a fallback), `alternate_url`, employer, area, `snippet` text, and structured salary bounds.
+  - Results pass through the common polling freshness window; a failing query never blocks the remaining queries.
+
 ## Source Policy
 
 Every automatic source must produce real vacancy pages, post URLs, and real vacancy text. The bot does not log in to services, store account cookies, create fake identities, perform CAPTCHA bypasses, publish placeholder vacancies, or invent fallback records. LinkedIn hiring posts additionally require a reliable publication date and pass `LINKEDIN_POST_MAX_AGE_HOURS`, capped at 240 hours. All source vacancies pass through the common vacancy filter (the active `/filters` specialties and grades), freshness filter, localization boundary, publication limit, and SQLite deduplication before Telegram publication. The Russia-wide sources deliberately follow the base-layer freshness behavior: dated results older than `SOURCE_MAX_AGE_HOURS` are dropped, while undated results rely on source ordering, the per-poll publication limit, and SQLite deduplication.
@@ -70,4 +105,4 @@ LinkedIn links can also enter through manual Telegram messages or forwards. Thos
 
 ## Adding Sources
 
-New automatic sources follow the project source-adapter contract: add a real `SourceAdapter`, normalize into `Vacancy`, preserve deduplication and freshness handling, document required environment variables, and add focused tests. The owner authorizes the linkedin, Russia internet-search, and public Telegram-channel source families; other automatic sources still need an explicit source-policy change.
+New automatic sources follow the project source-adapter contract: add a real `SourceAdapter`, normalize into `Vacancy`, preserve deduplication and freshness handling, document required environment variables, and add focused tests. The owner authorizes the linkedin, Russia internet-search, and public Telegram-channel source families, plus the five official Russian job-board APIs documented above (HeadHunter JSON API, Habr Career JSON, SuperJob API v2, Работа России open data, Zarplata.ru API); other automatic sources still need an explicit source-policy change.

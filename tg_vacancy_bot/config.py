@@ -192,6 +192,36 @@ class Settings(BaseSettings):
     enable_hhru_rss: bool = Field(default=False, alias="ENABLE_HHRU_RSS")
     hhru_rss_query: str = Field(default="", alias="HHRU_RSS_QUERY")
     hhru_rss_results_wanted: int = Field(default=40, alias="HHRU_RSS_RESULTS_WANTED", gt=0)
+    # HeadHunter public JSON API: official anonymous vacancy search. hh.ru
+    # requires a User-Agent header with a real contact email, so the adapter
+    # stays disabled with a warning until HH_API_CONTACT_EMAIL is set.
+    enable_hh_api: bool = Field(default=False, alias="ENABLE_HH_API")
+    hh_api_contact_email: str = Field(default="", alias="HH_API_CONTACT_EMAIL")
+    hh_api_query: str = Field(default="", alias="HH_API_QUERY")
+    hh_api_results_wanted: int = Field(default=40, alias="HH_API_RESULTS_WANTED", gt=0)
+    # Habr Career public JSON: the same feed the site serves its own vacancy
+    # pages, IT-only, no key or account. Carries qualification and salaries.
+    enable_habr_api: bool = Field(default=False, alias="ENABLE_HABR_API")
+    habr_api_query: str = Field(default="", alias="HABR_API_QUERY")
+    habr_api_results_wanted: int = Field(default=40, alias="HABR_API_RESULTS_WANTED", gt=0)
+    # SuperJob public API v2: official vacancy search; a free registered
+    # application key rides in the X-Api-App-Id header. Vacancy contacts are
+    # never requested, so no user authorization is involved.
+    enable_superjob_api: bool = Field(default=False, alias="ENABLE_SUPERJOB_API")
+    superjob_api_key: str = Field(default="", alias="SUPERJOB_API_KEY")
+    superjob_api_query: str = Field(default="", alias="SUPERJOB_API_QUERY")
+    superjob_api_results_wanted: int = Field(default=40, alias="SUPERJOB_API_RESULTS_WANTED", gt=0)
+    # Работа России open data: the official government JSON vacancy API,
+    # no key or account. Contact details from the payload are never mapped.
+    enable_trudvsem_api: bool = Field(default=False, alias="ENABLE_TRUDVSEM_API")
+    trudvsem_api_query: str = Field(default="", alias="TRUDVSEM_API_QUERY")
+    trudvsem_api_results_wanted: int = Field(default=40, alias="TRUDVSEM_API_RESULTS_WANTED", gt=0)
+    # Zarplata.ru public API: official vacancy search. Anonymous calls are
+    # captcha-limited by the provider, so failures skip quietly with a warning
+    # instead of being bypassed.
+    enable_zp_api: bool = Field(default=False, alias="ENABLE_ZP_API")
+    zp_api_query: str = Field(default="", alias="ZP_API_QUERY")
+    zp_api_results_wanted: int = Field(default=40, alias="ZP_API_RESULTS_WANTED", gt=0)
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4.1-mini", alias="OPENAI_MODEL")
     openai_fallback_models_raw: str = Field(default="", alias="OPENAI_FALLBACK_MODELS")

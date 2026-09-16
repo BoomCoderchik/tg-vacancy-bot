@@ -61,6 +61,30 @@ jobs:
       ENABLE_HHRU_RSS: ${{ secrets.ENABLE_HHRU_RSS || 'true' }}
       HHRU_RSS_QUERY: ${{ secrets.HHRU_RSS_QUERY }}
       HHRU_RSS_RESULTS_WANTED: ${{ secrets.HHRU_RSS_RESULTS_WANTED || '40' }}
+      # Official Russian job-board JSON APIs are opt-in (default off); queries
+      # auto-build from the synced /filters selection unless set explicitly.
+      # HeadHunter JSON needs a real contact email for its User-Agent header.
+      ENABLE_HH_API: ${{ secrets.ENABLE_HH_API || 'false' }}
+      HH_API_CONTACT_EMAIL: ${{ secrets.HH_API_CONTACT_EMAIL }}
+      HH_API_QUERY: ${{ secrets.HH_API_QUERY }}
+      HH_API_RESULTS_WANTED: ${{ secrets.HH_API_RESULTS_WANTED || '40' }}
+      # Habr Career public JSON needs no key.
+      ENABLE_HABR_API: ${{ secrets.ENABLE_HABR_API || 'false' }}
+      HABR_API_QUERY: ${{ secrets.HABR_API_QUERY }}
+      HABR_API_RESULTS_WANTED: ${{ secrets.HABR_API_RESULTS_WANTED || '40' }}
+      # SuperJob API v2 needs a free registered application key.
+      ENABLE_SUPERJOB_API: ${{ secrets.ENABLE_SUPERJOB_API || 'false' }}
+      SUPERJOB_API_KEY: ${{ secrets.SUPERJOB_API_KEY }}
+      SUPERJOB_API_QUERY: ${{ secrets.SUPERJOB_API_QUERY }}
+      SUPERJOB_API_RESULTS_WANTED: ${{ secrets.SUPERJOB_API_RESULTS_WANTED || '40' }}
+      # Работа России open data needs no key.
+      ENABLE_TRUDVSEM_API: ${{ secrets.ENABLE_TRUDVSEM_API || 'false' }}
+      TRUDVSEM_API_QUERY: ${{ secrets.TRUDVSEM_API_QUERY }}
+      TRUDVSEM_API_RESULTS_WANTED: ${{ secrets.TRUDVSEM_API_RESULTS_WANTED || '40' }}
+      # Zarplata.ru public API needs no key; anonymous calls are captcha-limited.
+      ENABLE_ZP_API: ${{ secrets.ENABLE_ZP_API || 'false' }}
+      ZP_API_QUERY: ${{ secrets.ZP_API_QUERY }}
+      ZP_API_RESULTS_WANTED: ${{ secrets.ZP_API_RESULTS_WANTED || '40' }}
       LINKEDIN_POST_APIFY_ACTOR: ${{ secrets.LINKEDIN_POST_APIFY_ACTOR || 'harvestapi/linkedin-post-search' }}
       LINKEDIN_POST_APIFY_SEARCH_QUERIES: ${{ secrets.LINKEDIN_POST_APIFY_SEARCH_QUERIES }}
       LINKEDIN_POST_APIFY_POSTED_LIMIT: ${{ secrets.LINKEDIN_POST_APIFY_POSTED_LIMIT || '24h' }}

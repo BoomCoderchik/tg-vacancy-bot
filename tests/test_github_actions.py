@@ -93,3 +93,20 @@ def test_poll_sources_workflow_defaults_optional_runtime_values() -> None:
     assert "APPLICATION_AUTO_SUBMIT:" not in text
     assert "APPLICATION_QUEUE_RESUME_FILE_ID:" not in text
     assert "always() && env.APPLICATION_QUEUE_ENABLED == 'true'" not in text
+    assert "ENABLE_HH_API: ${{ secrets.ENABLE_HH_API || 'false' }}" in text
+    assert "HH_API_CONTACT_EMAIL: ${{ secrets.HH_API_CONTACT_EMAIL }}" in text
+    assert "HH_API_QUERY: ${{ secrets.HH_API_QUERY }}" in text
+    assert "HH_API_RESULTS_WANTED: ${{ secrets.HH_API_RESULTS_WANTED || '40' }}" in text
+    assert "ENABLE_HABR_API: ${{ secrets.ENABLE_HABR_API || 'false' }}" in text
+    assert "HABR_API_QUERY: ${{ secrets.HABR_API_QUERY }}" in text
+    assert "HABR_API_RESULTS_WANTED: ${{ secrets.HABR_API_RESULTS_WANTED || '40' }}" in text
+    assert "ENABLE_SUPERJOB_API: ${{ secrets.ENABLE_SUPERJOB_API || 'false' }}" in text
+    assert "SUPERJOB_API_KEY: ${{ secrets.SUPERJOB_API_KEY }}" in text
+    assert "SUPERJOB_API_QUERY: ${{ secrets.SUPERJOB_API_QUERY }}" in text
+    assert "SUPERJOB_API_RESULTS_WANTED: ${{ secrets.SUPERJOB_API_RESULTS_WANTED || '40' }}" in text
+    assert "ENABLE_TRUDVSEM_API: ${{ secrets.ENABLE_TRUDVSEM_API || 'false' }}" in text
+    assert "TRUDVSEM_API_QUERY: ${{ secrets.TRUDVSEM_API_QUERY }}" in text
+    assert "TRUDVSEM_API_RESULTS_WANTED: ${{ secrets.TRUDVSEM_API_RESULTS_WANTED || '40' }}" in text
+    assert "ENABLE_ZP_API: ${{ secrets.ENABLE_ZP_API || 'false' }}" in text
+    assert "ZP_API_QUERY: ${{ secrets.ZP_API_QUERY }}" in text
+    assert "ZP_API_RESULTS_WANTED: ${{ secrets.ZP_API_RESULTS_WANTED || '40' }}" in text
