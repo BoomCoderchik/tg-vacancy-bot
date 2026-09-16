@@ -379,6 +379,57 @@ def test_build_adapters_registers_russia_search_and_telegram_when_enabled() -> N
     assert names == ["Russia Internet Search", "Telegram Vacancy Channels"]
 
 
+def test_build_adapters_registers_job_board_apis_when_enabled() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_LINKEDIN_POST_SEARCH=False,
+        ENABLE_LINKEDIN_POST_SCRAPER=False,
+        ENABLE_LINKEDIN_POST_GUEST=False,
+        ENABLE_LINKEDIN_POST_HEADLESS=False,
+        ENABLE_RUSSIA_SEARCH=False,
+        ENABLE_RUSSIA_TELEGRAM=False,
+        ENABLE_HHRU_RSS=False,
+        ENABLE_HH_API=True,
+        HH_API_CONTACT_EMAIL="bot@example.com",
+        ENABLE_HABR_API=True,
+        ENABLE_SUPERJOB_API=True,
+        SUPERJOB_API_KEY="test-key",
+        ENABLE_TRUDVSEM_API=True,
+        ENABLE_ZP_API=True,
+    )
+
+    names = [adapter.name for adapter in build_adapters(settings)]
+    assert names == [
+        "HeadHunter API",
+        "Habr Career",
+        "SuperJob",
+        "Работа России",
+        "Зарплата.ру",
+    ]
+
+
+def test_job_board_apis_require_credentials() -> None:
+    settings = Settings(
+        TELEGRAM_BOT_TOKEN="token",
+        TARGET_CHAT_ID="@target",
+        ENABLE_LINKEDIN_POST_SEARCH=False,
+        ENABLE_LINKEDIN_POST_SCRAPER=False,
+        ENABLE_LINKEDIN_POST_GUEST=False,
+        ENABLE_LINKEDIN_POST_HEADLESS=False,
+        ENABLE_RUSSIA_SEARCH=False,
+        ENABLE_RUSSIA_TELEGRAM=False,
+        ENABLE_HHRU_RSS=False,
+        ENABLE_HH_API=True,
+        ENABLE_SUPERJOB_API=True,
+    )
+
+    assert build_adapters(settings) == []
+    warnings = " ".join(source_configuration_warnings(settings))
+    assert "HH_API_CONTACT_EMAIL is empty" in warnings
+    assert "SUPERJOB_API_KEY is missing" in warnings
+
+
 def test_russia_telegram_source_warns_without_channels() -> None:
     settings = Settings(
         TELEGRAM_BOT_TOKEN="token",

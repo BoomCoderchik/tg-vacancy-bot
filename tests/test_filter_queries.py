@@ -162,6 +162,42 @@ def test_hh_rss_manual_query_is_not_overwritten() -> None:
     assert updated.hhru_rss_query == "custom hh query"
 
 
+def test_job_board_api_queries_generated_when_empty() -> None:
+    settings = _settings()
+    updated = apply_filter_queries(settings, ("frontend",), ("junior",))
+
+    for field in (
+        "hh_api_query",
+        "habr_api_query",
+        "superjob_api_query",
+        "trudvsem_api_query",
+        "zp_api_query",
+    ):
+        value = getattr(updated, field)
+        assert value, field
+        assert "||" in value, field
+        assert '"' not in value, field
+
+
+def test_job_board_api_manual_queries_are_not_overwritten() -> None:
+    settings = _settings().model_copy(
+        update={
+            "hh_api_query": "custom hh api",
+            "habr_api_query": "custom habr",
+            "superjob_api_query": "custom sj",
+            "trudvsem_api_query": "custom trud",
+            "zp_api_query": "custom zp",
+        }
+    )
+    updated = apply_filter_queries(settings, ("frontend",), ("junior",))
+
+    assert updated.hh_api_query == "custom hh api"
+    assert updated.habr_api_query == "custom habr"
+    assert updated.superjob_api_query == "custom sj"
+    assert updated.trudvsem_api_query == "custom trud"
+    assert updated.zp_api_query == "custom zp"
+
+
 def test_guest_post_query_generated_when_empty() -> None:
     settings = _settings()
     updated = apply_filter_queries(settings, ("frontend",), ("junior",))
