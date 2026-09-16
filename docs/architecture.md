@@ -27,15 +27,6 @@
   - Prints a secret-free report with safe error classes so search-engine blockages are visible.
   - Does not start Playwright, publish to Telegram, localize text, or mutate deduplication state.
 
-- `tg-vacancy-bot process-applications-once`
-  - Returns immediately when `APPLICATION_QUEUE_ENABLED=false`.
-  - Uses Telegram `getUpdates` to drain queued application callbacks and private queue-resume messages in batches.
-  - Requires one allowlisted operator and a queue profile configured through private environment variables.
-  - Persists only the latest `/queue_resume` document `file_id` and safe filename in SQLite; the document bytes remain in Telegram.
-  - Downloads the selected resume by Telegram `file_id` into a temporary directory.
-  - Runs the allowlisted browser adapter, persists the factual application status in SQLite, sends a private result, and exits.
-  - Never retries a callback that reached `submitting`, because the external form may already have accepted it.
-
 - `tg-vacancy-bot check-telegram`
   - Calls the real Telegram API.
   - Validates the bot token, target chat visibility, and bot membership/posting status.
@@ -93,12 +84,6 @@
 
 - `tg_vacancy_bot/deployment.py`
   - Hosts the minimal HTTP health endpoint used by web-service deployments.
-
-- `tg_vacancy_bot/application_queue.py`
-  - Implements the one-shot Telegram callback consumer used by GitHub Actions.
-  - Keeps profile secrets out of SQLite and keeps resume bytes out of Actions cache.
-  - Preserves update ordering and confirms Telegram offsets only after processing a batch.
-  - Runs the bot process alongside the health endpoint without changing Telegram publishing behavior.
 
 - `tg_vacancy_bot/parser.py`
   - Extracts URL, title, stack, location, salary, and source from free-form vacancy text.

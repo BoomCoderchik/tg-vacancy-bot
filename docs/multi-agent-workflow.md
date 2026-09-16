@@ -132,8 +132,8 @@ All normal project rules still apply:
   integrations real. Do not introduce fake fallbacks or placeholder vacancies.
 - Do not print or commit secrets, `.env`, databases, logs, caches, or virtual
   environments.
-- Preserve deduplication, vacancy filtering, operator allowlists, opt-in
-  LinkedIn boundaries, and application confirmation boundaries.
+- Preserve deduplication, vacancy filtering, operator allowlists, and opt-in
+  LinkedIn boundaries.
 - Stop instead of guessing when a real service, credential, permission, schema,
   or production resource is required but unavailable.
 - The lead agent is responsible for final verification even when a specialist
