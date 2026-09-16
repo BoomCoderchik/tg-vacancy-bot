@@ -1,5 +1,4 @@
 from functools import lru_cache
-from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
@@ -58,19 +57,6 @@ class Settings(BaseSettings):
     database_path: str = Field(default="data/vacancies.sqlite3", alias="DATABASE_PATH")
     resume_storage_dir: str = Field(default="data/resumes", alias="RESUME_STORAGE_DIR")
     resume_max_size_bytes: int = Field(default=10 * 1024 * 1024, alias="RESUME_MAX_SIZE_BYTES", gt=0)
-    browser_profile_dir: str = Field(default="data/browser-profile", alias="BROWSER_PROFILE_DIR")
-    browser_headless: bool = Field(default=True, alias="BROWSER_HEADLESS")
-    browser_timeout_seconds: int = Field(default=30, alias="BROWSER_TIMEOUT_SECONDS", gt=0)
-    application_allowed_domains_raw: str = Field(default="", alias="APPLICATION_ALLOWED_DOMAINS")
-    application_queue_enabled: bool = Field(default=False, alias="APPLICATION_QUEUE_ENABLED")
-    application_auto_submit: bool = Field(default=False, alias="APPLICATION_AUTO_SUBMIT")
-    application_queue_profile_full_name: str = Field(default="", alias="APPLICATION_QUEUE_PROFILE_FULL_NAME")
-    application_queue_profile_email: str = Field(default="", alias="APPLICATION_QUEUE_PROFILE_EMAIL")
-    application_queue_profile_phone: str = Field(default="", alias="APPLICATION_QUEUE_PROFILE_PHONE")
-    application_queue_profile_personal_url: str = Field(default="", alias="APPLICATION_QUEUE_PROFILE_PERSONAL_URL")
-    application_queue_profile_cover_letter: str = Field(default="", alias="APPLICATION_QUEUE_PROFILE_COVER_LETTER")
-    application_queue_resume_file_id: str = Field(default="", alias="APPLICATION_QUEUE_RESUME_FILE_ID")
-    application_queue_resume_file_name: str = Field(default="resume.pdf", alias="APPLICATION_QUEUE_RESUME_FILE_NAME")
     source_poll_interval_seconds: int = Field(default=900, alias="SOURCE_POLL_INTERVAL_SECONDS")
     source_max_publish_per_poll: int = Field(default=20, alias="SOURCE_MAX_PUBLISH_PER_POLL")
     source_max_age_hours: int = Field(default=48, alias="SOURCE_MAX_AGE_HOURS")
@@ -220,10 +206,6 @@ class Settings(BaseSettings):
         return parse_operator_user_ids(self.operator_user_ids_raw)
 
     @property
-    def application_allowed_domains(self) -> tuple[str, ...]:
-        return tuple(dict.fromkeys(item.strip().lower() for item in self.application_allowed_domains_raw.split(",") if item.strip()))
-
-    @property
     def openai_fallback_models(self) -> tuple[str, ...]:
         configured = tuple(
             model.strip() for model in self.openai_fallback_models_raw.split(",") if model.strip()
@@ -346,34 +328,6 @@ class Settings(BaseSettings):
 
     def require_bot_polling(self) -> None:
         self.require_runtime()
-        if self.application_queue_enabled:
-            raise RuntimeError(
-                "Telegram long polling and the scheduled application queue must not run at the same time. "
-                "Set APPLICATION_QUEUE_ENABLED=false for run/run-web, or stop the polling bot and keep "
-                "the GitHub Actions queue enabled."
-            )
-
-    def require_application_queue(self) -> None:
-        self.require_runtime()
-        missing = []
-        if len(self.operator_user_ids) != 1:
-            missing.append("exactly one OPERATOR_USER_IDS value")
-        if not self.application_auto_submit:
-            missing.append("APPLICATION_AUTO_SUBMIT=true")
-        if len(self.application_queue_profile_full_name.strip().split()) < 2:
-            missing.append("APPLICATION_QUEUE_PROFILE_FULL_NAME")
-        if not self.application_queue_profile_email.strip():
-            missing.append("APPLICATION_QUEUE_PROFILE_EMAIL")
-        resume_name = Path(self.application_queue_resume_file_name).name
-        if (
-            resume_name != self.application_queue_resume_file_name
-            or Path(resume_name).suffix.lower() not in {".pdf", ".docx"}
-        ):
-            missing.append("APPLICATION_QUEUE_RESUME_FILE_NAME (.pdf or .docx)")
-        if self.resume_max_size_bytes > 20 * 1024 * 1024:
-            missing.append("RESUME_MAX_SIZE_BYTES no greater than Telegram's 20 MB download limit")
-        if missing:
-            raise RuntimeError("Application queue configuration is incomplete: " + ", ".join(missing))
 
 
 @lru_cache

@@ -5,10 +5,6 @@ from urllib.parse import urlsplit, urlunsplit
 
 
 ResultType = Literal["vacancy"]
-ApplicationStatus = Literal[
-    "created", "queued", "loading", "submitting", "parsed", "profile_missing", "unsupported_site", "filled",
-    "manual_required", "awaiting_confirmation", "submitted", "failed", "cancelled",
-]
 
 _TRACKING_QUERY_PARAMS = frozenset({"fbclid", "gclid", "mc_cid", "mc_eid", "igshid", "si"})
 
@@ -85,14 +81,3 @@ class OperatorProfile:
     resume_stored_name: str | None = None
     resume_telegram_file_id: str | None = None
     resume_text: str | None = None
-
-
-@dataclass(frozen=True)
-class Application:
-    application_id: str
-    operator_user_id: int
-    vacancy_fingerprint: str
-    vacancy_url: str | None
-    site: str | None
-    status: ApplicationStatus
-    error_description: str | None = None

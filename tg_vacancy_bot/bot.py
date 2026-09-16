@@ -2,21 +2,18 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import replace
-from html import escape
 from io import BytesIO
 import logging
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ChatType, ParseMode
+from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from .access_control import is_authorized_user
-from .application_buttons import APPLICATION_CALLBACK_PREFIX
-from .browser_worker import BrowserWorker
 from .config import Settings
 from .description_localization import localize_vacancy_description
 from .formatting import format_vacancy_card
@@ -24,7 +21,7 @@ from .github_filter_sync import sync_vacancy_filter_to_github
 from .intake import looks_like_vacancy_message
 from .preview import parse_publishable_message
 from .runtime_lock import SingleInstanceLock, bot_run_lock_path
-from .models import ApplicationStatus, OperatorProfile, VacancyFilter
+from .models import OperatorProfile, VacancyFilter
 from .sources.filters import (
     DEFAULT_GRADE,
     DEFAULT_SPECIALTY,
@@ -205,210 +202,6 @@ def format_whoami_text(user_id: int | None) -> str:
     return f"Your Telegram user ID: {user_id}"
 
 
-def queue_resume_id_text(profile: OperatorProfile | None) -> str:
-    if not profile or not profile.resume_telegram_file_id:
-        return "Сначала загрузите резюме через /profile при запущенном локальном боте."
-    return (
-        "Скопируйте значение в GitHub secret APPLICATION_QUEUE_RESUME_FILE_ID:\n\n"
-        f"<code>{escape(profile.resume_telegram_file_id)}</code>"
-    )
-
-
-def manual_application_link_text(vacancy_url: str) -> str:
-    return (
-        "Автозаполнение для этой формы пока не поддерживается. "
-        f'<a href="{escape(vacancy_url, quote=True)}">Открыть вакансию и откликнуться вручную</a>.'
-    )
-
-
-def application_result_text(
-    status: ApplicationStatus,
-    *,
-    missing_fields: tuple[str, ...] = (),
-    error_description: str | None = None,
-) -> str:
-    """Describe the real application state without implying a submission that did not happen."""
-    if status == "submitted":
-        return "✅ Отклик отправлен."
-    if status == "filled":
-        return (
-            "🟡 Отклик ещё не отправлен.\n\n"
-            "Форма заполнена, но финальная отправка не выполнялась. "
-            "Откройте вакансию и подтвердите отправку вручную."
-        )
-    if status == "profile_missing":
-        missing = ", ".join(missing_fields) or "обязательные данные"
-        return (
-            "❌ Отклик не отправлен.\n\n"
-            f"Не хватает данных профиля: {missing}. Заполните их через /profile и попробуйте снова."
-        )
-    if status in {"manual_required", "unsupported_site"}:
-        text = (
-            "⚠️ Отклик не отправлен автоматически.\n\n"
-            "Для этой вакансии требуется открыть форму и завершить отклик вручную."
-        )
-        if detail := _application_error_detail(error_description):
-            text += f"\n\nПричина: {detail}"
-        return text
-    if status == "awaiting_confirmation":
-        return (
-            "🟡 Отклик ещё не отправлен.\n\n"
-            "Форма ожидает вашего подтверждения перед отправкой."
-        )
-    if status == "failed":
-        text = "❌ Не удалось отправить отклик. Попробуйте ещё раз или откройте вакансию вручную."
-        if detail := _application_error_detail(error_description):
-            text += f"\n\nПричина: {detail}"
-        return text
-    if status == "cancelled":
-        return "Отклик отменён и не отправлен."
-    return "⏳ Отклик обрабатывается. Бот сообщит результат отдельным сообщением."
-
-
-def _application_error_detail(error_description: str | None) -> str | None:
-    """Return a safe user-facing reason without exposing raw runner details."""
-    if not error_description:
-        return None
-    normalized = " ".join(error_description.strip().split()).lower()
-    known_reasons = (
-        (
-            "vacancy does not contain an external application url",
-            "у вакансии нет внешней ссылки на форму отклика.",
-        ),
-        (
-            "domain is not in application_allowed_domains",
-            "домен формы не включён в список разрешённых для автоотклика.",
-        ),
-        (
-            "no application adapter is registered for this site",
-            "для этого сайта ещё нет поддерживаемого автозаполнения.",
-        ),
-        (
-            "success state could not be verified",
-            "бот заполнил форму, но не смог надёжно подтвердить успешную отправку; повторять автоматически небезопасно.",
-        ),
-        (
-            "site protection detected",
-            "на странице обнаружена защита вроде CAPTCHA или 2FA.",
-        ),
-        (
-            "login is required",
-            "форма требует входа в аккаунт.",
-        ),
-        (
-            "previous runner stopped during submission",
-            "предыдущий запуск остановился во время отправки; автоматический повтор отключён, чтобы не отправить дубль.",
-        ),
-        (
-            "runner stopped after submission started",
-            "запуск остановился после начала отправки; автоматический повтор отключён, чтобы не отправить дубль.",
-        ),
-        (
-            "queued application processing failed before submission",
-            "очередь остановилась до начала отправки, поэтому можно попробовать ещё раз.",
-        ),
-        (
-            "browser preparation failed",
-            "браузерный запуск не смог подготовить форму.",
-        ),
-        (
-            "browser inspection failed",
-            "браузерный запуск не смог проверить страницу.",
-        ),
-    )
-    for marker, reason in known_reasons:
-        if marker in normalized:
-            return reason
-    return "бот остановил автоматическую отправку из-за неподдержанного состояния формы."
-
-
-def application_prepared_text() -> str:
-    return (
-        "Отклик подготовлен.\n\n"
-        "Я сохранил заявку по этой вакансии. Бот попробует обработать её через поддерживаемую форму "
-        "и пришлёт фактический результат отдельным сообщением."
-    )
-
-
-def application_result_markup(vacancy_url: str | None) -> InlineKeyboardMarkup | None:
-    if not vacancy_url:
-        return None
-    return InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="Открыть вакансию", url=vacancy_url)]]
-    )
-
-
-async def send_application_prepared_notification(
-    bot: Bot,
-    operator_user_id: int,
-    vacancy_url: str | None,
-) -> bool:
-    """Send a durable private queue confirmation; return False when Telegram rejects the DM."""
-    try:
-        await bot.send_message(
-            chat_id=operator_user_id,
-            text=application_prepared_text(),
-            reply_markup=application_result_markup(vacancy_url),
-        )
-    except Exception:
-        logger.warning("Could not send private application prepared notification.")
-        return False
-    return True
-
-
-async def send_application_result_notification(
-    bot: Bot,
-    operator_user_id: int,
-    status: ApplicationStatus,
-    vacancy_url: str | None,
-    *,
-    missing_fields: tuple[str, ...] = (),
-    error_description: str | None = None,
-) -> bool:
-    """Send a durable private result message; return False when Telegram rejects the DM."""
-    try:
-        await bot.send_message(
-            chat_id=operator_user_id,
-            text=application_result_text(
-                status,
-                missing_fields=missing_fields,
-                error_description=error_description,
-            ),
-            reply_markup=application_result_markup(vacancy_url),
-        )
-    except Exception:
-        logger.warning("Could not send private application result notification.")
-        return False
-    return True
-
-
-def profile_onboarding_missing_fields(profile: OperatorProfile | None) -> tuple[str, ...]:
-    """Return the private data required by the currently supported application adapter."""
-    missing: list[str] = []
-    name_parts = (profile.full_name or "").strip().split() if profile else []
-    if len(name_parts) < 2:
-        missing.append("имя и фамилия")
-    if not profile or not profile.email:
-        missing.append("email")
-    if not profile or not profile.resume_stored_name:
-        missing.append("резюме в PDF или DOCX")
-    return tuple(missing)
-
-
-def profile_onboarding_text(profile: OperatorProfile | None) -> str:
-    missing = ", ".join(profile_onboarding_missing_fields(profile))
-    return (
-        "Чтобы подготовить отклики, загрузите резюме и заполните профиль.\n"
-        f"Сейчас нужны: {missing}.\n\n"
-        "Нажмите «Заполнить поля», затем «Загрузить резюме». "
-        "Без этих данных бот не будет пытаться заполнить форму вакансии."
-    )
-
-
-def needs_profile_onboarding(profile: OperatorProfile | None) -> bool:
-    return bool(profile_onboarding_missing_fields(profile))
-
-
 def profile_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -428,33 +221,10 @@ def profile_confirm_delete_menu() -> InlineKeyboardMarkup:
     )
 
 
-async def send_profile_onboarding_reminders(bot: Bot, settings: Settings, store: VacancyStore) -> None:
-    """Prompt known operators after a bot restart until their application profile is ready."""
-    for operator_user_id in settings.operator_user_ids:
-        profile = store.get_operator_profile(operator_user_id)
-        if not needs_profile_onboarding(profile):
-            continue
-        try:
-            await bot.send_message(
-                chat_id=operator_user_id,
-                text=profile_onboarding_text(profile),
-                reply_markup=profile_menu(),
-            )
-        except Exception:
-            # A bot cannot message an operator who has never opened a private chat with it.
-            logger.warning("Could not send profile onboarding reminder to configured operator.")
-
-
 def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
     dp = Dispatcher()
     resume_storage = ResumeStorage(settings.resume_storage_dir, settings.resume_max_size_bytes)
     profile_service = ProfileService(store, resume_storage)
-    browser_worker = BrowserWorker(
-        settings.browser_profile_dir,
-        settings.application_allowed_domains,
-        settings.browser_headless,
-        settings.browser_timeout_seconds,
-    )
 
     def profile_operator_from_message(message: Message) -> int | None:
         user_id = message.from_user.id if message.from_user else None
@@ -478,14 +248,6 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             return
         await state.clear()
         await message.answer(format_profile_summary(store.get_operator_profile(operator_user_id)), reply_markup=profile_menu())
-
-    @dp.message(Command("queue_resume_id"))
-    async def queue_resume_id_command(message: Message) -> None:
-        operator_user_id = profile_operator_from_message(message)
-        if operator_user_id is None or message.chat.type != ChatType.PRIVATE:
-            await deny_profile_message(message)
-            return
-        await message.answer(queue_resume_id_text(store.get_operator_profile(operator_user_id)))
 
     @dp.callback_query(F.data == "profile:edit")
     async def profile_edit(callback: CallbackQuery, state: FSMContext) -> None:
@@ -628,76 +390,6 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
             return
         await state.clear()
         await callback.message.answer("Профиль удалён.", reply_markup=profile_menu())
-
-    @dp.callback_query(F.data.startswith(APPLICATION_CALLBACK_PREFIX))
-    async def application_button_pending(callback: CallbackQuery, bot: Bot) -> None:
-        if not is_profile_operator(callback.from_user.id if callback.from_user else None, settings.operator_user_ids):
-            await callback.answer("Отклик доступен только оператору.", show_alert=True)
-            return
-        vacancy_id = (callback.data or "").removeprefix(APPLICATION_CALLBACK_PREFIX)
-        result = store.create_application(callback.from_user.id, vacancy_id)
-        if result is None:
-            await callback.answer("Вакансия больше недоступна в локальной базе.", show_alert=True)
-            return
-        application, created = result
-        if application.status == "failed":
-            notified = await send_application_result_notification(
-                bot,
-                callback.from_user.id,
-                application.status,
-                application.vacancy_url,
-                error_description=application.error_description,
-            )
-            message = (
-                "Результат отправлен вам в личный чат."
-                if notified
-                else "Не удалось отправить результат. Откройте личный чат с ботом и нажмите Start."
-            )
-            await callback.answer(message, show_alert=True)
-            return
-        if created and application.vacancy_url:
-            store.update_application_status(application.application_id, "queued")
-            prepared_notified = await send_application_prepared_notification(
-                bot,
-                callback.from_user.id,
-                application.vacancy_url,
-            )
-            prepared_message = (
-                "Отклик подготовлен."
-                if prepared_notified
-                else "Отклик подготовлен. Откройте личный чат с ботом, чтобы получать сообщения."
-            )
-            await callback.answer(prepared_message, show_alert=not prepared_notified)
-            profile = store.get_operator_profile(callback.from_user.id)
-            resume_path = (
-                resume_storage.path_for(profile.resume_stored_name)
-                if profile and profile.resume_stored_name
-                else None
-            )
-            inspection = await browser_worker.prepare_application(application.vacancy_url, profile, resume_path)
-            store.update_application_status(application.application_id, inspection.status, inspection.error)
-            await send_application_result_notification(
-                bot,
-                callback.from_user.id,
-                inspection.status,
-                application.vacancy_url,
-                missing_fields=inspection.missing_fields,
-                error_description=inspection.error,
-            )
-            return
-        notified = await send_application_result_notification(
-            bot,
-            callback.from_user.id,
-            application.status,
-            application.vacancy_url,
-            error_description=application.error_description,
-        )
-        message = (
-            "Актуальный результат отправлен вам в личный чат."
-            if notified
-            else "Не удалось отправить результат. Откройте личный чат с ботом и нажмите Start."
-        )
-        await callback.answer(message, show_alert=True)
 
     @dp.message(Command("start"))
     async def start(message: Message, state: FSMContext) -> None:
@@ -1007,7 +699,6 @@ async def run_bot(settings: Settings) -> None:
         )
         dp = create_dispatcher(settings, store)
         asyncio.create_task(_sync_filter_on_startup(settings, store))
-        await send_profile_onboarding_reminders(bot, settings, store)
         polling_task = asyncio.create_task(poll_sources_forever(bot, settings, store))
 
         try:

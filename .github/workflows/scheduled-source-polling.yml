@@ -25,7 +25,6 @@ jobs:
       OPERATOR_USER_IDS: ${{ secrets.OPERATOR_USER_IDS }}
       FORWARDED_MODE: normalize
       DATABASE_PATH: data/vacancies.sqlite3
-      APPLICATION_QUEUE_ENABLED: "false"
       SOURCE_POLL_INTERVAL_SECONDS: "0"
       SOURCE_MAX_PUBLISH_PER_POLL: ${{ secrets.SOURCE_MAX_PUBLISH_PER_POLL || '20' }}
       SOURCE_MAX_AGE_HOURS: ${{ secrets.SOURCE_MAX_AGE_HOURS || '48' }}

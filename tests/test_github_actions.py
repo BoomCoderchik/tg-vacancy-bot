@@ -90,7 +90,6 @@ def test_poll_sources_workflow_defaults_optional_runtime_values() -> None:
     assert "LINKEDIN_POST_SEARCH_QUERY: ${{ secrets.LINKEDIN_POST_SEARCH_QUERY ||" in text
     assert "LINKEDIN_POST_SCRAPER_QUERY: ${{ secrets.LINKEDIN_POST_SCRAPER_QUERY ||" in text
     assert "python -m playwright install --with-deps chromium" in text
-    assert 'APPLICATION_QUEUE_ENABLED: "false"' in text
     assert "APPLICATION_AUTO_SUBMIT:" not in text
     assert "APPLICATION_QUEUE_RESUME_FILE_ID:" not in text
     assert "always() && env.APPLICATION_QUEUE_ENABLED == 'true'" not in text
