@@ -29,7 +29,7 @@ def format_check_result(result: TelegramCheckResult) -> str:
             f"Target: {result.target_title} ({result.target_type})",
             f"Bot membership: {result.membership_status}",
             f"Can post messages: {post_status}",
-            f"Operator allowlist: {'on' if result.operator_allowlist_enabled else 'off'}",
+            f"Operator allowlist: {'on' if result.operator_allowlist_enabled else 'empty (publishing locked)'}",
         ]
     )
 

@@ -5,6 +5,7 @@ import yaml
 
 WORKFLOW = Path(".github/workflows/scheduled-source-polling.yml")
 DIAGNOSTIC_WORKFLOW = Path(".github/workflows/diagnose-linkedin.yml")
+TESTS_WORKFLOW = Path(".github/workflows/tests.yml")
 OLD_WORKFLOW = Path(".github/workflows/poll-sources.yml")
 README = Path("README.md")
 
@@ -113,3 +114,20 @@ def test_poll_sources_workflow_defaults_optional_runtime_values() -> None:
     assert "ENABLE_ZP_API: ${{ secrets.ENABLE_ZP_API || 'false' }}" in text
     assert "ZP_API_QUERY: ${{ secrets.ZP_API_QUERY }}" in text
     assert "ZP_API_RESULTS_WANTED: ${{ secrets.ZP_API_RESULTS_WANTED || '40' }}" in text
+
+
+def test_tests_workflow_runs_pytest_on_push_and_pull_request() -> None:
+    parsed = _load_workflow(TESTS_WORKFLOW)
+
+    # PyYAML parses an unquoted ``on:`` key as boolean True.
+    triggers = parsed.get("on", parsed.get(True, {}))
+    assert "push" in triggers
+    assert "pull_request" in triggers
+    assert "main" in triggers["push"]["branches"]
+    assert "develop" in triggers["push"]["branches"]
+
+    job = parsed["jobs"]["pytest"]
+    run_commands = [step.get("run", "") for step in job["steps"]]
+    assert any("pip install -e '.[dev]'" in command for command in run_commands)
+    assert any("python -m pytest -q" in command for command in run_commands)
+    assert "3.12" in job["strategy"]["matrix"]["python-version"]

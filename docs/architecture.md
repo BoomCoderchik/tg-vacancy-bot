@@ -48,7 +48,7 @@
 - `tg_vacancy_bot/config.py`
   - Loads private runtime configuration from `.env`.
   - Requires `TELEGRAM_BOT_TOKEN` and `TARGET_CHAT_ID` for real publishing.
-  - Supports optional `OPERATOR_USER_IDS` for publish access control.
+  - Reads the `OPERATOR_USER_IDS` allowlist for publish access control (empty list = publishing locked).
   - Controls source polling with `SOURCE_POLL_INTERVAL_SECONDS`, `SOURCE_MAX_PUBLISH_PER_POLL`, and `SOURCE_MAX_AGE_HOURS`.
    - Accepts an optional filter override for scheduled/CLI runs through `VACANCY_FILTER_SPECIALTIES` and `VACANCY_FILTER_GRADES` (comma-separated values that win over the stored filter when present).
    - Supports optional auto-sync of the operator-chosen filter to GitHub Actions repository variables. Uses the authenticated `gh` CLI by default and auto-detects the repository from `git remote origin`; a fine-grained PAT via `GITHUB_FILTER_SYNC_TOKEN`/`GITHUB_REPOSITORY` is only an alternative for machines without a `gh` session.
@@ -166,7 +166,7 @@ The bot depends on real Telegram access:
 - `TELEGRAM_BOT_TOKEN` from BotFather.
 - `TARGET_CHAT_ID` for the target channel/group.
 - Bot admin rights in the target channel/group.
-- Optional `OPERATOR_USER_IDS` to restrict who can publish through the bot.
+- `OPERATOR_USER_IDS` listing the Telegram users who may publish through the bot; nobody can publish while it is empty.
 
 Optional source credentials:
 
@@ -204,7 +204,7 @@ For `@it_jobs_board`-style intake:
 - Obvious non-vacancy messages and vacancies outside the unified vacancy filtering policy are skipped.
 - If the forwarded source is a public Telegram channel, the card link can point back to the original `t.me/channel/message_id`.
 - If `FORWARDED_MODE=copy`, the bot applies the same allowed-vacancy intake check and then copies the original incoming message to the target chat.
-- If `OPERATOR_USER_IDS` is set, unauthorized users are rejected before copy/normalize publishing.
+- Unauthorized users are rejected before copy/normalize publishing; an empty `OPERATOR_USER_IDS` rejects everyone and the reply explains how to enable access.
 - `/whoami` remains available so an operator can discover their Telegram user ID for `OPERATOR_USER_IDS`.
 
 ## LinkedIn Boundary

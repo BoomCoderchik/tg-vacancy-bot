@@ -328,3 +328,38 @@ def test_localize_vacancy_description_requires_groq_key_when_enabled() -> None:
 
     with pytest.raises(RuntimeError, match="GROQ_API_KEY"):
         asyncio.run(localize_vacancy_description(vacancy, settings))
+
+
+def test_localization_cache_evicts_oldest_entry_when_full() -> None:
+    # Regression: the cache used ``dict.popitem(last=False)`` which raised
+    # ``TypeError`` on the 129th unique description and broke localization.
+    localizer = OpenAIDescriptionLocalizer(api_key="key", model="gpt-test", client=FakeOpenAIClient())
+    total = description_localization.CACHE_MAX_ENTRIES + 1
+
+    for index in range(total):
+        text = asyncio.run(localizer.localize(f"Remote backend role number {index} with Python."))
+        assert text
+
+    cache = description_localization._localization_cache
+    assert len(cache) == description_localization.CACHE_MAX_ENTRIES
+    assert "Remote backend role number 0 with Python." not in cache
+    assert f"Remote backend role number {total - 1} with Python." in cache
+
+
+def test_localization_cache_keeps_recently_used_entries() -> None:
+    client = FakeOpenAIClient()
+    localizer = OpenAIDescriptionLocalizer(api_key="key", model="gpt-test", client=client)
+    first = "Remote backend role number first with Python."
+    asyncio.run(localizer.localize(first))
+    for index in range(description_localization.CACHE_MAX_ENTRIES - 1):
+        asyncio.run(localizer.localize(f"Remote backend role number {index} with Python."))
+
+    # Touch the oldest entry, then overflow the cache: the touched entry must survive.
+    client.chat.completions.request = None
+    asyncio.run(localizer.localize(first))
+    assert client.chat.completions.request is None, "cache hit must not call the API"
+    asyncio.run(localizer.localize("Remote backend role number overflow with Python."))
+
+    cache = description_localization._localization_cache
+    assert first in cache
+    assert "Remote backend role number 0 with Python." not in cache
