@@ -317,13 +317,13 @@ bypassed — expect lower yield from this source than from the keyed ones.
 3. Create your target channel or group.
 4. Add the bot as an admin to that target channel/group.
 5. Put the target chat into `.env` as `TARGET_CHAT_ID`.
-6. For production safety, put your Telegram user ID into `OPERATOR_USER_IDS`.
+6. Put your Telegram user ID into `OPERATOR_USER_IDS`; publishing stays locked until at least one operator is listed.
 
 For a public channel, `TARGET_CHAT_ID` can be `@channel_username`. For a private channel/group, use the numeric chat ID.
 
-`OPERATOR_USER_IDS` is optional during first setup. When it is set, only listed Telegram users can publish forwarded messages, copy messages, or view `/status`. Use a comma-separated list, for example `OPERATOR_USER_IDS=123456789,987654321`.
+`OPERATOR_USER_IDS` is the operator allowlist. Only listed Telegram users can publish forwarded messages, copy messages, manage `/filters`, or view `/status`. Access is closed by default: while the list is empty the bot answers every publish attempt with a "publishing locked" hint instead of accepting vacancies from any Telegram user. Use a comma-separated list, for example `OPERATOR_USER_IDS=123456789,987654321`.
 
-To find your Telegram user ID, run the bot without `OPERATOR_USER_IDS` first, send `/whoami` to the bot, copy the returned ID into `.env`, then restart the bot.
+To find your Telegram user ID, start the bot with an empty `OPERATOR_USER_IDS`, send `/whoami` to the bot (it stays available to everyone), copy the returned ID into `.env`, then restart the bot.
 
 ## Local Setup
 

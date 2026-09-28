@@ -1,9 +1,13 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
 from tg_vacancy_bot.config import Settings
 from tg_vacancy_bot.models import Vacancy, VacancyFilter
-from tg_vacancy_bot.source_polling import poll_sources_once, resolve_active_filter
+from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
+
+from tg_vacancy_bot.source_polling import poll_sources_forever, poll_sources_once, resolve_active_filter
 
 
 class FakeBot:
@@ -200,3 +204,99 @@ def test_resolve_active_filter_falls_back_to_store_without_env_override() -> Non
     result = resolve_active_filter(FakeStore(), settings)
     assert result.specialties == ("frontend_fullstack",)
     assert result.grades == ("junior",)
+
+
+def test_poll_sources_once_retries_after_telegram_flood_control(monkeypatch) -> None:
+    settings = Settings(TELEGRAM_BOT_TOKEN="token", TARGET_CHAT_ID="@target", SOURCE_MAX_PUBLISH_PER_POLL="1")
+    monkeypatch.setattr("tg_vacancy_bot.source_polling.build_adapters", lambda _: [FakeAdapter()])
+
+    async def fake_localize(vacancy, settings):
+        return vacancy
+
+    sleeps: list[float] = []
+
+    async def fake_sleep(seconds):
+        sleeps.append(seconds)
+
+    class FloodControlBot:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def send_message(self, **kwargs) -> None:
+            self.calls += 1
+            if self.calls == 1:
+                raise TelegramRetryAfter(method=object(), message="Too Many Requests", retry_after=4)
+
+    monkeypatch.setattr("tg_vacancy_bot.source_polling.localize_vacancy_description", fake_localize)
+    monkeypatch.setattr("tg_vacancy_bot.publisher.asyncio.sleep", fake_sleep)
+    bot = FloodControlBot()
+    store = FakeStore()
+
+    published = asyncio.run(poll_sources_once(bot, settings, store))
+
+    assert published == 1
+    assert bot.calls == 2
+    assert sleeps == [5]
+    assert len(store.published) == 1
+
+
+def test_poll_sources_once_continues_after_failed_delivery(monkeypatch) -> None:
+    # A Telegram error for one vacancy must neither stop the cycle nor mark the
+    # vacancy as published, so the next poll can retry it.
+    settings = Settings(TELEGRAM_BOT_TOKEN="token", TARGET_CHAT_ID="@target")
+    monkeypatch.setattr("tg_vacancy_bot.source_polling.build_adapters", lambda _: [FakeAdapter()])
+
+    async def fake_localize(vacancy, settings):
+        return vacancy
+
+    class FlakyBot:
+        def __init__(self) -> None:
+            self.sent_messages: list[str] = []
+
+        async def send_message(self, **kwargs) -> None:
+            if "Developer 1" in kwargs["text"]:
+                raise TelegramForbiddenError(method=object(), message="bot was kicked from the channel")
+            self.sent_messages.append(kwargs["text"])
+
+    monkeypatch.setattr("tg_vacancy_bot.source_polling.localize_vacancy_description", fake_localize)
+    bot = FlakyBot()
+    store = FakeStore()
+
+    published = asyncio.run(poll_sources_once(bot, settings, store))
+
+    assert published == 4
+    assert len(bot.sent_messages) == 4
+    assert [vacancy.title for vacancy in store.published] == [
+        "Junior Frontend Developer 0",
+        "Junior Frontend Developer 2",
+        "Junior Frontend Developer 3",
+        "Junior Frontend Developer 4",
+    ]
+
+
+def test_poll_sources_forever_survives_a_failed_cycle(monkeypatch) -> None:
+    settings = Settings(TELEGRAM_BOT_TOKEN="token", TARGET_CHAT_ID="@target", SOURCE_POLL_INTERVAL_SECONDS="30")
+    calls: list[int] = []
+    sleeps: list[float] = []
+
+    async def flaky_poll(bot, settings, store):
+        calls.append(len(calls))
+        if len(calls) == 1:
+            raise RuntimeError("database is locked")
+        if len(calls) == 3:
+            raise asyncio.CancelledError()
+        return 0
+
+    async def fake_sleep(seconds):
+        sleeps.append(seconds)
+
+    monkeypatch.setattr("tg_vacancy_bot.source_polling.poll_sources_once", flaky_poll)
+    monkeypatch.setattr("tg_vacancy_bot.source_polling.asyncio.sleep", fake_sleep)
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(poll_sources_forever(FakeBot(), settings, FakeStore()))
+
+    # First cycle crashed -> backoff sleep; second cycle succeeded -> normal interval;
+    # third cycle was cancelled -> loop stopped instead of swallowing the cancellation.
+    assert calls == [0, 1, 2]
+    assert sleeps == [30, 30]

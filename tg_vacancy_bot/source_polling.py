@@ -5,12 +5,12 @@ import logging
 from datetime import UTC, datetime
 
 from aiogram import Bot
-from aiogram.enums import ParseMode
 
 from .config import Settings
 from .description_localization import localize_vacancy_description
 from .formatting import format_vacancy_card
 from .models import VacancyFilter
+from .publisher import send_vacancy_card
 from .sources import build_adapters, filter_it_vacancies, source_configuration_warnings
 from .sources.filter_queries import apply_filter_queries
 from .sources.filters import normalize_grades, normalize_specialties
@@ -18,6 +18,10 @@ from .sources.freshness import filter_fresh_vacancies
 from .storage import VacancyStore
 
 logger = logging.getLogger(__name__)
+
+# Pause before the next polling cycle when a whole cycle crashed, so a broken
+# dependency (Telegram outage, database error) does not turn into a hot loop.
+POLL_ERROR_BACKOFF_SECONDS = 60
 
 
 def utcnow() -> datetime:
@@ -87,14 +91,21 @@ async def poll_sources_once(bot: Bot, settings: Settings, store: VacancyStore) -
                     vacancy.source,
                 )
                 localized_vacancy = vacancy
-            await bot.send_message(
-                chat_id=settings.target_chat_id,
-                text=format_vacancy_card(localized_vacancy),
-                parse_mode=ParseMode.HTML,
-                disable_web_page_preview=True,
-            )
-            if store.mark_published(vacancy):
-                published += 1
+            # A single failed delivery (Telegram error after flood-control retries,
+            # formatting problem, storage error) must not abort the whole cycle:
+            # log it, leave the vacancy unpublished so the next poll retries it,
+            # and continue with the remaining vacancies.
+            try:
+                await send_vacancy_card(
+                    bot,
+                    settings.target_chat_id,
+                    format_vacancy_card(localized_vacancy),
+                )
+                if store.mark_published(vacancy):
+                    published += 1
+            except Exception:
+                logger.exception("%s: failed to publish %r", vacancy.source, vacancy.title)
+                continue
 
         logger.info("%s: fetched=%s published_total=%s", adapter.name, len(vacancies), published)
 
@@ -108,5 +119,14 @@ async def poll_sources_forever(bot: Bot, settings: Settings, store: VacancyStore
         return
 
     while True:
-        await poll_sources_once(bot, settings, store)
+        try:
+            await poll_sources_once(bot, settings, store)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            # Never let one broken cycle kill the background task: the bot would
+            # keep answering commands while silently publishing nothing.
+            logger.exception("Background source polling cycle failed; retrying after backoff")
+            await asyncio.sleep(min(interval, POLL_ERROR_BACKOFF_SECONDS))
+            continue
         await asyncio.sleep(interval)
