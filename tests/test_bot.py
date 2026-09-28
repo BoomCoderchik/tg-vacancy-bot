@@ -21,7 +21,7 @@ def test_build_status_text_does_not_expose_bot_token() -> None:
     assert "secret-token" not in text
     assert "Target chat: @target" in text
     assert "Forwarded mode: normalize" in text
-    assert "Operator allowlist: off" in text
+    assert "Operator allowlist: empty (publishing locked)" in text
     assert "Description localization: on" in text
     assert "LinkedInPosts=off" in text
     assert "LinkedInPostScraper=off" in text

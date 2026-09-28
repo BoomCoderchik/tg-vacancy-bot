@@ -13,7 +13,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
-from .access_control import is_authorized_user
+from .access_control import is_authorized_user, unauthorized_reply_text
 from .config import Settings
 from .description_localization import localize_vacancy_description
 from .formatting import format_vacancy_card
@@ -160,7 +160,7 @@ def build_status_text(settings: Settings, vacancy_filter: VacancyFilter | None =
             f"Forwarded mode: {settings.forwarded_mode}",
             f"Target chat: {settings.target_chat_id or 'not configured'}",
             f"Vacancy filter: {format_filter_text(vacancy_filter)}",
-            f"Operator allowlist: {'on' if settings.operator_user_ids else 'off'}",
+            f"Operator allowlist: {'on' if settings.operator_user_ids else 'empty (publishing locked)'}",
             f"Description localization: {'on' if settings.localize_descriptions else 'off'}",
             f"Source polling interval: {settings.source_poll_interval_seconds}s",
             "Sources: " + ", ".join(source_states),
@@ -396,7 +396,8 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
         if not _message_is_authorized(message, settings):
             await message.answer(
                 "Пришли или перешли мне вакансию. Я опубликую ее тебе в личку "
-                "как карточку или скопирую оригинал, в зависимости от FORWARDED_MODE."
+                "как карточку или скопирую оригинал, в зависимости от FORWARDED_MODE.\n\n"
+                + unauthorized_reply_text(settings.operator_user_ids)
             )
             return
         await state.clear()
@@ -423,14 +424,14 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
     @dp.message(Command("status"))
     async def status(message: Message) -> None:
         if not _message_is_authorized(message, settings):
-            await message.reply("Not authorized.")
+            await message.reply(unauthorized_reply_text(settings.operator_user_ids))
             return
         await message.answer(build_status_text(settings, store.get_vacancy_filter()))
 
     @dp.message(Command("filters"))
     async def filters_command(message: Message, state: FSMContext) -> None:
         if not _message_is_authorized(message, settings):
-            await message.reply("Not authorized.")
+            await message.reply(unauthorized_reply_text(settings.operator_user_ids))
             return
         await state.clear()
         current = store.get_vacancy_filter()
@@ -448,7 +449,7 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
     @dp.callback_query(FilterForm.specialty, F.data.startswith("fspec:"))
     async def filter_specialty_toggled(callback: CallbackQuery, state: FSMContext) -> None:
         if not _callback_is_authorized(callback, settings):
-            await callback.answer("Not authorized.", show_alert=True)
+            await callback.answer(unauthorized_reply_text(settings.operator_user_ids), show_alert=True)
             return
         specialty = (callback.data or "").removeprefix("fspec:").strip().lower()
         if specialty not in VALID_SPECIALTIES:
@@ -470,7 +471,7 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
     @dp.callback_query(FilterForm.specialty, F.data == "filter:next")
     async def filter_specialties_done(callback: CallbackQuery, state: FSMContext) -> None:
         if not _callback_is_authorized(callback, settings):
-            await callback.answer("Not authorized.", show_alert=True)
+            await callback.answer(unauthorized_reply_text(settings.operator_user_ids), show_alert=True)
             return
         data = await state.get_data()
         selected = [item for item in data.get("specialties", []) if item in VALID_SPECIALTIES]
@@ -488,7 +489,7 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
     @dp.callback_query(FilterForm.grade, F.data.startswith("fgrade:"))
     async def filter_grade_toggled(callback: CallbackQuery, state: FSMContext) -> None:
         if not _callback_is_authorized(callback, settings):
-            await callback.answer("Not authorized.", show_alert=True)
+            await callback.answer(unauthorized_reply_text(settings.operator_user_ids), show_alert=True)
             return
         grade = (callback.data or "").removeprefix("fgrade:").strip().lower()
         if grade not in VALID_GRADES:
@@ -510,7 +511,7 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
     @dp.callback_query(FilterForm.grade, F.data == "filter:back")
     async def filter_back_to_specialties(callback: CallbackQuery, state: FSMContext) -> None:
         if not _callback_is_authorized(callback, settings):
-            await callback.answer("Not authorized.", show_alert=True)
+            await callback.answer(unauthorized_reply_text(settings.operator_user_ids), show_alert=True)
             return
         data = await state.get_data()
         selected = [item for item in data.get("specialties", []) if item in VALID_SPECIALTIES]
@@ -524,7 +525,7 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
     @dp.callback_query(FilterForm.grade, F.data == "filter:next")
     async def filter_grades_done(callback: CallbackQuery, state: FSMContext) -> None:
         if not _callback_is_authorized(callback, settings):
-            await callback.answer("Not authorized.", show_alert=True)
+            await callback.answer(unauthorized_reply_text(settings.operator_user_ids), show_alert=True)
             return
         data = await state.get_data()
         selected_specialties = [item for item in data.get("specialties", []) if item in VALID_SPECIALTIES]
@@ -547,7 +548,7 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
     @dp.callback_query(FilterForm.confirm, F.data == "filter:confirm")
     async def filter_confirmed(callback: CallbackQuery, state: FSMContext) -> None:
         if not _callback_is_authorized(callback, settings):
-            await callback.answer("Not authorized.", show_alert=True)
+            await callback.answer(unauthorized_reply_text(settings.operator_user_ids), show_alert=True)
             return
         data = await state.get_data()
         try:
@@ -572,7 +573,7 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
     @dp.callback_query(FilterForm.confirm, F.data == "filter:restart")
     async def filter_restart(callback: CallbackQuery, state: FSMContext) -> None:
         if not _callback_is_authorized(callback, settings):
-            await callback.answer("Not authorized.", show_alert=True)
+            await callback.answer(unauthorized_reply_text(settings.operator_user_ids), show_alert=True)
             return
         data = await state.get_data()
         selected = [item for item in data.get("specialties", []) if item in VALID_SPECIALTIES]
@@ -591,7 +592,7 @@ def create_dispatcher(settings: Settings, store: VacancyStore) -> Dispatcher:
     @dp.message(F.text | F.caption)
     async def handle_message(message: Message, bot: Bot) -> None:
         if not _message_is_authorized(message, settings):
-            await message.reply("Not authorized.")
+            await message.reply(unauthorized_reply_text(settings.operator_user_ids))
             return
 
         active_filter = store.get_vacancy_filter()
@@ -700,6 +701,7 @@ async def run_bot(settings: Settings) -> None:
         dp = create_dispatcher(settings, store)
         asyncio.create_task(_sync_filter_on_startup(settings, store))
         polling_task = asyncio.create_task(poll_sources_forever(bot, settings, store))
+        polling_task.add_done_callback(_report_polling_task_exit)
 
         try:
             await dp.start_polling(bot)
@@ -714,6 +716,15 @@ async def run_bot(settings: Settings) -> None:
 
 def run_bot_sync(settings: Settings) -> None:
     asyncio.run(run_bot(settings))
+
+
+def _report_polling_task_exit(task: asyncio.Task) -> None:
+    """Make an unexpected end of the background polling task visible in logs."""
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is not None:
+        logger.error("Background source polling task stopped unexpectedly.", exc_info=exc)
 
 
 async def _sync_filter_on_startup(settings: Settings, store: VacancyStore) -> None:
