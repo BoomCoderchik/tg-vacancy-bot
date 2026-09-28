@@ -3,7 +3,7 @@ from html import escape
 from .models import Vacancy
 
 
-MAX_DESCRIPTION_CHARS = 1400
+MAX_DESCRIPTION_CHARS = 300
 
 
 def trim_text(text: str, max_chars: int) -> str:
