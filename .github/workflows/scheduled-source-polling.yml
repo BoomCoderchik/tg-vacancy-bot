@@ -28,6 +28,13 @@ jobs:
       SOURCE_POLL_INTERVAL_SECONDS: "0"
       SOURCE_MAX_PUBLISH_PER_POLL: ${{ secrets.SOURCE_MAX_PUBLISH_PER_POLL || '20' }}
       SOURCE_MAX_AGE_HOURS: ${{ secrets.SOURCE_MAX_AGE_HOURS || '48' }}
+      # Active filter chosen by the operator in /filters. The local bot pushes
+      # these GitHub Actions variables whenever /filters changes and once on
+      # startup, so the scheduled parser follows the stored filter instead of
+      # the built-in default. When the variables are empty, poll-once falls
+      # back to the default junior frontend/fullstack filter.
+      VACANCY_FILTER_SPECIALTIES: ${{ vars.VACANCY_FILTER_SPECIALTIES }}
+      VACANCY_FILTER_GRADES: ${{ vars.VACANCY_FILTER_GRADES }}
       ENABLE_LINKEDIN_POST_SEARCH: ${{ secrets.ENABLE_LINKEDIN_POST_SEARCH || 'false' }}
       SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
       LINKEDIN_POST_SEARCH_QUERY: ${{ secrets.LINKEDIN_POST_SEARCH_QUERY || '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR hiring OR "ищем" OR "ищет") ("junior frontend developer" OR "junior fullstack developer" OR frontend OR fullstack)' }}

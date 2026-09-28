@@ -71,6 +71,9 @@ def test_poll_sources_workflow_defaults_optional_runtime_values() -> None:
 
     assert "SOURCE_MAX_PUBLISH_PER_POLL: ${{ secrets.SOURCE_MAX_PUBLISH_PER_POLL || '20' }}" in text
     assert "SOURCE_MAX_AGE_HOURS: ${{ secrets.SOURCE_MAX_AGE_HOURS || '48' }}" in text
+    # The single scheduled pipeline must follow /filters through repo variables.
+    assert "VACANCY_FILTER_SPECIALTIES: ${{ vars.VACANCY_FILTER_SPECIALTIES }}" in text
+    assert "VACANCY_FILTER_GRADES: ${{ vars.VACANCY_FILTER_GRADES }}" in text
     assert 'LOCALIZE_DESCRIPTIONS: "true"' in text
     assert "LOCALIZATION_PROVIDER: ${{ secrets.LOCALIZATION_PROVIDER || 'groq' }}" in text
     assert "GROQ_MODEL: ${{ secrets.GROQ_MODEL || 'openai/gpt-oss-120b' }}" in text
