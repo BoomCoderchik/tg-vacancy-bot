@@ -31,3 +31,19 @@ def test_format_vacancy_card_contains_expected_sections() -> None:
     assert "📍 <b>Локация</b>: Remote" in card
     assert "🧠 <b>Стек</b>: Python, FastAPI" in card
     assert 'href="https://t.me/example/1"' in card
+
+
+def test_format_vacancy_card_trims_long_description() -> None:
+    card = format_vacancy_card(
+        Vacancy(
+            title="Junior Frontend Developer",
+            description="We are hiring. " * 100,
+            source="LinkedIn Hiring Posts (Apify)",
+        )
+    )
+
+    assert "Описание" in card
+    lines = card.splitlines()
+    description_line = lines[lines.index("<b>Описание</b>") + 1]
+    assert len(description_line) <= 310
+    assert description_line.endswith("...")
