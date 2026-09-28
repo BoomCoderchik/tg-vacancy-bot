@@ -357,15 +357,9 @@ tg-vacancy-bot poll-once
 This repository includes `.github/workflows/scheduled-source-polling.yml`, which runs
 `tg-vacancy-bot poll-once` on GitHub Actions every 15 minutes. This lets new
 source vacancies be parsed and published to Telegram even when your local
-server or laptop is off.
-
-### Scheduled parsing into the bot's private chat
-
-`.github/workflows/scheduled-bot-polling.yml` runs the same parser every 15
-minutes and publishes the filtered vacancies to the operator's private chat
-with the bot — that is, exactly "into the bot" itself. It uses its own SQLite
-deduplication cache, so it does not double-post from the channel scheduler's
-state.
+server or laptop is off. This is the single scheduled pipeline: it publishes
+to the same `TARGET_CHAT_ID` channel as the local bot and keeps its SQLite
+deduplication database in the GitHub Actions cache.
 
 Two pieces keep this pipeline following your filter:
 
@@ -379,20 +373,14 @@ Two pieces keep this pipeline following your filter:
   `git remote origin`. An optional `GITHUB_FILTER_SYNC_TOKEN` (fine-grained PAT,
   **Actions > Variables: Read and write**) is only an alternative for machines
   without a usable `gh` session. Credentials are never committed or logged.
-- **A dedicated target.** The bot-target workflow publishes through the
-  `BOT_TARGET_CHAT_ID` repository secret. Set it to the same numeric Telegram
-  user ID you already use as the local bot's `TARGET_CHAT_ID` (your private
-  chat). Until that secret exists, the workflow reports the missing
-  `TARGET_CHAT_ID` and does not publish.
-
-The workflow also passes `VACANCY_FILTER_SPECIALTIES`/`VACANCY_FILTER_GRADES`
-as an environment override, which `poll-once` uses instead of a stored SQLite
-filter. When the variables are empty, it falls back to the default
-junior frontend/fullstack filter. Use the separate cache key
-(`vacancy-bot-db-`) so channel and bot-target schedules never share dedup state.
+- **Environment override.** The workflow passes
+  `VACANCY_FILTER_SPECIALTIES`/`VACANCY_FILTER_GRADES` as an environment
+  override, which `poll-once` uses instead of a stored SQLite filter. When the
+  variables are empty, it falls back to the default junior frontend/fullstack
+  filter.
 
 The buffer and publication limits still apply per run: `SOURCE_MAX_PUBLISH_PER_POLL`
-(default 20) caps each poll, and the per-target deduplication database is kept
+(default 20) caps each poll, and the deduplication database is kept
 in the GitHub Actions cache.
 
 Configure the required repository secrets in GitHub before enabling production

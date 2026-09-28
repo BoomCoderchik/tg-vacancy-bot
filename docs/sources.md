@@ -34,7 +34,7 @@ vacancies that follow the operator's `/filters` selection.
   - Keeps only posts whose body contains both a hiring signal and a supported development role.
 
 - `LinkedInPostGuestAdapter`
-  - Off by default for the bot-target pipeline; opt-in with `ENABLE_LINKEDIN_POST_GUEST=true`.
+  - Opt-in with `ENABLE_LINKEDIN_POST_GUEST=true`.
   - Discovers public post URLs through the same free public search providers as the scraper (Bing RSS, DuckDuckGo HTML, Bing HTML, DuckDuckGo Lite, Mojeek), then reads each post's own public linkedin.com page through ordinary guest HTTP; no account, key, browser, or protection bypass is involved.
   - Queries are built from the active `/filters` selection (specialties × grades, Russian and English) when `LINKEDIN_POST_GUEST_QUERY` is empty; a manual `||`-separated query always wins.
   - Reads the real post text and derives the publication date from the post's activity ID, keeping only posts within the common freshness window; when a post's guest page is behind a login wall, the still real, dated public search result that discovered the link is published instead.
