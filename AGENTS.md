@@ -25,6 +25,14 @@ Follow `docs/multi-agent-workflow.md` for large session-like tasks. The lead
 agent may start up to four specialist AI agents, each with a bounded role,
 shared context, explicit outputs, and final reconciliation by the lead agent.
 
+## Skills
+
+At session start, load the `habr-top50` skill router from
+`.opencode/skills/habr-top50/SKILL.md` and keep its routing table in mind.
+When a user task matches a router entry, propose the matching external skill
+(installation is opt-in: show the command, never run `npx skills add` without
+explicit user approval and a repo review per Owner-Approved rules above).
+
 ## GitFlow
 
 This project uses an adapted GitFlow process. `main` contains production-ready
