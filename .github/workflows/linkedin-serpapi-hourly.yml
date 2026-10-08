@@ -1,0 +1,92 @@
+name: LinkedIn hiring posts (SerpApi hourly)
+
+# LinkedIn discovery/reading is blocked for GitHub-hosted runners: their
+# datacenter IPs get zero results from Bing/DuckDuckGo/Mojeek and a signup
+# wall from linkedin.com itself (see issues #19-#21). The keyed SerpApi
+# adapter searches Google on SerpApi's side and builds the vacancy from the
+# search-result snippet plus the post date, so the runner IP does not matter.
+# This workflow is the only LinkedIn source in GitHub Actions and runs once
+# an hour to keep SerpApi usage low (1 request per run; the free tier is
+# 100 requests/month, paid is about $1-2 per 1000 requests).
+
+on:
+  schedule:
+    - cron: "13 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: poll-linkedin-serpapi
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TARGET_CHAT_ID: ${{ secrets.TARGET_CHAT_ID }}
+      OPERATOR_USER_IDS: ${{ secrets.OPERATOR_USER_IDS }}
+      DATABASE_PATH: data/vacancies.sqlite3
+      SOURCE_POLL_INTERVAL_SECONDS: "0"
+      SOURCE_MAX_PUBLISH_PER_POLL: ${{ secrets.SOURCE_MAX_PUBLISH_PER_POLL || '20' }}
+      SOURCE_MAX_AGE_HOURS: ${{ secrets.SOURCE_MAX_AGE_HOURS || '48' }}
+      # Follows the operator's active /filters selection, same as the main poll.
+      VACANCY_FILTER_SPECIALTIES: ${{ vars.VACANCY_FILTER_SPECIALTIES }}
+      VACANCY_FILTER_GRADES: ${{ vars.VACANCY_FILTER_GRADES }}
+      # Keyed SerpApi search: the only enabled source in this workflow.
+      ENABLE_LINKEDIN_POST_SEARCH: ${{ secrets.ENABLE_LINKEDIN_POST_SEARCH || 'true' }}
+      SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
+      LINKEDIN_POST_SEARCH_QUERY: ${{ secrets.LINKEDIN_POST_SEARCH_QUERY || '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR hiring OR "ищем" OR "ищет") ("junior frontend developer" OR "junior fullstack developer" OR frontend OR fullstack)' }}
+      LINKEDIN_POST_SEARCH_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SEARCH_RESULTS_WANTED || '10' }}
+      LINKEDIN_POST_MAX_AGE_HOURS: ${{ secrets.LINKEDIN_POST_MAX_AGE_HOURS || '240' }}
+      # Source vacancies always pass through localization before publication.
+      LOCALIZE_DESCRIPTIONS: "true"
+      LOCALIZATION_PROVIDER: ${{ secrets.LOCALIZATION_PROVIDER || 'groq' }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || 'gpt-4.1-mini' }}
+      OPENAI_FALLBACK_MODELS: ${{ secrets.OPENAI_FALLBACK_MODELS }}
+      OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      GROQ_MODEL: ${{ secrets.GROQ_MODEL || 'openai/gpt-oss-120b' }}
+      GROQ_FALLBACK_MODELS: ${{ secrets.GROQ_FALLBACK_MODELS || 'openai/gpt-oss-20b' }}
+      # Every other source stays off here; they run in the scheduled
+      # source-polling workflow. The keyless LinkedIn adapters are disabled
+      # because datacenter IPs get no search results and a login wall.
+      ENABLE_LINKEDIN_POST_SCRAPER: "false"
+      ENABLE_LINKEDIN_POST_GUEST: "false"
+      ENABLE_LINKEDIN_POST_APIFY: "false"
+      ENABLE_LINKEDIN_POST_HEADLESS: "false"
+      ENABLE_RUSSIA_SEARCH: "false"
+      ENABLE_RUSSIA_TELEGRAM: "false"
+      ENABLE_HHRU_RSS: "false"
+      ENABLE_HH_API: "false"
+      ENABLE_HABR_API: "false"
+      ENABLE_SUPERJOB_API: "false"
+      ENABLE_TRUDVSEM_API: "false"
+      ENABLE_ZP_API: "false"
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      # Same cache key prefix as scheduled-source-polling.yml, so both
+      # workflows share one deduplication database.
+      - name: Restore deduplication database
+        uses: actions/cache@v5
+        with:
+          path: data/
+          key: vacancy-db-${{ github.run_id }}
+          restore-keys: |
+            vacancy-db-
+
+      - name: Install bot
+        run: pip install .
+
+      - name: Poll LinkedIn via SerpApi and publish new vacancies
+        run: python -m tg_vacancy_bot.app poll-once
