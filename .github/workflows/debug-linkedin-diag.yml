@@ -1,6 +1,11 @@
 name: DEBUG LinkedIn diagnosis (temporary)
 
 on:
+  push:
+    branches:
+      - arena/2973d93c-tg-vacancy-bot
+    paths:
+      - ".github/workflows/debug-linkedin-diag.yml"
   workflow_dispatch:
 
 permissions:
