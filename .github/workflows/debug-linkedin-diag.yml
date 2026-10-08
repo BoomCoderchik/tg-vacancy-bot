@@ -31,7 +31,7 @@ jobs:
       SOURCE_MAX_AGE_HOURS: ${{ secrets.SOURCE_MAX_AGE_HOURS || '48' }}
       VACANCY_FILTER_SPECIALTIES: ${{ vars.VACANCY_FILTER_SPECIALTIES }}
       VACANCY_FILTER_GRADES: ${{ vars.VACANCY_FILTER_GRADES }}
-      ENABLE_LINKEDIN_POST_SEARCH: ${{ secrets.ENABLE_LINKEDIN_POST_SEARCH || 'false' }}
+      ENABLE_LINKEDIN_POST_SEARCH: "true"
       SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
       LINKEDIN_POST_SEARCH_QUERY: ${{ secrets.LINKEDIN_POST_SEARCH_QUERY || '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR hiring OR "ищем" OR "ищет") ("junior frontend developer" OR "junior fullstack developer" OR frontend OR fullstack)' }}
       LINKEDIN_POST_SEARCH_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SEARCH_RESULTS_WANTED || '10' }}
@@ -115,6 +115,9 @@ jobs:
             echo
             echo "=== diagnose-linkedin (default profile) ==="
             python -m tg_vacancy_bot.app diagnose-linkedin --use-default-profile --limit 10 --show-limit 5 2>&1 || true
+            echo
+            echo "=== preview-sources: SerpApi LinkedIn adapter (forced on) ==="
+            python -m tg_vacancy_bot.app preview-sources --source "LinkedIn Hiring Posts" --limit 10 2>&1 || true
             echo
             echo "=== raw network probes from this runner ==="
             UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
