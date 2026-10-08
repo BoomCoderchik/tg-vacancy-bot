@@ -1,0 +1,145 @@
+name: DEBUG LinkedIn diagnosis (temporary)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: debug-linkedin-diag
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TARGET_CHAT_ID: ${{ secrets.TARGET_CHAT_ID }}
+      OPERATOR_USER_IDS: ${{ secrets.OPERATOR_USER_IDS }}
+      FORWARDED_MODE: normalize
+      DATABASE_PATH: data/vacancies.sqlite3
+      SOURCE_POLL_INTERVAL_SECONDS: "0"
+      SOURCE_MAX_PUBLISH_PER_POLL: ${{ secrets.SOURCE_MAX_PUBLISH_PER_POLL || '20' }}
+      SOURCE_MAX_AGE_HOURS: ${{ secrets.SOURCE_MAX_AGE_HOURS || '48' }}
+      VACANCY_FILTER_SPECIALTIES: ${{ vars.VACANCY_FILTER_SPECIALTIES }}
+      VACANCY_FILTER_GRADES: ${{ vars.VACANCY_FILTER_GRADES }}
+      ENABLE_LINKEDIN_POST_SEARCH: ${{ secrets.ENABLE_LINKEDIN_POST_SEARCH || 'false' }}
+      SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
+      LINKEDIN_POST_SEARCH_QUERY: ${{ secrets.LINKEDIN_POST_SEARCH_QUERY || '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR hiring OR "ищем" OR "ищет") ("junior frontend developer" OR "junior fullstack developer" OR frontend OR fullstack)' }}
+      LINKEDIN_POST_SEARCH_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SEARCH_RESULTS_WANTED || '10' }}
+      ENABLE_LINKEDIN_POST_SCRAPER: ${{ secrets.ENABLE_LINKEDIN_POST_SCRAPER || 'false' }}
+      LINKEDIN_POST_SCRAPER_QUERY: ${{ secrets.LINKEDIN_POST_SCRAPER_QUERY || '(site:linkedin.com/posts OR site:linkedin.com/feed/update) ("we are hiring" OR hiring OR "ищем" OR "ищет") ("junior frontend developer" OR "junior fullstack developer" OR frontend OR fullstack)' }}
+      LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS: ${{ secrets.LINKEDIN_POST_SCRAPER_SEARCH_PROVIDERS || 'bing_rss,duckduckgo,bing,duckduckgo_lite,mojeek' }}
+      LINKEDIN_POST_SCRAPER_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_SCRAPER_RESULTS_WANTED || '100' }}
+      ENABLE_LINKEDIN_POST_APIFY: ${{ secrets.ENABLE_LINKEDIN_POST_APIFY || 'false' }}
+      APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
+      ENABLE_LINKEDIN_POST_GUEST: ${{ secrets.ENABLE_LINKEDIN_POST_GUEST || 'true' }}
+      LINKEDIN_POST_GUEST_QUERY: ${{ secrets.LINKEDIN_POST_GUEST_QUERY }}
+      LINKEDIN_POST_GUEST_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_GUEST_RESULTS_WANTED || '30' }}
+      ENABLE_RUSSIA_SEARCH: ${{ secrets.ENABLE_RUSSIA_SEARCH || 'false' }}
+      RUSSIA_SEARCH_RESULTS_WANTED: ${{ secrets.RUSSIA_SEARCH_RESULTS_WANTED || '50' }}
+      RUSSIA_SEARCH_QUERY: ${{ secrets.RUSSIA_SEARCH_QUERY }}
+      RUSSIA_SEARCH_PROVIDERS: ${{ secrets.RUSSIA_SEARCH_PROVIDERS || 'bing_rss,duckduckgo,bing,duckduckgo_lite,mojeek' }}
+      ENABLE_RUSSIA_TELEGRAM: ${{ secrets.ENABLE_RUSSIA_TELEGRAM || 'true' }}
+      RUSSIA_TELEGRAM_CHANNELS: ${{ secrets.RUSSIA_TELEGRAM_CHANNELS || 'itvacancy,it_vacancy,vakansii_it,superjob_it,itjobs_ru,vakansii,remote_it,webdev_jobs,rabota_russia,it_vacancy_ru,frontend_vacancy' }}
+      RUSSIA_TELEGRAM_MAX_POSTS_PER_CHANNEL: ${{ secrets.RUSSIA_TELEGRAM_MAX_POSTS_PER_CHANNEL || '20' }}
+      ENABLE_HHRU_RSS: ${{ secrets.ENABLE_HHRU_RSS || 'true' }}
+      HHRU_RSS_QUERY: ${{ secrets.HHRU_RSS_QUERY }}
+      HHRU_RSS_RESULTS_WANTED: ${{ secrets.HHRU_RSS_RESULTS_WANTED || '40' }}
+      ENABLE_HH_API: ${{ secrets.ENABLE_HH_API || 'false' }}
+      HH_API_CONTACT_EMAIL: ${{ secrets.HH_API_CONTACT_EMAIL }}
+      HH_API_QUERY: ${{ secrets.HH_API_QUERY }}
+      HH_API_RESULTS_WANTED: ${{ secrets.HH_API_RESULTS_WANTED || '40' }}
+      ENABLE_HABR_API: ${{ secrets.ENABLE_HABR_API || 'false' }}
+      HABR_API_QUERY: ${{ secrets.HABR_API_QUERY }}
+      HABR_API_RESULTS_WANTED: ${{ secrets.HABR_API_RESULTS_WANTED || '40' }}
+      ENABLE_SUPERJOB_API: ${{ secrets.ENABLE_SUPERJOB_API || 'false' }}
+      SUPERJOB_API_KEY: ${{ secrets.SUPERJOB_API_KEY }}
+      SUPERJOB_API_QUERY: ${{ secrets.SUPERJOB_API_QUERY }}
+      SUPERJOB_API_RESULTS_WANTED: ${{ secrets.SUPERJOB_API_RESULTS_WANTED || '40' }}
+      ENABLE_TRUDVSEM_API: ${{ secrets.ENABLE_TRUDVSEM_API || 'false' }}
+      TRUDVSEM_API_QUERY: ${{ secrets.TRUDVSEM_API_QUERY }}
+      TRUDVSEM_API_RESULTS_WANTED: ${{ secrets.TRUDVSEM_API_RESULTS_WANTED || '40' }}
+      ENABLE_ZP_API: ${{ secrets.ENABLE_ZP_API || 'false' }}
+      ZP_API_QUERY: ${{ secrets.ZP_API_QUERY }}
+      ZP_API_RESULTS_WANTED: ${{ secrets.ZP_API_RESULTS_WANTED || '40' }}
+      LINKEDIN_POST_APIFY_ACTOR: ${{ secrets.LINKEDIN_POST_APIFY_ACTOR || 'harvestapi/linkedin-post-search' }}
+      LINKEDIN_POST_APIFY_SEARCH_QUERIES: ${{ secrets.LINKEDIN_POST_APIFY_SEARCH_QUERIES }}
+      LINKEDIN_POST_APIFY_POSTED_LIMIT: ${{ secrets.LINKEDIN_POST_APIFY_POSTED_LIMIT || '24h' }}
+      LINKEDIN_POST_APIFY_MAX_POSTS: ${{ secrets.LINKEDIN_POST_APIFY_MAX_POSTS || '25' }}
+      LINKEDIN_POST_APIFY_TIMEOUT_SECONDS: ${{ secrets.LINKEDIN_POST_APIFY_TIMEOUT_SECONDS || '240' }}
+      ENABLE_LINKEDIN_POST_HEADLESS: ${{ secrets.ENABLE_LINKEDIN_POST_HEADLESS || 'false' }}
+      LINKEDIN_HEADLESS_ACCESS_AUTHORIZED: ${{ secrets.LINKEDIN_HEADLESS_ACCESS_AUTHORIZED || 'false' }}
+      LINKEDIN_HEADLESS_PERMISSION_REFERENCE: ${{ secrets.LINKEDIN_HEADLESS_PERMISSION_REFERENCE }}
+      LINKEDIN_POST_HEADLESS_QUERY: ${{ secrets.LINKEDIN_POST_HEADLESS_QUERY }}
+      LINKEDIN_POST_HEADLESS_RESULTS_WANTED: ${{ secrets.LINKEDIN_POST_HEADLESS_RESULTS_WANTED || '10' }}
+      LINKEDIN_POST_SEARCH_INTENTS_PER_CYCLE: ${{ secrets.LINKEDIN_POST_SEARCH_INTENTS_PER_CYCLE || '6' }}
+      LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS: ${{ secrets.LINKEDIN_POST_HEADLESS_TIMEOUT_SECONDS || '20' }}
+      LOCALIZE_DESCRIPTIONS: "false"
+      LINKEDIN_POST_MAX_AGE_HOURS: ${{ secrets.LINKEDIN_POST_MAX_AGE_HOURS || '240' }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install bot
+        run: pip install .
+
+      - name: Collect diagnostics
+        run: |
+          set +e
+          {
+            echo "=== date (UTC): $(date -u) ==="
+            echo "=== runner public IP ==="
+            curl -s https://api.ipify.org || true
+            echo
+            echo "=== effective env (LinkedIn-related, secrets masked) ==="
+            env | grep -E "^(ENABLE_|LINKEDIN_|SERPAPI|APIFY|RUSSIA_|HHRU|HH_|HABR|SUPERJOB|TRUDVSEM|ZP_|SOURCE_|VACANCY_)" | sed -E 's/(TOKEN|KEY|QUERY)=.*/\1=<set>/' | sort
+            echo
+            echo "=== check-sources ==="
+            python -m tg_vacancy_bot.app check-sources 2>&1 || true
+            echo
+            echo "=== preview-sources (all configured adapters) ==="
+            python -m tg_vacancy_bot.app preview-sources --limit 5 2>&1 || true
+            echo
+            echo "=== diagnose-linkedin (default profile) ==="
+            python -m tg_vacancy_bot.app diagnose-linkedin --use-default-profile --limit 10 --show-limit 5 2>&1 || true
+            echo
+            echo "=== raw network probes from this runner ==="
+            UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+            echo "--- bing rss status:"
+            curl -s -o /tmp/bing_rss.xml -w "%{http_code}\n" "https://www.bing.com/search?format=rss&q=site%3Alinkedin.com%2Fposts+hiring+frontend" || true
+            echo "--- bing rss first 400 bytes:"
+            head -c 400 /tmp/bing_rss.xml 2>/dev/null || true
+            echo
+            echo "--- duckduckgo html status:"
+            curl -s -o /tmp/ddg.html -w "%{http_code}\n" -A "$UA" "https://html.duckduckgo.com/html/?q=site%3Alinkedin.com%2Fposts+hiring+frontend" || true
+            echo "--- ddg html size: $(wc -c < /tmp/ddg.html 2>/dev/null || echo 0)"
+            echo "--- bing html status:"
+            curl -s -o /tmp/bing.html -w "%{http_code}\n" -A "$UA" "https://www.bing.com/search?q=site%3Alinkedin.com%2Fposts+hiring+frontend" || true
+            echo "--- bing html size: $(wc -c < /tmp/bing.html 2>/dev/null || echo 0)"
+            echo "--- linkedin guest feed-update probe (status + redirect):"
+            curl -s -o /tmp/li.html -w "%{http_code} redirect=%{redirect_url}\n" -A "$UA" "https://www.linkedin.com/feed/update/urn:li:activity:7382000000000000000/" || true
+            echo "--- linkedin probe page size: $(wc -c < /tmp/li.html 2>/dev/null || echo 0)"
+            echo "--- linkedin probe: login-wall markers:"
+            grep -o -i -m 5 "authwall\|sign in\|login\|challenge" /tmp/li.html 2>/dev/null | sort | uniq -c || true
+          } > diag_report.txt 2>&1
+          cat diag_report.txt
+
+      - name: Report to GitHub issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          TITLE="DEBUG LinkedIn diagnosis $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          if [ -s diag_report.txt ]; then
+            gh issue create --repo BoomCoderchik/tg-vacancy-bot --title "$TITLE" --body-file diag_report.txt
+          else
+            gh issue create --repo BoomCoderchik/tg-vacancy-bot --title "$TITLE" --body "diag_report.txt is empty"
+          fi
