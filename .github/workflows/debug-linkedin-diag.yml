@@ -137,6 +137,13 @@ jobs:
             echo "--- linkedin probe page size: $(wc -c < /tmp/li.html 2>/dev/null || echo 0)"
             echo "--- linkedin probe: login-wall markers:"
             grep -o -i -m 5 "authwall\|sign in\|login\|challenge" /tmp/li.html 2>/dev/null | sort | uniq -c || true
+            echo "--- google news rss probe (free DC-friendly source?):"
+            curl -s -o /tmp/gn.xml -w "%{http_code}\n" "https://news.google.com/rss/search?q=site%3Alinkedin.com%2Fposts%20hiring%20frontend&hl=ru&gl=RU&ceid=RU:ru" || true
+            echo "--- google news rss item count: $(grep -c '<item>' /tmp/gn.xml 2>/dev/null || echo 0)"
+            echo "--- secret lengths (values never printed):"
+            echo "SERPAPI_API_KEY length: ${#SERPAPI_API_KEY}"
+            echo "APIFY_API_TOKEN length: ${#APIFY_API_TOKEN}"
+            echo "TELEGRAM_BOT_TOKEN length: ${#TELEGRAM_BOT_TOKEN}"
           } > diag_report.txt 2>&1
           cat diag_report.txt
 
